@@ -1092,7 +1092,26 @@ class Handler(http.server.SimpleHTTPRequestHandler):
                 except:
                     pass
             self.send_json({"engines": engines})
-        
+
+        # AI Configuration endpoints (GET)
+        elif path == '/api/ai/config':
+            # Get current AI configuration
+            config_to_send = ai_config.copy()
+            # Don't send full API keys, just indicate if they're set
+            if config_to_send.get("openai_api_key"):
+                config_to_send["openai_api_key_set"] = True
+                config_to_send["openai_api_key"] = config_to_send["openai_api_key"][:8] + "..." if len(config_to_send["openai_api_key"]) > 8 else "***"
+            if config_to_send.get("custom_api_key"):
+                config_to_send["custom_api_key_set"] = True
+                config_to_send["custom_api_key"] = "***"
+
+            config_to_send["available"] = OPENAI_AVAILABLE
+            config_to_send["active"] = openai_client is not None
+            config_to_send["is_local"] = is_ai_local()
+            config_to_send["model"] = get_ai_model()
+
+            self.send_json(config_to_send)
+
         else:
             super().do_GET()
     
@@ -1355,25 +1374,7 @@ class Handler(http.server.SimpleHTTPRequestHandler):
             # This would need audio recording - for now just return the session
             self.send_json({"status": "ok", "message": "Reprocessing requires audio recording"})
 
-        # AI Configuration endpoints
-        elif path == '/api/ai/config':
-            # Get current AI configuration
-            config_to_send = ai_config.copy()
-            # Don't send full API keys, just indicate if they're set
-            if config_to_send.get("openai_api_key"):
-                config_to_send["openai_api_key_set"] = True
-                config_to_send["openai_api_key"] = config_to_send["openai_api_key"][:8] + "..." if len(config_to_send["openai_api_key"]) > 8 else "***"
-            if config_to_send.get("custom_api_key"):
-                config_to_send["custom_api_key_set"] = True
-                config_to_send["custom_api_key"] = "***"
-
-            config_to_send["available"] = OPENAI_AVAILABLE
-            config_to_send["active"] = openai_client is not None
-            config_to_send["is_local"] = is_ai_local()
-            config_to_send["model"] = get_ai_model()
-
-            self.send_json(config_to_send)
-
+        # AI Configuration endpoints (POST)
         elif path == '/api/ai/config/update':
             # Update AI configuration
             new_config = data
