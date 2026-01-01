@@ -1606,8 +1606,115 @@
     <script type="text/babel">
         const { useState, useEffect, useRef } = React;
 
+        // Translation dictionary
+        const translations = {
+            en: {
+                // Header
+                'AI for Accessibility': 'AI for Accessibility',
+                'Professional live captioning for community media. Zero cost. Powered by AI + Human intelligence.': 'Professional live captioning for community media. Zero cost. Powered by AI + Human intelligence.',
+                'Open Control Dashboard': 'Open Control Dashboard',
+                'Learn More': 'Learn More',
+                'AI Settings': 'AI Settings',
+                // Dashboard
+                'Control Dashboard': 'Control Dashboard',
+                'Back to Home': 'Back to Home',
+                'Configure Engine': 'Configure Engine',
+                'Upload Engine': 'Upload Engine',
+                'Live Preview': 'Live Preview',
+                'Captioning Mode': 'Captioning Mode',
+                'Browser Speech': 'Browser Speech',
+                'Whisper AI': 'Whisper AI',
+                'Start Browser Captions': 'Start Browser Captions',
+                'Stop Browser Captions': 'Stop Browser Captions',
+                'AI Caption Engine': 'AI Caption Engine',
+                'Engine Active': 'Engine Active',
+                'Engine Disabled': 'Engine Disabled',
+                'Total Terms': 'Total Terms',
+                'Corrections Made': 'Corrections Made',
+                'Engine Status': 'Engine Status',
+            },
+            es: {
+                // Header
+                'AI for Accessibility': 'IA para Accesibilidad',
+                'Professional live captioning for community media. Zero cost. Powered by AI + Human intelligence.': 'Subtitulado en vivo profesional para medios comunitarios. Costo cero. Impulsado por IA + inteligencia humana.',
+                'Open Control Dashboard': 'Abrir Panel de Control',
+                'Learn More': 'Más Información',
+                'AI Settings': 'Configuración de IA',
+                // Dashboard
+                'Control Dashboard': 'Panel de Control',
+                'Back to Home': 'Volver al Inicio',
+                'Configure Engine': 'Configurar Motor',
+                'Upload Engine': 'Cargar Motor',
+                'Live Preview': 'Vista Previa en Vivo',
+                'Captioning Mode': 'Modo de Subtitulado',
+                'Browser Speech': 'Voz del Navegador',
+                'Whisper AI': 'Whisper IA',
+                'Start Browser Captions': 'Iniciar Subtítulos del Navegador',
+                'Stop Browser Captions': 'Detener Subtítulos del Navegador',
+                'AI Caption Engine': 'Motor de Subtítulos IA',
+                'Engine Active': 'Motor Activo',
+                'Engine Disabled': 'Motor Deshabilitado',
+                'Total Terms': 'Términos Totales',
+                'Corrections Made': 'Correcciones Realizadas',
+                'Engine Status': 'Estado del Motor',
+            },
+            pt: {
+                // Header
+                'AI for Accessibility': 'IA para Acessibilidade',
+                'Professional live captioning for community media. Zero cost. Powered by AI + Human intelligence.': 'Legendagem ao vivo profissional para mídia comunitária. Custo zero. Alimentado por IA + inteligência humana.',
+                'Open Control Dashboard': 'Abrir Painel de Controle',
+                'Learn More': 'Saiba Mais',
+                'AI Settings': 'Configurações de IA',
+                // Dashboard
+                'Control Dashboard': 'Painel de Controle',
+                'Back to Home': 'Voltar ao Início',
+                'Configure Engine': 'Configurar Motor',
+                'Upload Engine': 'Carregar Motor',
+                'Live Preview': 'Visualização ao Vivo',
+                'Captioning Mode': 'Modo de Legendagem',
+                'Browser Speech': 'Fala do Navegador',
+                'Whisper AI': 'Whisper IA',
+                'Start Browser Captions': 'Iniciar Legendas do Navegador',
+                'Stop Browser Captions': 'Parar Legendas do Navegador',
+                'AI Caption Engine': 'Motor de Legendas IA',
+                'Engine Active': 'Motor Ativo',
+                'Engine Disabled': 'Motor Desativado',
+                'Total Terms': 'Termos Totais',
+                'Corrections Made': 'Correções Feitas',
+                'Engine Status': 'Status do Motor',
+            },
+            fr: {
+                // Header
+                'AI for Accessibility': 'IA pour l\'Accessibilité',
+                'Professional live captioning for community media. Zero cost. Powered by AI + Human intelligence.': 'Sous-titrage en direct professionnel pour les médias communautaires. Coût zéro. Alimenté par l\'IA + intelligence humaine.',
+                'Open Control Dashboard': 'Ouvrir le Tableau de Bord',
+                'Learn More': 'En Savoir Plus',
+                'AI Settings': 'Paramètres IA',
+                // Dashboard
+                'Control Dashboard': 'Tableau de Bord',
+                'Back to Home': 'Retour à l\'Accueil',
+                'Configure Engine': 'Configurer le Moteur',
+                'Upload Engine': 'Télécharger le Moteur',
+                'Live Preview': 'Aperçu en Direct',
+                'Captioning Mode': 'Mode de Sous-titrage',
+                'Browser Speech': 'Voix du Navigateur',
+                'Whisper AI': 'Whisper IA',
+                'Start Browser Captions': 'Démarrer les Sous-titres du Navigateur',
+                'Stop Browser Captions': 'Arrêter les Sous-titres du Navigateur',
+                'AI Caption Engine': 'Moteur de Sous-titres IA',
+                'Engine Active': 'Moteur Actif',
+                'Engine Disabled': 'Moteur Désactivé',
+                'Total Terms': 'Termes Totaux',
+                'Corrections Made': 'Corrections Effectuées',
+                'Engine Status': 'État du Moteur',
+            }
+        };
+
         function App() {
             const [view, setView] = useState('landing');
+            const [language, setLanguage] = useState('en');
+
+            const t = (key) => translations[language][key] || key;
 
             const startDashboard = () => setView('dashboard');
             const startEngineWizard = () => setView('engine-wizard');
@@ -1620,23 +1727,47 @@
                     onStartEngine={startEngineWizard}
                     onShowAbout={showAbout}
                     onShowAISettings={showAISettings}
+                    language={language}
+                    setLanguage={setLanguage}
+                    t={t}
                 />;
             }
 
             if (view === 'dashboard') {
-                return <Dashboard onBack={() => setView('landing')} onConfigureEngine={startEngineWizard} />;
+                return <Dashboard
+                    onBack={() => setView('landing')}
+                    onConfigureEngine={startEngineWizard}
+                    language={language}
+                    setLanguage={setLanguage}
+                    t={t}
+                />;
             }
 
             if (view === 'engine-wizard') {
-                return <EngineWizard onBack={() => setView('landing')} />;
+                return <EngineWizard
+                    onBack={() => setView('landing')}
+                    language={language}
+                    setLanguage={setLanguage}
+                    t={t}
+                />;
             }
 
             if (view === 'about') {
-                return <AboutPage onBack={() => setView('landing')} />;
+                return <AboutPage
+                    onBack={() => setView('landing')}
+                    language={language}
+                    setLanguage={setLanguage}
+                    t={t}
+                />;
             }
 
             if (view === 'ai-settings') {
-                return <AISettings onBack={() => setView('landing')} />;
+                return <AISettings
+                    onBack={() => setView('landing')}
+                    language={language}
+                    setLanguage={setLanguage}
+                    t={t}
+                />;
             }
         }
 
@@ -1751,7 +1882,7 @@
             );
         }
 
-        function LandingPage({ onStartDashboard, onStartEngine, onShowAbout, onShowAISettings }) {
+        function LandingPage({ onStartDashboard, onStartEngine, onShowAbout, onShowAISettings, language, setLanguage, t }) {
             return (
                 <div className="landing-page">
                     <div className="blob-container">
@@ -1773,44 +1904,67 @@
                                 <span className="badge-tag">Open Source Captioning for Community Media</span>
                             </div>
                         </div>
-                        <button
-                            onClick={onShowAISettings}
-                            style={{
-                                padding: '8px 16px',
-                                background: 'var(--sage-primary)',
-                                color: 'white',
-                                border: 'none',
-                                borderRadius: '8px',
-                                cursor: 'pointer',
-                                fontSize: '14px',
-                                fontWeight: '500'
-                            }}
-                        >
-                            AI Settings
-                        </button>
+                        <div style={{display: 'flex', gap: '12px', alignItems: 'center'}}>
+                            <select
+                                value={language}
+                                onChange={(e) => setLanguage(e.target.value)}
+                                style={{
+                                    padding: '8px 12px',
+                                    background: 'var(--bg-white)',
+                                    color: 'var(--text-dark)',
+                                    border: '2px solid var(--border-sage)',
+                                    borderRadius: '8px',
+                                    cursor: 'pointer',
+                                    fontSize: '14px',
+                                    fontWeight: '500',
+                                    fontFamily: 'DM Sans, sans-serif'
+                                }}
+                            >
+                                <option value="en">English</option>
+                                <option value="es">Español</option>
+                                <option value="pt">Português</option>
+                                <option value="fr">Français</option>
+                            </select>
+                            <button
+                                onClick={onShowAISettings}
+                                style={{
+                                    padding: '8px 16px',
+                                    background: 'var(--sage-primary)',
+                                    color: 'white',
+                                    border: 'none',
+                                    borderRadius: '8px',
+                                    cursor: 'pointer',
+                                    fontSize: '14px',
+                                    fontWeight: '500'
+                                }}
+                            >
+                                {t('AI Settings')}
+                            </button>
+                        </div>
                     </header>
 
                     <section className="hero-section">
                         <h1 className="hero-title">
-                            <TypeWriter text="AI for Accessibility" delay={80} />
+                            <TypeWriter text={t('AI for Accessibility')} delay={80} key={language + '-title'} />
                         </h1>
 
                         <CaptionDemo />
 
                         <p className="hero-subtitle">
                             <TypeWriter
-                                text="Professional live captioning for community media. Zero cost. Powered by AI + Human intelligence."
+                                text={t('Professional live captioning for community media. Zero cost. Powered by AI + Human intelligence.')}
                                 delay={30}
                                 startDelay={1600}
+                                key={language + '-subtitle'}
                             />
                         </p>
 
                         <div className="cta-buttons">
                             <button className="cta-btn cta-btn-primary" onClick={onStartDashboard}>
-                                Open Control Dashboard
+                                {t('Open Control Dashboard')}
                             </button>
                             <button className="cta-btn cta-btn-secondary" onClick={onShowAbout}>
-                                Learn More
+                                {t('Learn More')}
                             </button>
                         </div>
                     </section>
@@ -2036,7 +2190,7 @@
             );
         }
 
-        function Dashboard({ onBack, onConfigureEngine }) {
+        function Dashboard({ onBack, onConfigureEngine, language, setLanguage, t }) {
             const [mode, setMode] = useState('browser');
             const [caption, setCaption] = useState('');
             const [rawCaption, setRawCaption] = useState('');
@@ -2312,10 +2466,10 @@
                 <div className="dashboard active">
                     <div className="dashboard-header">
                         <div style={{display: 'flex', alignItems: 'center', gap: '16px'}}>
-                            <h1 className="dashboard-title">Control Dashboard</h1>
+                            <h1 className="dashboard-title">{t('Control Dashboard')}</h1>
                             <img src="/big-logo.png" alt="BIG" style={{height: '50px', marginTop: '4px'}} />
                         </div>
-                        <button className="back-btn" onClick={onBack}>← Back to Home</button>
+                        <button className="back-btn" onClick={onBack}>← {t('Back to Home')}</button>
                     </div>
 
                     <div className="dashboard-grid">
@@ -2324,7 +2478,7 @@
                                 fontSize: `${fontSize}px`,
                                 lineHeight: lineHeight
                             }}>
-                                <div className="preview-label">Live Preview</div>
+                                <div className="preview-label">{t('Live Preview')}</div>
                                 <div className="preview-badges">
                                     <div className="preview-badge mode">{mode.toUpperCase()}</div>
                                     {browserListening && <div className="preview-badge listening">LISTENING</div>}
@@ -2349,19 +2503,19 @@
                             </div>
 
                             <div className="card">
-                                <h2 className="card-title">Captioning Mode</h2>
+                                <h2 className="card-title">{t('Captioning Mode')}</h2>
                                 <div className="mode-selector">
                                     <button
                                         className={`mode-btn ${mode === 'browser' ? 'active' : ''}`}
                                         onClick={() => setMode('browser')}
                                     >
-                                        Browser Speech
+                                        {t('Browser Speech')}
                                     </button>
                                     <button
                                         className={`mode-btn whisper ${mode === 'whisper' ? 'active whisper' : ''}`}
                                         onClick={() => setMode('whisper')}
                                     >
-                                        Whisper AI
+                                        {t('Whisper AI')}
                                     </button>
                                 </div>
 
@@ -2371,7 +2525,7 @@
                                             className="btn-large btn-primary"
                                             onClick={browserListening ? stopBrowserCaptions : startBrowserCaptions}
                                         >
-                                            {browserListening ? 'Stop Browser Captions' : 'Start Browser Captions'}
+                                            {browserListening ? t('Stop Browser Captions') : t('Start Browser Captions')}
                                         </button>
                                         <p style={{fontSize: '14px', color: 'var(--text-medium)', marginTop: '12px'}}>
                                             Uses Chrome/Edge speech recognition. Requires internet connection.
@@ -2467,10 +2621,10 @@
 
                                 <div style={{display: 'flex', gap: '12px', marginTop: '16px', flexWrap: 'wrap'}}>
                                     <button className="btn-large btn-outline" style={{flex: '1', minWidth: '140px'}} onClick={onConfigureEngine}>
-                                        Configure Engine
+                                        {t('Configure Engine')}
                                     </button>
                                     <label className="btn-large btn-outline" style={{flex: '1', minWidth: '140px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer'}}>
-                                        Upload Engine
+                                        {t('Upload Engine')}
                                         <input
                                             type="file"
                                             accept=".json"
@@ -2693,7 +2847,7 @@
             );
         }
 
-        function EngineWizard({ onBack }) {
+        function EngineWizard({ onBack, language, setLanguage, t }) {
             const [engineStats, setEngineStats] = useState(null);
             const [newTerm, setNewTerm] = useState({ term: '', category: 'person', aliases: '' });
             const [testText, setTestText] = useState('');
@@ -2815,8 +2969,8 @@
             return (
                 <div className="dashboard active">
                     <div className="dashboard-header">
-                        <h1 className="dashboard-title">AI Caption Engine</h1>
-                        <button className="back-btn" onClick={onBack}>← Back</button>
+                        <h1 className="dashboard-title">{t('AI Caption Engine')}</h1>
+                        <button className="back-btn" onClick={onBack}>← {t('Back to Home')}</button>
                     </div>
 
                     <div style={{padding: '0 24px 24px'}}>
@@ -2826,19 +2980,19 @@
                                 <div style={{fontSize: '36px', fontWeight: '700', color: 'var(--sage-primary)'}}>
                                     {engineStats ? engineStats.term_count : '...'}
                                 </div>
-                                <div style={{fontSize: '14px', color: 'var(--text-medium)', fontWeight: '600'}}>Total Terms</div>
+                                <div style={{fontSize: '14px', color: 'var(--text-medium)', fontWeight: '600'}}>{t('Total Terms')}</div>
                             </div>
                             <div className="card" style={{textAlign: 'center', padding: '20px'}}>
                                 <div style={{fontSize: '36px', fontWeight: '700', color: 'var(--purple-accent)'}}>
                                     {engineStats ? engineStats.correction_count : '...'}
                                 </div>
-                                <div style={{fontSize: '14px', color: 'var(--text-medium)', fontWeight: '600'}}>Corrections Made</div>
+                                <div style={{fontSize: '14px', color: 'var(--text-medium)', fontWeight: '600'}}>{t('Corrections Made')}</div>
                             </div>
                             <div className="card" style={{textAlign: 'center', padding: '20px'}}>
                                 <div style={{fontSize: '36px', fontWeight: '700', color: engineStats?.enabled ? 'var(--green-bright)' : 'var(--text-light)'}}>
                                     {engineStats?.enabled ? 'ON' : 'OFF'}
                                 </div>
-                                <div style={{fontSize: '14px', color: 'var(--text-medium)', fontWeight: '600'}}>Engine Status</div>
+                                <div style={{fontSize: '14px', color: 'var(--text-medium)', fontWeight: '600'}}>{t('Engine Status')}</div>
                             </div>
                         </div>
 
