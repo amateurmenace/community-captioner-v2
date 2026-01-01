@@ -498,14 +498,16 @@ community-captioner/
 ## Roadmap (v4.1 and Beyond)
 
 ### Completed - v4.0 Frontend UI (January 2026)
+
+#### Session 1 Updates
 1. **RAG Suggestions Panel** - COMPLETED
-   - Collapsible panel in Dashboard sidebar
+   - Integrated into Caption Stats card (not standalone)
    - Displays pending low-confidence corrections (0.60-0.85 confidence)
    - One-click Accept/Reject buttons
    - Real-time polling for new suggestions
-   - Purple accent border when suggestions pending
+   - Purple highlight when suggestions pending
 
-2. **Knowledge Base UI** - COMPLETED
+2. **Document Import Panel** - COMPLETED (renamed from "Knowledge Base")
    - Full-width collapsible panel in Dashboard
    - Upload PDF/DOCX files or paste text
    - View extracted entities with category color coding
@@ -515,9 +517,10 @@ community-captioner/
 3. **Video Intelligence Panel** - COMPLETED
    - Full-width collapsible panel in Dashboard
    - Upload MP4/MOV video files
+   - **NEW: Video transcription with Whisper** - Generate transcript from uploaded video
    - Generate AI-powered highlights from transcript
    - Create highlight reel (requires ffmpeg)
-   - Display detected highlights with timestamps and scores
+   - Download transcript as TXT or SRT
 
 4. **Editable Corrections** - COMPLETED
    - Edit/Undo buttons on each correction in SessionAnalysisPage
@@ -525,11 +528,25 @@ community-captioner/
    - Changes automatically update the transcript
    - Undo restores original ASR text
 
+5. **AI Caption Engine Redesign** - COMPLETED
+   - Fixed stats display (terms_count, rules_count, corrections_applied)
+   - New 3-step workflow layout: Load Engine → Add Terms → Save Engine
+   - Purple numbered step badges for visual clarity
+   - Compact test corrections section
+
+6. **UX Improvements** - COMPLETED
+   - Brookline engine loads by default on Dashboard open
+   - Site title/logo clickable to homepage everywhere
+   - Stop & Analyze button only active when captioning running
+   - Homepage demo fixed (removed fictional "Coolidge Corner Town Hall")
+   - Updated tagline: "Free, Open Source Captions + More"
+
 ### High Priority - UX Polish
 1. **Mobile Responsive** - Test and fix layout on tablets/phones
 2. **Keyboard Shortcuts** - Quick actions for common operations
 3. **Onboarding Tour** - First-time user walkthrough
 4. **Error State UI** - Better feedback when things go wrong
+5. **Session History** - View and re-analyze past sessions
 
 ### Medium Priority
 1. **Live Corrections UI** - Edit corrections in real-time during session
@@ -537,6 +554,7 @@ community-captioner/
 3. **Remote Control** - Control from phone/tablet
 4. **YouTube Integration** - Paste URL to download and sync video
 5. **Session Templates** - Pre-configured settings for different event types
+6. **Custom Engine Templates** - Beyond Brookline, allow community templates
 
 ### Lower Priority (Translation - Deprioritized)
 1. **Real-time translation** during live captioning
