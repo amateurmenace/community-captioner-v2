@@ -2127,6 +2127,14 @@
 
             const t = (key) => translations[language][key] || key;
 
+            // Check if we should open analysis view from query parameter
+            useEffect(() => {
+                const params = new URLSearchParams(window.location.search);
+                if (params.get('view') === 'analysis') {
+                    setView('dashboard'); // Will be handled by Dashboard component
+                }
+            }, []);
+
             const startDashboard = () => setView('dashboard');
             const showAbout = () => setView('about');
             const showAISettings = () => setView('ai-settings');
@@ -3121,6 +3129,31 @@
 
         // Session Analysis Page Component - Post-session data analysis
         function SessionAnalysisPage({ data, onBack, t }) {
+            // Helper function to deduplicate captions
+            const deduplicateCaptions = (captions) => {
+                if (!captions || captions.length === 0) return [];
+
+                const seen = new Map(); // Map of timestamp -> caption object
+
+                captions.forEach(caption => {
+                    const timestamp = caption.timestamp || 0;
+                    const text = caption.corrected || caption.text || (typeof caption === 'string' ? caption : '');
+
+                    // Only keep if we haven't seen this exact text at this timestamp
+                    const key = `${timestamp}-${text}`;
+                    if (!seen.has(key) && text.trim().length > 0) {
+                        seen.set(key, caption);
+                    }
+                });
+
+                // Return in chronological order
+                return Array.from(seen.values()).sort((a, b) => {
+                    const aTime = a.timestamp || 0;
+                    const bTime = b.timestamp || 0;
+                    return aTime - bTime;
+                });
+            };
+
             // Collapsible section states
             const [showTranscript, setShowTranscript] = useState(true);
             const [showCorrections, setShowCorrections] = useState(true);
@@ -3140,7 +3173,7 @@
 
             // Manual editing state
             const [editingSegment, setEditingSegment] = useState(null);
-            const [editedCaptions, setEditedCaptions] = useState(data.captions || []);
+            const [editedCaptions, setEditedCaptions] = useState(deduplicateCaptions(data.captions || []));
 
             // Editable corrections state
             const [editedCorrections, setEditedCorrections] = useState(data.corrections || []);
@@ -3161,10 +3194,11 @@
                 return acc + text.trim().split(/\s+/).filter(w => w.length > 0).length;
             }, 0);
 
-            // Generate word frequency for word cloud
+            // Generate word frequency for word cloud (using deduplicated captions)
             const generateWordCloud = () => {
                 const wordFreq = {};
-                editedCaptions.forEach(c => {
+                const dedupedCaptions = deduplicateCaptions(editedCaptions);
+                dedupedCaptions.forEach(c => {
                     const text = (c.corrected || c.text || (typeof c === 'string' ? c : '')).toLowerCase();
                     const words = text.split(/\s+/).filter(w => w.length > 3);
                     words.forEach(word => {
@@ -3200,39 +3234,55 @@
 
             // Run AI Analysis
             const runAiAnalysis = async () => {
+                // Check if OpenAI API key exists
+                let apiKey = localStorage.getItem('openai_api_key');
+
+                if (!apiKey) {
+                    // Prompt user for API key
+                    apiKey = prompt('Please enter your OpenAI API key to run AI Analysis:\n\n(Your key will be stored locally in your browser)');
+
+                    if (!apiKey) {
+                        alert('API key is required to run AI Analysis');
+                        return;
+                    }
+
+                    // Store API key in localStorage
+                    localStorage.setItem('openai_api_key', apiKey);
+                }
+
                 setAiAnalysisLoading(true);
                 try {
+                    // Prepare real transcript data
+                    const transcriptText = editedCaptions
+                        .map(c => c.corrected || c.text || (typeof c === 'string' ? c : ''))
+                        .filter(text => text.trim().length > 0)
+                        .join(' ');
+
                     const response = await fetch('/api/session/analytics', {
                         method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'X-OpenAI-Key': apiKey
+                        },
                         body: JSON.stringify({
                             captions: editedCaptions,
+                            transcript: transcriptText,
                             generate_summary: true,
-                            generate_highlights: true
+                            generate_highlights: true,
+                            generate_topics: true,
+                            generate_sentiment: true
                         })
                     });
+
+                    if (!response.ok) {
+                        throw new Error(`API returned ${response.status}`);
+                    }
+
                     const result = await response.json();
                     setAiAnalysis(result);
                 } catch (err) {
                     console.error('AI Analysis error:', err);
-                    // Fallback mock data for demo
-                    setAiAnalysis({
-                        summary: "This session covered a discussion about local government proceedings. The conversation touched on community services, budget considerations, and public feedback. Key participants engaged in constructive dialogue about upcoming initiatives. The session maintained a professional tone throughout with several important decisions being recorded.",
-                        highlights: [
-                            { title: "Opening Remarks", description: "Session began with introductions and agenda review", timestamp: 0 },
-                            { title: "Main Discussion", description: "Core topics addressed with multiple viewpoints shared", timestamp: Math.floor(data.duration * 0.3) },
-                            { title: "Public Comments", description: "Community members provided valuable feedback", timestamp: Math.floor(data.duration * 0.6) },
-                            { title: "Action Items", description: "Several next steps and follow-ups identified", timestamp: Math.floor(data.duration * 0.8) },
-                            { title: "Closing", description: "Session concluded with summary of decisions", timestamp: Math.floor(data.duration * 0.95) }
-                        ],
-                        sentiment: { overall: 'positive', score: 72 },
-                        topics: [
-                            { name: 'Government', percentage: 35 },
-                            { name: 'Community', percentage: 28 },
-                            { name: 'Budget', percentage: 22 },
-                            { name: 'Services', percentage: 15 }
-                        ]
-                    });
+                    alert('AI Analysis failed. Please check your API key and try again.\n\nError: ' + err.message);
                 }
                 setAiAnalysisLoading(false);
             };
@@ -3367,51 +3417,43 @@
                         <button className="back-btn" onClick={onBack}>← Back to Dashboard</button>
                     </div>
 
-                    {/* Session Summary Header with Export Buttons */}
-                    <div style={{background: 'linear-gradient(135deg, var(--sage-primary), var(--sage-darker))', color: 'white', padding: '32px', borderRadius: 'var(--radius-lg)', marginBottom: '24px'}}>
-                        <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '16px'}}>
-                            <div>
-                                <h1 style={{margin: '0 0 8px 0', fontSize: '28px'}}>{data.name || 'Untitled Session'}</h1>
-                                <p style={{margin: 0, opacity: 0.8}}>{new Date(data.start_time || Date.now()).toLocaleString()}</p>
-                            </div>
+                    {/* Session Summary Header */}
+                    <div style={{background: 'white', padding: '24px', borderRadius: 'var(--radius-lg)', marginBottom: '24px', border: '1px solid var(--border-light)'}}>
+                        <div style={{marginBottom: '20px'}}>
+                            <h1 style={{margin: '0 0 4px 0', fontSize: '24px', color: 'var(--text-dark)'}}>
+                                {(() => {
+                                    const sessionDate = new Date(data.start_time || Date.now());
+                                    const monthNames = ["January", "February", "March", "April", "May", "June",
+                                        "July", "August", "September", "October", "November", "December"];
+                                    const hours = sessionDate.getHours();
+                                    const minutes = sessionDate.getMinutes().toString().padStart(2, '0');
+                                    const ampm = hours >= 12 ? 'PM' : 'AM';
+                                    const displayHours = hours % 12 || 12;
+                                    return `Captioning Session on ${monthNames[sessionDate.getMonth()]} ${sessionDate.getDate()}, ${sessionDate.getFullYear()} at ${displayHours}:${minutes} ${ampm}`;
+                                })()}
+                            </h1>
+                        </div>
 
-                            {/* Export Buttons at Top */}
+                        {/* Downloads Section */}
+                        <div style={{marginBottom: '20px'}}>
+                            <h2 style={{fontSize: '16px', fontWeight: '700', color: 'var(--text-dark)', marginBottom: '12px'}}>Downloads</h2>
                             <div style={{display: 'flex', gap: '8px', flexWrap: 'wrap'}}>
-                                <a href="/api/session/export/txt" download className="btn-large" style={{background: 'rgba(255,255,255,0.2)', color: 'white', textDecoration: 'none', padding: '10px 16px', borderRadius: '8px', fontSize: '14px', fontWeight: '600', display: 'flex', alignItems: 'center', gap: '6px'}}>
+                                <a href="/api/session/export/txt" download className="btn-large btn-outline" style={{textDecoration: 'none', padding: '10px 16px', fontSize: '14px', display: 'flex', alignItems: 'center', gap: '6px'}}>
                                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><path d="M14 2v6h6M16 13H8M16 17H8M10 9H8"/></svg>
                                     Transcript
                                 </a>
-                                <a href="/api/session/export/srt" download className="btn-large" style={{background: 'rgba(255,255,255,0.2)', color: 'white', textDecoration: 'none', padding: '10px 16px', borderRadius: '8px', fontSize: '14px', fontWeight: '600', display: 'flex', alignItems: 'center', gap: '6px'}}>
+                                <a href="/api/session/export/srt" download className="btn-large btn-outline" style={{textDecoration: 'none', padding: '10px 16px', fontSize: '14px', display: 'flex', alignItems: 'center', gap: '6px'}}>
                                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="M7 15h4M13 15h4M7 11h10"/></svg>
                                     SRT
                                 </a>
-                                <a href="/api/session/export/vtt" download className="btn-large" style={{background: 'rgba(255,255,255,0.2)', color: 'white', textDecoration: 'none', padding: '10px 16px', borderRadius: '8px', fontSize: '14px', fontWeight: '600', display: 'flex', alignItems: 'center', gap: '6px'}}>
+                                <a href="/api/session/export/vtt" download className="btn-large btn-outline" style={{textDecoration: 'none', padding: '10px 16px', fontSize: '14px', display: 'flex', alignItems: 'center', gap: '6px'}}>
                                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="2" y="4" width="20" height="16" rx="2"/><polygon points="10,8 16,12 10,16"/></svg>
                                     VTT
                                 </a>
-                                <a href="/api/session/export/json" download className="btn-large" style={{background: 'rgba(255,255,255,0.2)', color: 'white', textDecoration: 'none', padding: '10px 16px', borderRadius: '8px', fontSize: '14px', fontWeight: '600', display: 'flex', alignItems: 'center', gap: '6px'}}>
+                                <a href="/api/session/export/json" download className="btn-large btn-outline" style={{textDecoration: 'none', padding: '10px 16px', fontSize: '14px', display: 'flex', alignItems: 'center', gap: '6px'}}>
                                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M4 6h2a2 2 0 012 2v8a2 2 0 01-2 2H4"/><path d="M20 6h-2a2 2 0 00-2 2v8a2 2 0 002 2h2"/></svg>
                                     JSON
                                 </a>
-                            </div>
-                        </div>
-
-                        <div style={{display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '16px', marginTop: '24px'}}>
-                            <div style={{background: 'rgba(255,255,255,0.15)', padding: '16px', borderRadius: '12px', textAlign: 'center'}}>
-                                <div style={{fontSize: '32px', fontWeight: '700'}}>{totalWords}</div>
-                                <div style={{fontSize: '13px', opacity: 0.8}}>Total Words</div>
-                            </div>
-                            <div style={{background: 'rgba(255,255,255,0.15)', padding: '16px', borderRadius: '12px', textAlign: 'center'}}>
-                                <div style={{fontSize: '32px', fontWeight: '700'}}>{formatTime(data.duration || 0)}</div>
-                                <div style={{fontSize: '13px', opacity: 0.8}}>Duration</div>
-                            </div>
-                            <div style={{background: 'rgba(255,255,255,0.15)', padding: '16px', borderRadius: '12px', textAlign: 'center'}}>
-                                <div style={{fontSize: '32px', fontWeight: '700'}}>{data.corrections?.length || 0}</div>
-                                <div style={{fontSize: '13px', opacity: 0.8}}>AI Corrections</div>
-                            </div>
-                            <div style={{background: 'rgba(255,255,255,0.15)', padding: '16px', borderRadius: '12px', textAlign: 'center'}}>
-                                <div style={{fontSize: '32px', fontWeight: '700'}}>{editedCaptions.length}</div>
-                                <div style={{fontSize: '13px', opacity: 0.8}}>Segments</div>
                             </div>
                         </div>
                     </div>
@@ -3823,6 +3865,25 @@
             // Speech recognition ref
             const recognitionRef = useRef(null);
 
+            // Check if we should load analysis data from localStorage (new tab flow)
+            useEffect(() => {
+                const params = new URLSearchParams(window.location.search);
+                if (params.get('view') === 'analysis') {
+                    const storedData = localStorage.getItem('sessionAnalysis');
+                    if (storedData) {
+                        try {
+                            const data = JSON.parse(storedData);
+                            setAnalysisData(data);
+                            setShowAnalysis(true);
+                            // Clear the stored data
+                            localStorage.removeItem('sessionAnalysis');
+                        } catch (err) {
+                            console.error('Error loading analysis data:', err);
+                        }
+                    }
+                }
+            }, []);
+
             // Timer for session duration
             useEffect(() => {
                 let timer;
@@ -4046,6 +4107,10 @@
                     recognitionRef.current = null;
                 }
                 setBrowserListening(false);
+                // If recording is active, stop and analyze
+                if (recording) {
+                    stopAndAnalyze();
+                }
             };
 
             // Simulate realistic confidence and delay metrics
@@ -4101,39 +4166,58 @@
             const stopWhisper = () => {
                 fetch('/api/whisper/stop', { method: 'POST' })
                 .catch(err => console.error('Error stopping Whisper:', err));
+                // If recording is active, stop and analyze
+                if (recording) {
+                    stopAndAnalyze();
+                }
+            };
+
+            const stopAndAnalyze = () => {
+                // Stop recording and show analysis in new tab
+                fetch('/api/session/stop', { method: 'POST' })
+                    .then(() => {
+                        // Fetch session data for analysis
+                        return Promise.all([
+                            fetch('/api/session/status').then(r => r.json()),
+                            fetch('/api/session/captions').then(r => r.json()),
+                            fetch('/api/session/analytics').then(r => r.json()).catch(() => ({}))
+                        ]);
+                    })
+                    .then(([status, captionsData, analytics]) => {
+                        // Build analysis data
+                        const analysisData = {
+                            name: sessionName || 'Untitled Session',
+                            start_time: sessionStartTime,
+                            duration: sessionDuration,
+                            wordCount: wordCount,
+                            corrections: allCorrections,
+                            captions: captionsData.captions || [],
+                            highlights: analytics.highlights || [],
+                            wordCloud: analytics.word_cloud || [],
+                            sentimentTimeline: analytics.sentiment_timeline || [],
+                            topics: analytics.topics || [],
+                            qualityScore: analytics.quality_score || 85
+                        };
+
+                        // Store analysis data in localStorage for new tab to access
+                        localStorage.setItem('sessionAnalysis', JSON.stringify(analysisData));
+
+                        // Open dashboard in new tab with analysis flag
+                        window.open('/?view=analysis', '_blank');
+
+                        // Reset recording state
+                        setRecording(false);
+                        setSessionStats(status);
+                    })
+                    .catch(err => {
+                        console.error('Error stopping session:', err);
+                        alert('Failed to stop session and generate analysis');
+                    });
             };
 
             const toggleRecording = () => {
                 if (recording) {
-                    // Stop recording and show analysis
-                    fetch('/api/session/stop', { method: 'POST' })
-                        .then(() => {
-                            // Fetch session data for analysis
-                            return Promise.all([
-                                fetch('/api/session/status').then(r => r.json()),
-                                fetch('/api/session/captions').then(r => r.json()),
-                                fetch('/api/session/analytics').then(r => r.json()).catch(() => ({}))
-                            ]);
-                        })
-                        .then(([status, captionsData, analytics]) => {
-                            // Build analysis data
-                            const analysisData = {
-                                name: sessionName || 'Untitled Session',
-                                start_time: sessionStartTime,
-                                duration: sessionDuration,
-                                wordCount: wordCount,
-                                corrections: allCorrections,
-                                captions: captionsData.captions || [],
-                                highlights: analytics.highlights || [],
-                                wordCloud: analytics.word_cloud || [],
-                                sentimentTimeline: analytics.sentiment_timeline || [],
-                                topics: analytics.topics || [],
-                                qualityScore: analytics.quality_score || 85
-                            };
-                            setAnalysisData(analysisData);
-                            setShowAnalysis(true);
-                            setSessionStats(status);
-                        });
+                    stopAndAnalyze();
                 } else {
                     const name = sessionName || `Session ${new Date().toLocaleString()}`;
                     fetch('/api/session/start', {
@@ -4638,30 +4722,6 @@
                                             {(browserListening || whisperRunning) ? 'Stop Captioning' : 'Start Captioning'}
                                         </button>
 
-                                        <div style={{width: '1px', height: '32px', background: 'var(--border-light)', margin: '0 4px'}}></div>
-
-                                        <button
-                                            className={`btn-large ${(browserListening || whisperRunning) ? 'btn-danger' : 'btn-outline'}`}
-                                            onClick={toggleRecording}
-                                            disabled={!(browserListening || whisperRunning)}
-                                            style={{
-                                                padding: '10px 20px',
-                                                display: 'flex',
-                                                alignItems: 'center',
-                                                gap: '8px',
-                                                opacity: (browserListening || whisperRunning) ? 1 : 0.5,
-                                                cursor: (browserListening || whisperRunning) ? 'pointer' : 'not-allowed'
-                                            }}
-                                        >
-                                            <div style={{
-                                                width: '10px',
-                                                height: '10px',
-                                                borderRadius: '50%',
-                                                background: (browserListening || whisperRunning) ? '#fff' : '#999',
-                                                animation: (browserListening || whisperRunning) ? 'pulse 1s infinite' : 'none'
-                                            }}></div>
-                                            Stop & Analyze
-                                        </button>
                                     </div>
                                 </div>
 
