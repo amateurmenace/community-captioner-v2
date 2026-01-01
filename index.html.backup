@@ -1,0 +1,1014 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Community Captioner - Free AI-Powered Live Captioning</title>
+    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700;800&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <style>
+        :root {
+            /* Sage green & warm background palette */
+            --bg-warm: #F5F3EE;
+            --bg-sage-light: #E8EDE7;
+            --bg-white: #FFFFFF;
+            --sage-primary: #7D9B76;
+            --sage-dark: #5A7C55;
+            --sage-darker: #3D5A47;
+            --sage-muted: #A8BAA3;
+            --text-dark: #2D3A2E;
+            --text-medium: #5A6B5E;
+            --text-light: #8A9A8E;
+            --border-light: #D4D2CD;
+            --border-sage: #C4D3BE;
+
+            /* Accent colors - purple used sparingly */
+            --purple-accent: #8B7FC7;
+            --purple-light: #A69DD6;
+
+            /* Functional colors */
+            --red-primary: #DC2626;
+            --orange-primary: #EA580C;
+            --green-bright: #00A676;
+
+            /* Spacing */
+            --radius-sm: 10px;
+            --radius-md: 14px;
+            --radius-lg: 18px;
+            --radius-xl: 24px;
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: 'DM Sans', 'Inter', -apple-system, sans-serif;
+            background: var(--bg-warm);
+            color: var(--text-dark);
+            line-height: 1.6;
+            min-height: 100vh;
+        }
+
+        /* Landing Page Styles */
+        .landing-page {
+            min-height: 100vh;
+            padding: 0;
+        }
+
+        .landing-header {
+            padding: 24px 32px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid var(--border-light);
+            background: var(--bg-white);
+        }
+
+        .logo-section {
+            display: flex;
+            align-items: center;
+            gap: 14px;
+        }
+
+        .logo-icon {
+            width: 50px;
+            height: 50px;
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+            justify-content: center;
+        }
+
+        .logo-bar {
+            height: 9px;
+            border-radius: 4px;
+            transition: all 0.3s;
+        }
+
+        .logo-bar-1 { background: var(--sage-darker); width: 100%; }
+        .logo-bar-2 { background: var(--sage-primary); width: 75%; }
+        .logo-bar-3 { background: var(--sage-muted); width: 50%; }
+
+        .logo-text {
+            font-size: 28px;
+            font-weight: 800;
+            color: var(--text-dark);
+            letter-spacing: -0.5px;
+        }
+
+        .badge-tag {
+            display: inline-block;
+            background: var(--bg-sage-light);
+            color: var(--sage-darker);
+            padding: 6px 14px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .hero-section {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 80px 32px 60px;
+            text-align: center;
+        }
+
+        .hero-title {
+            font-size: 68px;
+            font-weight: 800;
+            color: var(--text-dark);
+            line-height: 1.1;
+            margin-bottom: 24px;
+            letter-spacing: -1.5px;
+        }
+
+        .hero-subtitle {
+            font-size: 24px;
+            color: var(--text-medium);
+            margin-bottom: 16px;
+            font-weight: 500;
+        }
+
+        .hero-subtitle strong {
+            color: var(--sage-darker);
+            font-weight: 700;
+        }
+
+        .hero-description {
+            font-size: 18px;
+            color: var(--text-medium);
+            max-width: 800px;
+            margin: 0 auto 40px;
+            line-height: 1.7;
+        }
+
+        .cta-buttons {
+            display: flex;
+            gap: 16px;
+            justify-content: center;
+            margin-bottom: 80px;
+        }
+
+        .cta-btn {
+            padding: 18px 36px;
+            font-size: 18px;
+            font-weight: 700;
+            border-radius: var(--radius-md);
+            border: none;
+            cursor: pointer;
+            transition: all 0.2s;
+            font-family: inherit;
+        }
+
+        .cta-btn-primary {
+            background: var(--sage-darker);
+            color: white;
+        }
+
+        .cta-btn-primary:hover {
+            background: var(--sage-primary);
+            transform: translateY(-2px);
+            box-shadow: 0 8px 20px rgba(61, 90, 71, 0.3);
+        }
+
+        .cta-btn-secondary {
+            background: transparent;
+            color: var(--sage-darker);
+            border: 2px solid var(--sage-darker);
+        }
+
+        .cta-btn-secondary:hover {
+            background: var(--bg-sage-light);
+        }
+
+        .feature-cards {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 40px 32px;
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 24px;
+        }
+
+        .feature-card {
+            background: var(--bg-white);
+            border: 2px solid var(--border-light);
+            border-radius: var(--radius-lg);
+            padding: 40px 32px;
+            text-align: center;
+            transition: all 0.3s;
+            cursor: pointer;
+        }
+
+        .feature-card:hover {
+            border-color: var(--sage-primary);
+            transform: translateY(-4px);
+            box-shadow: 0 12px 30px rgba(125, 155, 118, 0.15);
+        }
+
+        .feature-icon {
+            width: 80px;
+            height: 80px;
+            margin: 0 auto 24px;
+            background: var(--bg-sage-light);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 36px;
+        }
+
+        .feature-card.special .feature-icon {
+            background: linear-gradient(135deg, var(--purple-accent), var(--purple-light));
+            color: white;
+        }
+
+        .feature-title {
+            font-size: 22px;
+            font-weight: 700;
+            margin-bottom: 12px;
+            color: var(--text-dark);
+        }
+
+        .feature-desc {
+            font-size: 15px;
+            color: var(--text-medium);
+            line-height: 1.6;
+        }
+
+        .special-badge {
+            display: inline-block;
+            background: var(--purple-accent);
+            color: white;
+            padding: 4px 10px;
+            border-radius: 12px;
+            font-size: 11px;
+            font-weight: 700;
+            text-transform: uppercase;
+            margin-bottom: 8px;
+        }
+
+        /* Dashboard Styles */
+        .dashboard {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 32px;
+            display: none;
+        }
+
+        .dashboard.active {
+            display: block;
+        }
+
+        .dashboard-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 32px;
+            padding-bottom: 24px;
+            border-bottom: 2px solid var(--border-light);
+        }
+
+        .dashboard-title {
+            font-size: 36px;
+            font-weight: 800;
+            color: var(--text-dark);
+        }
+
+        .back-btn {
+            padding: 12px 24px;
+            background: transparent;
+            border: 2px solid var(--border-light);
+            border-radius: var(--radius-sm);
+            font-size: 15px;
+            font-weight: 600;
+            cursor: pointer;
+            color: var(--text-medium);
+            transition: all 0.2s;
+        }
+
+        .back-btn:hover {
+            border-color: var(--sage-primary);
+            color: var(--sage-darker);
+        }
+
+        .dashboard-grid {
+            display: grid;
+            grid-template-columns: 2fr 1fr;
+            gap: 28px;
+        }
+
+        .preview-section {
+            background: #1a1a1a;
+            border-radius: var(--radius-xl);
+            padding: 48px 32px;
+            min-height: 200px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+            margin-bottom: 28px;
+        }
+
+        .preview-label {
+            position: absolute;
+            top: 16px;
+            left: 20px;
+            font-size: 11px;
+            color: #666;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            font-weight: 600;
+        }
+
+        .preview-badges {
+            position: absolute;
+            top: 16px;
+            right: 20px;
+            display: flex;
+            gap: 8px;
+        }
+
+        .preview-badge {
+            padding: 6px 12px;
+            border-radius: 8px;
+            font-size: 11px;
+            font-weight: 700;
+            color: white;
+        }
+
+        .preview-badge.mode { background: var(--sage-primary); }
+        .preview-badge.whisper { background: var(--orange-primary); }
+        .preview-badge.engine { background: var(--purple-accent); }
+        .preview-badge.corrections { background: var(--green-bright); }
+
+        .preview-text {
+            font-size: 32px;
+            font-weight: 600;
+            color: white;
+            text-align: center;
+            max-width: 90%;
+            line-height: 1.4;
+        }
+
+        .preview-text.empty {
+            color: #555;
+            font-size: 18px;
+        }
+
+        .card {
+            background: var(--bg-white);
+            border: 2px solid var(--border-light);
+            border-radius: var(--radius-lg);
+            padding: 28px;
+            margin-bottom: 24px;
+        }
+
+        .card-title {
+            font-size: 20px;
+            font-weight: 700;
+            margin-bottom: 20px;
+            color: var(--text-dark);
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .card-badge {
+            padding: 4px 10px;
+            background: var(--purple-accent);
+            color: white;
+            border-radius: 8px;
+            font-size: 11px;
+            font-weight: 700;
+            text-transform: uppercase;
+        }
+
+        .mode-selector {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+            margin-bottom: 24px;
+        }
+
+        .mode-btn {
+            padding: 18px 24px;
+            background: var(--bg-sage-light);
+            border: 2px solid var(--border-sage);
+            border-radius: var(--radius-md);
+            font-size: 16px;
+            font-weight: 700;
+            cursor: pointer;
+            transition: all 0.2s;
+            color: var(--text-medium);
+        }
+
+        .mode-btn:hover {
+            border-color: var(--sage-primary);
+        }
+
+        .mode-btn.active {
+            background: var(--sage-darker);
+            border-color: var(--sage-darker);
+            color: white;
+        }
+
+        .mode-btn.active.whisper {
+            background: var(--orange-primary);
+            border-color: var(--orange-primary);
+        }
+
+        .btn-large {
+            width: 100%;
+            padding: 18px 24px;
+            font-size: 17px;
+            font-weight: 700;
+            border-radius: var(--radius-md);
+            border: none;
+            cursor: pointer;
+            transition: all 0.2s;
+            margin-bottom: 12px;
+        }
+
+        .btn-primary {
+            background: var(--sage-darker);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background: var(--sage-primary);
+        }
+
+        .btn-danger {
+            background: var(--red-primary);
+            color: white;
+        }
+
+        .btn-outline {
+            background: transparent;
+            border: 2px solid var(--border-light);
+            color: var(--text-medium);
+        }
+
+        .btn-outline:hover {
+            border-color: var(--sage-primary);
+            color: var(--sage-darker);
+        }
+
+        .btn:disabled {
+            opacity: 0.4;
+            cursor: not-allowed;
+        }
+
+        .setting-group {
+            margin-bottom: 24px;
+        }
+
+        .setting-label {
+            font-size: 14px;
+            font-weight: 700;
+            color: var(--text-dark);
+            margin-bottom: 8px;
+            display: block;
+        }
+
+        .setting-input {
+            width: 100%;
+            padding: 14px 16px;
+            border: 2px solid var(--border-light);
+            border-radius: var(--radius-sm);
+            font-size: 15px;
+            font-family: inherit;
+            transition: border-color 0.2s;
+        }
+
+        .setting-input:focus {
+            outline: none;
+            border-color: var(--sage-primary);
+        }
+
+        .toggle-setting {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 16px;
+            background: var(--bg-sage-light);
+            border-radius: var(--radius-sm);
+            margin-bottom: 12px;
+        }
+
+        .toggle-label {
+            font-size: 15px;
+            font-weight: 600;
+            color: var(--text-dark);
+        }
+
+        .toggle-switch {
+            width: 50px;
+            height: 28px;
+            background: var(--border-light);
+            border-radius: 14px;
+            position: relative;
+            cursor: pointer;
+            transition: background 0.3s;
+        }
+
+        .toggle-switch.on {
+            background: var(--sage-primary);
+        }
+
+        .toggle-switch::after {
+            content: '';
+            position: absolute;
+            width: 22px;
+            height: 22px;
+            background: white;
+            border-radius: 50%;
+            top: 3px;
+            left: 3px;
+            transition: transform 0.3s;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+        }
+
+        .toggle-switch.on::after {
+            transform: translateX(22px);
+        }
+
+        .rec-indicator {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 14px 20px;
+            background: var(--bg-white);
+            border: 2px solid var(--border-light);
+            border-radius: 16px;
+            font-size: 14px;
+            font-weight: 600;
+        }
+
+        .rec-indicator.recording {
+            background: #FEE2E2;
+            border-color: var(--red-primary);
+            color: var(--red-primary);
+        }
+
+        .rec-dot {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            background: var(--border-light);
+        }
+
+        .rec-indicator.recording .rec-dot {
+            background: var(--red-primary);
+            animation: pulse 1.5s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.4; }
+        }
+
+        .url-display {
+            background: var(--bg-sage-light);
+            padding: 16px;
+            border-radius: var(--radius-sm);
+            margin-top: 16px;
+        }
+
+        .url-label {
+            font-size: 12px;
+            font-weight: 700;
+            color: var(--text-medium);
+            margin-bottom: 8px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .url-text {
+            font-family: 'Monaco', monospace;
+            font-size: 14px;
+            color: var(--sage-darker);
+            word-break: break-all;
+            padding: 10px;
+            background: white;
+            border-radius: 6px;
+            border: 1px solid var(--border-sage);
+        }
+
+        @media (max-width: 1024px) {
+            .feature-cards {
+                grid-template-columns: 1fr;
+            }
+            .dashboard-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect } = React;
+
+        function App() {
+            const [view, setView] = useState('landing');
+            const [mode, setMode] = useState('browser');
+            const [caption, setCaption] = useState('');
+            const [recording, setRecording] = useState(false);
+            const [engineEnabled, setEngineEnabled] = useState(false);
+            const [engineStats, setEngineStats] = useState(null);
+            const [localIP, setLocalIP] = useState('');
+
+            useEffect(() => {
+                // Fetch engine status
+                fetch('/api/engine/status')
+                    .then(r => r.json())
+                    .then(data => {
+                        setEngineEnabled(data.enabled);
+                        setEngineStats(data);
+                    });
+
+                // Get local IP from server
+                fetch('/api/caption')
+                    .then(r => r.json())
+                    .then(data => {
+                        // Extract IP from server response or use window location
+                        setLocalIP(window.location.hostname);
+                    });
+            }, []);
+
+            const startDashboard = () => setView('dashboard');
+            const startEngineWizard = () => setView('engine-wizard');
+            const showAbout = () => setView('about');
+
+            if (view === 'landing') {
+                return <LandingPage
+                    onStartDashboard={startDashboard}
+                    onStartEngine={startEngineWizard}
+                    onShowAbout={showAbout}
+                />;
+            }
+
+            if (view === 'dashboard') {
+                return <Dashboard onBack={() => setView('landing')} />;
+            }
+
+            if (view === 'engine-wizard') {
+                return <EngineWizard onBack={() => setView('landing')} />;
+            }
+
+            if (view === 'about') {
+                return <AboutPage onBack={() => setView('landing')} />;
+            }
+        }
+
+        function LandingPage({ onStartDashboard, onStartEngine, onShowAbout }) {
+            return (
+                <div className="landing-page">
+                    <header className="landing-header">
+                        <div className="logo-section">
+                            <div className="logo-icon">
+                                <div className="logo-bar logo-bar-1"></div>
+                                <div className="logo-bar logo-bar-2"></div>
+                                <div className="logo-bar logo-bar-3"></div>
+                            </div>
+                            <div>
+                                <div className="logo-text">Community Captioner</div>
+                                <span className="badge-tag">AI for Public Transparency</span>
+                            </div>
+                        </div>
+                        <img src="/big-logo.png" alt="BIG" className="big-logo" style={{height: '60px'}} />
+                    </header>
+
+                    <section className="hero-section">
+                        <h1 className="hero-title">Free Live Captioning</h1>
+                        <p className="hero-subtitle">
+                            Making civic information <strong>accessible</strong>, <strong>searchable</strong>, and <strong>understandable</strong> for everyone.
+                        </p>
+                        <p className="hero-description">
+                            Professional-grade live captioning for community media organizations.
+                            No subscription fees, no cloud dependencies.
+                            Built for transparency, powered by AI.
+                        </p>
+
+                        <div className="cta-buttons">
+                            <button className="cta-btn cta-btn-primary" onClick={onStartDashboard}>
+                                Open Control Dashboard
+                            </button>
+                            <button className="cta-btn cta-btn-secondary" onClick={onShowAbout}>
+                                Learn More
+                            </button>
+                        </div>
+                    </section>
+
+                    <div className="feature-cards">
+                        <div className="feature-card" onClick={onStartDashboard}>
+                            <div className="feature-icon">▶</div>
+                            <h3 className="feature-title">Live Overlay</h3>
+                            <p className="feature-desc">
+                                Real-time captions for OBS, vMix, and streaming platforms.
+                                Fully customizable appearance and positioning.
+                            </p>
+                        </div>
+
+                        <div className="feature-card special" onClick={onStartEngine}>
+                            <span className="special-badge">Unique Feature</span>
+                            <div className="feature-icon">⚡</div>
+                            <h3 className="feature-title">AI Caption Engine</h3>
+                            <p className="feature-desc">
+                                Automatically corrects local names, places, and organizations.
+                                Build custom correction rules from documents and web sources.
+                            </p>
+                        </div>
+
+                        <div className="feature-card" onClick={onStartDashboard}>
+                            <div className="feature-icon">📝</div>
+                            <h3 className="feature-title">Session Recording</h3>
+                            <p className="feature-desc">
+                                Record and export captions in SRT, VTT, TXT, or JSON formats.
+                                Perfect for post-production and archival.
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            );
+        }
+
+        function Dashboard({ onBack }) {
+            const [mode, setMode] = useState('browser');
+            const [caption, setCaption] = useState('');
+            const [rawCaption, setRawCaption] = useState('');
+            const [corrections, setCorrections] = useState([]);
+            const [recording, setRecording] = useState(false);
+            const [sessionName, setSessionName] = useState('');
+            const [engineEnabled, setEngineEnabled] = useState(false);
+            const [whisperRunning, setWhisperRunning] = useState(false);
+            const [localIP, setLocalIP] = useState(window.location.hostname);
+            const port = window.location.port || '8080';
+
+            useEffect(() => {
+                const interval = setInterval(() => {
+                    fetch('/api/caption')
+                        .then(r => r.json())
+                        .then(data => {
+                            setCaption(data.caption || '');
+                            setRawCaption(data.raw_caption || '');
+                            setCorrections(data.corrections || []);
+                            setRecording(data.session?.recording || false);
+                            setWhisperRunning(data.whisper_running || false);
+                        });
+
+                    fetch('/api/engine/status')
+                        .then(r => r.json())
+                        .then(data => setEngineEnabled(data.enabled));
+                }, 500);
+
+                return () => clearInterval(interval);
+            }, []);
+
+            const toggleRecording = () => {
+                if (recording) {
+                    fetch('/api/session/stop', { method: 'POST' });
+                } else {
+                    const name = sessionName || `Session ${new Date().toLocaleString()}`;
+                    fetch('/api/session/start', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ name })
+                    });
+                }
+            };
+
+            const openOverlay = () => {
+                window.open('/overlay.html', '_blank', 'width=1200,height=200');
+            };
+
+            const toggleEngine = () => {
+                fetch('/api/engine/enable', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ enabled: !engineEnabled })
+                })
+                .then(r => r.json())
+                .then(data => setEngineEnabled(data.enabled));
+            };
+
+            return (
+                <div className="dashboard active">
+                    <div className="dashboard-header">
+                        <h1 className="dashboard-title">Control Dashboard</h1>
+                        <button className="back-btn" onClick={onBack}>← Back to Home</button>
+                    </div>
+
+                    <div className="dashboard-grid">
+                        <div className="main-column">
+                            <div className="preview-section">
+                                <div className="preview-label">Live Preview</div>
+                                <div className="preview-badges">
+                                    <div className="preview-badge mode">{mode.toUpperCase()}</div>
+                                    {whisperRunning && <div className="preview-badge whisper">WHISPER</div>}
+                                    {engineEnabled && <div className="preview-badge engine">ENGINE ON</div>}
+                                    {corrections.length > 0 && (
+                                        <div className="preview-badge corrections">{corrections.length} FIXES</div>
+                                    )}
+                                </div>
+                                <div className={`preview-text ${!caption ? 'empty' : ''}`}>
+                                    {caption || 'Captions will appear here...'}
+                                </div>
+                            </div>
+
+                            <div className="card">
+                                <h2 className="card-title">Captioning Mode</h2>
+                                <div className="mode-selector">
+                                    <button
+                                        className={`mode-btn ${mode === 'browser' ? 'active' : ''}`}
+                                        onClick={() => setMode('browser')}
+                                    >
+                                        Browser Speech
+                                    </button>
+                                    <button
+                                        className={`mode-btn whisper ${mode === 'whisper' ? 'active whisper' : ''}`}
+                                        onClick={() => setMode('whisper')}
+                                    >
+                                        Whisper AI
+                                    </button>
+                                </div>
+
+                                {mode === 'browser' && (
+                                    <button className="btn-large btn-primary">
+                                        Start Browser Captions
+                                    </button>
+                                )}
+
+                                {mode === 'whisper' && (
+                                    <div>
+                                        <button className="btn-large btn-primary">
+                                            Load Whisper Model
+                                        </button>
+                                        <p style={{fontSize: '14px', color: 'var(--text-medium)', marginTop: '12px'}}>
+                                            Local AI transcription. Requires faster-whisper package.
+                                        </p>
+                                    </div>
+                                )}
+                            </div>
+
+                            <div className="card">
+                                <h2 className="card-title">
+                                    AI Caption Engine
+                                    <span className="card-badge">Unique</span>
+                                </h2>
+                                <div className="toggle-setting">
+                                    <span className="toggle-label">
+                                        {engineEnabled ? 'Engine Active' : 'Engine Disabled'}
+                                    </span>
+                                    <div
+                                        className={`toggle-switch ${engineEnabled ? 'on' : ''}`}
+                                        onClick={toggleEngine}
+                                    ></div>
+                                </div>
+
+                                {corrections.length > 0 && (
+                                    <div style={{marginTop: '16px', padding: '14px', background: 'var(--bg-sage-light)', borderRadius: 'var(--radius-sm)'}}>
+                                        <div style={{fontSize: '12px', fontWeight: '700', marginBottom: '8px', color: 'var(--text-medium)'}}>
+                                            RECENT CORRECTIONS
+                                        </div>
+                                        {corrections.map((c, i) => (
+                                            <div key={i} style={{fontSize: '14px', marginBottom: '4px'}}>
+                                                <span style={{color: '#DC2626', textDecoration: 'line-through'}}>{c.from}</span>
+                                                {' → '}
+                                                <span style={{color: '#00A676', fontWeight: '600'}}>{c.to}</span>
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
+
+                                <button className="btn-large btn-outline" style={{marginTop: '16px'}}>
+                                    Configure Engine
+                                </button>
+                            </div>
+                        </div>
+
+                        <div className="sidebar-column">
+                            <div className="card">
+                                <h2 className="card-title">Live Overlay</h2>
+                                <button className="btn-large btn-primary" onClick={openOverlay}>
+                                    Open Overlay Window
+                                </button>
+
+                                <div className="url-display">
+                                    <div className="url-label">Local Network URL</div>
+                                    <div className="url-text">
+                                        http://{localIP}:{port}/overlay.html
+                                    </div>
+                                </div>
+
+                                <p style={{fontSize: '13px', color: 'var(--text-medium)', marginTop: '12px', lineHeight: '1.5'}}>
+                                    Use this URL in OBS Browser Source, vMix, or any streaming software.
+                                    Access from any device on your local network.
+                                </p>
+                            </div>
+
+                            <div className="card">
+                                <h2 className="card-title">Session Recording</h2>
+                                <div className="rec-indicator" style={{marginBottom: '16px'}}>
+                                    <div className={`rec-indicator ${recording ? 'recording' : ''}`}>
+                                        <div className="rec-dot"></div>
+                                        {recording ? 'Recording' : 'Not Recording'}
+                                    </div>
+                                </div>
+
+                                {!recording && (
+                                    <div className="setting-group">
+                                        <label className="setting-label">Session Name</label>
+                                        <input
+                                            type="text"
+                                            className="setting-input"
+                                            placeholder="e.g., Select Board Meeting"
+                                            value={sessionName}
+                                            onChange={(e) => setSessionName(e.target.value)}
+                                        />
+                                    </div>
+                                )}
+
+                                <button
+                                    className={`btn-large ${recording ? 'btn-danger' : 'btn-primary'}`}
+                                    onClick={toggleRecording}
+                                >
+                                    {recording ? 'Stop Recording' : 'Start Recording'}
+                                </button>
+
+                                {recording && (
+                                    <div style={{marginTop: '16px', padding: '14px', background: '#FEE2E2', borderRadius: 'var(--radius-sm)', fontSize: '13px', color: '#991B1B'}}>
+                                        All captions and corrections are being saved.
+                                        Export available after stopping.
+                                    </div>
+                                )}
+                            </div>
+
+                            <div className="card">
+                                <h2 className="card-title">Caption Styling</h2>
+                                <div className="setting-group">
+                                    <label className="setting-label">Font Size</label>
+                                    <input type="range" className="setting-input" min="24" max="72" />
+                                </div>
+                                <div className="setting-group">
+                                    <label className="setting-label">Line Height</label>
+                                    <input type="range" className="setting-input" min="1" max="2" step="0.1" />
+                                </div>
+                                <div className="setting-group">
+                                    <label className="setting-label">Max Width (%)</label>
+                                    <input type="range" className="setting-input" min="50" max="100" />
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            );
+        }
+
+        function EngineWizard({ onBack }) {
+            return (
+                <div className="dashboard active">
+                    <div className="dashboard-header">
+                        <h1 className="dashboard-title">AI Caption Engine Wizard</h1>
+                        <button className="back-btn" onClick={onBack}>← Back</button>
+                    </div>
+                    <div style={{maxWidth: '800px', margin: '0 auto', padding: '40px'}}>
+                        <div className="card">
+                            <h2 className="card-title">Coming Soon</h2>
+                            <p>The guided Caption Engine wizard is under development.</p>
+                        </div>
+                    </div>
+                </div>
+            );
+        }
+
+        function AboutPage({ onBack }) {
+            return (
+                <div className="dashboard active">
+                    <div className="dashboard-header">
+                        <h1 className="dashboard-title">About Community Captioner</h1>
+                        <button className="back-btn" onClick={onBack}>← Back</button>
+                    </div>
+                    <div style={{maxWidth: '900px', margin: '0 auto', padding: '40px'}}>
+                        <div className="card">
+                            <h2 className="card-title">Project Overview</h2>
+                            <p style={{fontSize: '16px', lineHeight: '1.7', color: 'var(--text-medium)'}}>
+                                Community Captioner is a free, open-source live captioning system built specifically for
+                                community media organizations. Full documentation coming soon.
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            );
+        }
+
+        ReactDOM.render(<App />, document.getElementById('root'));
+    </script>
+</body>
+</html>

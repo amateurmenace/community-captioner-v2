@@ -13,7 +13,7 @@
             /* Sage green & warm background palette */
             --bg-warm: #F5F3EE;
             --bg-sage-light: #E8EDE7;
-            --bg-white: #F5F3EE;
+            --bg-white: #FFFFFF;
             --sage-primary: #7D9B76;
             --sage-dark: #5A7C55;
             --sage-darker: #3D5A47;
@@ -54,107 +54,23 @@
         .landing-page {
             min-height: 100vh;
             padding: 0;
-            background: #F5F3EE;
+            background: linear-gradient(135deg,
+                #E8F5E9 0%,
+                #C8E6C9 25%,
+                #A5D6A7 50%,
+                #C8E6C9 75%,
+                #E8F5E9 100%);
+            background-size: 400% 400%;
+            animation: gradientShift 8s ease-in-out infinite;
             position: relative;
             overflow-x: hidden;
         }
 
-        .blob-container {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            z-index: 0;
-            overflow: hidden;
-            pointer-events: none;
-        }
-
-        .blob {
-            position: absolute;
-            border-radius: 50%;
-            filter: blur(60px);
-            opacity: 0.15;
-            animation-timing-function: ease-in-out;
-            animation-iteration-count: infinite;
-        }
-
-        .blob-1 {
-            width: 400px;
-            height: 400px;
-            background: #81C784;
-            top: 10%;
-            left: 10%;
-            animation: float-1 20s infinite;
-        }
-
-        .blob-2 {
-            width: 350px;
-            height: 350px;
-            background: #9575CD;
-            top: 60%;
-            left: 70%;
-            animation: float-2 25s infinite;
-        }
-
-        .blob-3 {
-            width: 450px;
-            height: 450px;
-            background: #66BB6A;
-            top: 30%;
-            left: 60%;
-            animation: float-3 30s infinite;
-        }
-
-        .blob-4 {
-            width: 300px;
-            height: 300px;
-            background: #AB47BC;
-            top: 70%;
-            left: 20%;
-            animation: float-4 22s infinite;
-        }
-
-        .blob-5 {
-            width: 380px;
-            height: 380px;
-            background: #7E57C2;
-            top: 15%;
-            left: 80%;
-            animation: float-5 28s infinite;
-        }
-
-        @keyframes float-1 {
-            0%, 100% { transform: translate(0, 0) scale(1); }
-            25% { transform: translate(30px, -50px) scale(1.1); }
-            50% { transform: translate(-20px, 30px) scale(0.9); }
-            75% { transform: translate(40px, 20px) scale(1.05); }
-        }
-
-        @keyframes float-2 {
-            0%, 100% { transform: translate(0, 0) scale(1); }
-            25% { transform: translate(-40px, 30px) scale(0.95); }
-            50% { transform: translate(20px, -40px) scale(1.1); }
-            75% { transform: translate(-30px, -20px) scale(1); }
-        }
-
-        @keyframes float-3 {
-            0%, 100% { transform: translate(0, 0) scale(1); }
-            33% { transform: translate(-50px, 40px) scale(1.05); }
-            66% { transform: translate(30px, -30px) scale(0.95); }
-        }
-
-        @keyframes float-4 {
-            0%, 100% { transform: translate(0, 0) scale(1); }
-            25% { transform: translate(25px, 35px) scale(1.08); }
-            50% { transform: translate(-35px, -25px) scale(0.92); }
-            75% { transform: translate(15px, -40px) scale(1.03); }
-        }
-
-        @keyframes float-5 {
-            0%, 100% { transform: translate(0, 0) scale(1); }
-            33% { transform: translate(40px, -35px) scale(0.97); }
-            66% { transform: translate(-25px, 45px) scale(1.08); }
+        @keyframes gradientShift {
+            0%, 100% { background-position: 0% 50%; }
+            25% { background-position: 100% 50%; }
+            50% { background-position: 100% 100%; }
+            75% { background-position: 0% 100%; }
         }
 
         .landing-header {
@@ -163,9 +79,7 @@
             justify-content: space-between;
             align-items: center;
             border-bottom: 1px solid var(--border-light);
-            background: #F5F3EE;
-            position: relative;
-            z-index: 10;
+            background: var(--bg-white);
         }
 
         .logo-section {
@@ -214,20 +128,18 @@
 
         /* Demo Section */
         .demo-section {
-            max-width: 700px;
-            margin: 40px auto 40px;
+            max-width: 1000px;
+            margin: 0 auto 80px;
             padding: 0 32px;
-            position: relative;
-            z-index: 5;
         }
 
         .demo-card {
-            background: rgba(245, 243, 238, 0.95);
+            background: rgba(255, 255, 255, 0.95);
             backdrop-filter: blur(10px);
-            border: 2px solid var(--sage-primary);
-            border-radius: 20px;
-            padding: 28px;
-            box-shadow: 0 15px 40px rgba(61, 90, 71, 0.12);
+            border: 3px solid var(--sage-primary);
+            border-radius: 24px;
+            padding: 40px;
+            box-shadow: 0 20px 60px rgba(61, 90, 71, 0.15);
         }
 
         .demo-header {
@@ -238,7 +150,7 @@
         }
 
         .demo-title {
-            font-size: 22px;
+            font-size: 28px;
             font-weight: 800;
             color: var(--sage-darker);
             margin: 0;
@@ -280,10 +192,10 @@
 
         .demo-box {
             background: linear-gradient(135deg, #1a1a1a 0%, #2d2d2d 100%);
-            border-radius: 14px;
-            padding: 32px 28px;
-            margin-bottom: 16px;
-            min-height: 100px;
+            border-radius: 16px;
+            padding: 48px 40px;
+            margin-bottom: 20px;
+            min-height: 140px;
             display: flex;
             align-items: center;
             justify-content: center;
@@ -308,11 +220,11 @@
         }
 
         .demo-text {
-            font-size: 24px;
+            font-size: 32px;
             font-weight: 600;
             color: white;
             text-align: center;
-            line-height: 1.5;
+            line-height: 1.6;
             transition: all 0.5s ease;
             position: relative;
             z-index: 1;
@@ -363,8 +275,6 @@
             margin: 0 auto;
             padding: 100px 32px 80px;
             text-align: center;
-            position: relative;
-            z-index: 5;
         }
 
         .hero-title {
@@ -476,8 +386,6 @@
             display: grid;
             grid-template-columns: repeat(3, 1fr);
             gap: 24px;
-            position: relative;
-            z-index: 5;
         }
 
         .feature-card {
@@ -536,205 +444,6 @@
             font-weight: 700;
             text-transform: uppercase;
             margin-bottom: 8px;
-        }
-
-        /* About/FAQ Sections */
-        .info-section {
-            max-width: 1200px;
-            margin: 80px auto;
-            padding: 0 32px;
-            position: relative;
-            z-index: 5;
-        }
-
-        .section-title {
-            font-size: 42px;
-            font-weight: 900;
-            color: var(--sage-darker);
-            margin-bottom: 16px;
-            text-align: center;
-        }
-
-        .section-subtitle {
-            font-size: 18px;
-            color: var(--text-medium);
-            text-align: center;
-            margin-bottom: 48px;
-            max-width: 800px;
-            margin-left: auto;
-            margin-right: auto;
-        }
-
-        .info-grid {
-            display: grid;
-            grid-template-columns: repeat(2, 1fr);
-            gap: 28px;
-            margin-bottom: 40px;
-        }
-
-        .info-card {
-            background: var(--bg-white);
-            border: 2px solid var(--border-light);
-            border-radius: 16px;
-            padding: 32px;
-            transition: all 0.3s;
-        }
-
-        .info-card:hover {
-            border-color: var(--sage-primary);
-            transform: translateY(-2px);
-            box-shadow: 0 8px 24px rgba(61, 90, 71, 0.1);
-        }
-
-        .info-card h3 {
-            font-size: 24px;
-            font-weight: 700;
-            color: var(--sage-darker);
-            margin-bottom: 16px;
-            display: flex;
-            align-items: center;
-            gap: 12px;
-        }
-
-        .info-card p, .info-card li {
-            font-size: 16px;
-            color: var(--text-medium);
-            line-height: 1.7;
-            margin-bottom: 12px;
-        }
-
-        .info-card ul {
-            list-style: none;
-            padding-left: 0;
-        }
-
-        .info-card li::before {
-            content: "→";
-            color: var(--sage-primary);
-            font-weight: bold;
-            margin-right: 10px;
-        }
-
-        .faq-item {
-            background: var(--bg-white);
-            border: 2px solid var(--border-light);
-            border-radius: 12px;
-            padding: 24px;
-            margin-bottom: 16px;
-        }
-
-        .faq-question {
-            font-size: 18px;
-            font-weight: 700;
-            color: var(--sage-darker);
-            margin-bottom: 12px;
-        }
-
-        .faq-answer {
-            font-size: 16px;
-            color: var(--text-medium);
-            line-height: 1.7;
-        }
-
-        .highlight-box {
-            background: var(--bg-sage-light);
-            border-left: 4px solid var(--sage-primary);
-            padding: 20px 24px;
-            border-radius: 8px;
-            margin: 24px 0;
-        }
-
-        .highlight-box strong {
-            color: var(--sage-darker);
-            font-size: 17px;
-        }
-
-        /* Footer Styles */
-        .site-footer {
-            background: var(--sage-darker);
-            color: white;
-            padding: 48px 32px 32px;
-            margin-top: 100px;
-            position: relative;
-            z-index: 5;
-        }
-
-        .footer-content {
-            max-width: 1200px;
-            margin: 0 auto;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            gap: 28px;
-        }
-
-        .footer-text {
-            font-size: 16px;
-            line-height: 1.8;
-            text-align: center;
-            max-width: 800px;
-        }
-
-        .footer-text a {
-            color: #A5D6A7;
-            text-decoration: none;
-            font-weight: 600;
-            transition: color 0.2s;
-        }
-
-        .footer-text a:hover {
-            color: #C8E6C9;
-            text-decoration: underline;
-        }
-
-        .footer-logos {
-            display: flex;
-            align-items: center;
-            gap: 32px;
-            flex-wrap: wrap;
-            justify-content: center;
-        }
-
-        .footer-logo {
-            height: 60px;
-            object-fit: contain;
-            opacity: 0.9;
-            transition: opacity 0.2s;
-        }
-
-        .footer-logo:hover {
-            opacity: 1;
-        }
-
-        .footer-links {
-            display: flex;
-            gap: 20px;
-            align-items: center;
-        }
-
-        .footer-icon-link {
-            color: white;
-            font-size: 28px;
-            text-decoration: none;
-            opacity: 0.8;
-            transition: opacity 0.2s, transform 0.2s;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-        }
-
-        .footer-icon-link:hover {
-            opacity: 1;
-            transform: translateY(-2px);
-        }
-
-        .footer-license {
-            font-size: 13px;
-            color: #C8E6C9;
-            text-align: center;
-            margin-top: 16px;
-            padding-top: 24px;
-            border-top: 1px solid rgba(255, 255, 255, 0.2);
         }
 
         /* Dashboard Styles */
@@ -1601,13 +1310,6 @@
         function LandingPage({ onStartDashboard, onStartEngine, onShowAbout, onShowAISettings }) {
             return (
                 <div className="landing-page">
-                    <div className="blob-container">
-                        <div className="blob blob-1"></div>
-                        <div className="blob blob-2"></div>
-                        <div className="blob blob-3"></div>
-                        <div className="blob blob-4"></div>
-                        <div className="blob blob-5"></div>
-                    </div>
                     <header className="landing-header">
                         <div className="logo-section">
                             <div className="logo-icon">
@@ -1649,8 +1351,6 @@
                             Free, open-source captioning that actually gets local names right. Automatically corrects "Brooklyn" to "Brookline" and "bernard green" to "Bernard Greene" using AI trained on your community's documents.
                         </p>
 
-                        <CaptionDemo />
-
                         <div className="cta-buttons">
                             <button className="cta-btn cta-btn-primary" onClick={onStartDashboard}>
                                 Open Control Dashboard
@@ -1660,6 +1360,8 @@
                             </button>
                         </div>
                     </section>
+
+                    <CaptionDemo />
 
                     <div className="feature-cards">
                         <div className="feature-card" onClick={onStartDashboard}>
@@ -1672,6 +1374,7 @@
                         </div>
 
                         <div className="feature-card special" onClick={onStartEngine}>
+                            <span className="special-badge">Unique Feature</span>
                             <div className="feature-icon">⚡</div>
                             <h3 className="feature-title">AI Caption Engine</h3>
                             <p className="feature-desc">
@@ -1689,191 +1392,6 @@
                             </p>
                         </div>
                     </div>
-
-                    {/* About Section */}
-                    <section className="info-section">
-                        <h2 className="section-title">About Community Captioner</h2>
-                        <p className="section-subtitle">
-                            Free, open-source live captioning built for community media organizations
-                        </p>
-
-                        <div className="highlight-box">
-                            <strong>The Problem:</strong> Commercial live captioning encoders cost $30,000+, putting accessibility features out of reach for community media stations, local governments, and small organizations.
-                        </div>
-
-                        <div className="info-grid">
-                            <div className="info-card">
-                                <h3>🎯 Why It Exists</h3>
-                                <p>
-                                    Community Captioner was created for Brookline Interactive Group (BIG), a community media organization in Brookline, MA. They needed live captions for town meetings and local programming but couldn't afford commercial solutions.
-                                </p>
-                                <p>
-                                    This tool provides professional-grade captioning at zero cost, using browser APIs and optional local AI.
-                                </p>
-                            </div>
-
-                            <div className="info-card">
-                                <h3>✨ What Makes It Unique</h3>
-                                <p>
-                                    Generic speech recognition systems fail on local proper nouns. They transcribe "Bernard Greene" as "bernard green" and "Brookline" as "Brooklyn."
-                                </p>
-                                <p>
-                                    The <strong>AI Caption Engine</strong> uses RAG (Retrieval Augmented Generation) to automatically correct these errors based on your community's specific vocabulary.
-                                </p>
-                            </div>
-
-                            <div className="info-card">
-                                <h3>🧠 How RAG Works</h3>
-                                <p>
-                                    RAG stands for Retrieval Augmented Generation. Here's how it corrects captions:
-                                </p>
-                                <ul>
-                                    <li>You upload documents (meeting agendas, staff directories, etc.)</li>
-                                    <li>AI extracts proper nouns (people, places, organizations)</li>
-                                    <li>System builds a local correction dictionary</li>
-                                    <li>Incoming captions are matched and corrected in real-time</li>
-                                </ul>
-                            </div>
-
-                            <div className="info-card">
-                                <h3>🏗️ Design Values</h3>
-                                <ul>
-                                    <li><strong>Zero Dependencies:</strong> Works in any browser, no installation required</li>
-                                    <li><strong>Privacy First:</strong> Can run 100% locally with Whisper AI</li>
-                                    <li><strong>Community Focused:</strong> Built for local governments and community media</li>
-                                    <li><strong>Free Forever:</strong> Open source under CC BY-SA 4.0 license</li>
-                                </ul>
-                            </div>
-                        </div>
-                    </section>
-
-                    {/* How To Section */}
-                    <section className="info-section">
-                        <h2 className="section-title">How To Use</h2>
-                        <p className="section-subtitle">
-                            Get started with live captioning in three simple steps
-                        </p>
-
-                        <div className="info-grid">
-                            <div className="info-card">
-                                <h3>1️⃣ Start Captioning</h3>
-                                <ul>
-                                    <li>Click "Open Control Dashboard"</li>
-                                    <li>Choose Browser Mode (fast, needs internet) or Whisper Mode (local, more accurate)</li>
-                                    <li>Click "Start Listening" and speak - captions appear instantly</li>
-                                    <li>Copy the overlay URL and add to OBS/vMix as a browser source</li>
-                                </ul>
-                            </div>
-
-                            <div className="info-card">
-                                <h3>2️⃣ Configure The Engine</h3>
-                                <ul>
-                                    <li>Upload meeting agendas or staff directories</li>
-                                    <li>AI automatically extracts names, places, and organizations</li>
-                                    <li>Review and edit extracted terms</li>
-                                    <li>Toggle the engine on to start correcting captions</li>
-                                </ul>
-                            </div>
-
-                            <div className="info-card">
-                                <h3>3️⃣ Record Sessions</h3>
-                                <ul>
-                                    <li>Click "Start Recording" before your event</li>
-                                    <li>All captions are timestamped automatically</li>
-                                    <li>After the event, click "Stop Recording"</li>
-                                    <li>Export captions as SRT, VTT, TXT, or JSON for archival</li>
-                                </ul>
-                            </div>
-
-                            <div className="info-card">
-                                <h3>🎨 Customize Appearance</h3>
-                                <ul>
-                                    <li>Adjust font size, family, and colors</li>
-                                    <li>Position captions (top, middle, bottom)</li>
-                                    <li>Control background opacity and text shadows</li>
-                                    <li>Add your organization's logo to the overlay</li>
-                                </ul>
-                            </div>
-                        </div>
-                    </section>
-
-                    {/* FAQ Section */}
-                    <section className="info-section">
-                        <h2 className="section-title">Frequently Asked Questions</h2>
-
-                        <div className="faq-item">
-                            <div className="faq-question">Do I need an OpenAI API key?</div>
-                            <div className="faq-answer">
-                                No! The basic captioning features work without any AI. You only need an API key if you want AI-powered features like automatic term extraction from documents or session summaries. You can also use local AI providers like Ollama or LM Studio for free.
-                            </div>
-                        </div>
-
-                        <div className="faq-item">
-                            <div className="faq-question">What's the difference between Browser Mode and Whisper Mode?</div>
-                            <div className="faq-answer">
-                                <strong>Browser Mode:</strong> Uses your browser's built-in speech recognition (Web Speech API). Fast (~200ms latency) but requires Chrome/Edge and internet connection. Less accurate with proper nouns.<br/><br/>
-                                <strong>Whisper Mode:</strong> Uses OpenAI's Whisper AI model running locally on your computer. More accurate, works offline, but has 2-4 second latency. Requires Python and faster-whisper installation.
-                            </div>
-                        </div>
-
-                        <div className="faq-item">
-                            <div className="faq-question">Can I use this for live streaming?</div>
-                            <div className="faq-answer">
-                                Yes! The overlay URL can be added to OBS, vMix, or any streaming software that supports browser sources. Captions will appear live on your stream.
-                            </div>
-                        </div>
-
-                        <div className="faq-item">
-                            <div className="faq-question">How do I share my correction engine with other organizations?</div>
-                            <div className="faq-answer">
-                                Click "Configure Engine" → "Download Engine" to export your correction rules as a JSON file. Other organizations can import this file to instantly get your community's vocabulary. Perfect for sharing between towns or sister organizations.
-                            </div>
-                        </div>
-
-                        <div className="faq-item">
-                            <div className="faq-question">Is my data private?</div>
-                            <div className="faq-answer">
-                                <strong>Browser Mode:</strong> Audio is sent to Google/Microsoft's servers for transcription.<br/>
-                                <strong>Whisper Mode:</strong> Everything stays on your computer. No data leaves your machine.<br/>
-                                <strong>AI Features:</strong> If using OpenAI, document text is sent for processing. If using Ollama/LM Studio, everything stays local.
-                            </div>
-                        </div>
-
-                        <div className="faq-item">
-                            <div className="faq-question">What file formats can I export?</div>
-                            <div className="faq-answer">
-                                Sessions can be exported as SRT (subtitles), VTT (web video), TXT (plain transcript), or JSON (full data including corrections and timestamps). Perfect for archival or post-production editing.
-                            </div>
-                        </div>
-                    </section>
-
-                    {/* Footer */}
-                    <footer className="site-footer">
-                        <div className="footer-content">
-                            <div className="footer-text">
-                                A <a href="https://community.weirdmachine.org" target="_blank" rel="noopener noreferrer">Community AI Project</a> from <a href="https://brooklineinteractive.org" target="_blank" rel="noopener noreferrer">Brookline Interactive Group</a> in partnership with <a href="https://neighborhoodai.org" target="_blank" rel="noopener noreferrer">Neighborhood AI</a>
-                                <br/>
-                                Designed and developed by <a href="https://weirdmachine.org" target="_blank" rel="noopener noreferrer">Stephen Walter</a> + AI
-                            </div>
-
-                            <div className="footer-logos">
-                                <img src="/big-logo.png" alt="Brookline Interactive Group" className="footer-logo" />
-                                <img src="/weird-machine-logo.png" alt="Weird Machine" className="footer-logo" />
-                            </div>
-
-                            <div className="footer-links">
-                                <a href="https://github.com/weirdmachine-org/community-captioner-v2" target="_blank" rel="noopener noreferrer" className="footer-icon-link" title="View on GitHub">
-                                    <svg width="28" height="28" fill="currentColor" viewBox="0 0 24 24">
-                                        <path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/>
-                                    </svg>
-                                </a>
-                            </div>
-
-                            <div className="footer-license">
-                                Licensed under CC BY-SA 4.0 — Free to use, modify, and share with attribution
-                            </div>
-                        </div>
-                    </footer>
                 </div>
             );
         }
@@ -2242,6 +1760,7 @@
                             <div className="card">
                                 <h2 className="card-title">
                                     AI Caption Engine
+                                    <span className="card-badge">Unique</span>
                                 </h2>
                                 <div className="toggle-setting">
                                     <span className="toggle-label">
