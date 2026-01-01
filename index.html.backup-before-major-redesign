@@ -1639,12 +1639,14 @@
 
                     <section className="hero-section">
                         <h1 className="hero-title">AI for Accessibility</h1>
-
-                        <CaptionDemo />
-
                         <p className="hero-subtitle">
                             Professional live captioning for community media. Zero cost. Powered by AI + Human intelligence.
                         </p>
+                        <p className="hero-description">
+                            Free, open-source captioning that actually gets local names right. Automatically corrects "Brooklyn" to "Brookline" and "bernard green" to "Bernard Greene" using AI trained on your community's documents.
+                        </p>
+
+                        <CaptionDemo />
 
                         <div className="cta-buttons">
                             <button className="cta-btn cta-btn-primary" onClick={onStartDashboard}>
@@ -1658,7 +1660,7 @@
 
                     <div className="feature-cards">
                         <div className="feature-card" onClick={onStartDashboard}>
-                            
+                            <div className="feature-icon">▶</div>
                             <h3 className="feature-title">Live Overlay</h3>
                             <p className="feature-desc">
                                 Real-time captions for OBS, vMix, and streaming platforms.
@@ -1667,7 +1669,7 @@
                         </div>
 
                         <div className="feature-card special" onClick={onStartEngine}>
-                            
+                            <div className="feature-icon">⚡</div>
                             <h3 className="feature-title">AI Caption Engine</h3>
                             <p className="feature-desc">
                                 Automatically corrects local names, places, and organizations.
@@ -1676,7 +1678,7 @@
                         </div>
 
                         <div className="feature-card" onClick={onStartDashboard}>
-                            
+                            <div className="feature-icon">📝</div>
                             <h3 className="feature-title">Session Recording</h3>
                             <p className="feature-desc">
                                 Record and export captions in SRT, VTT, TXT, or JSON formats.
@@ -1698,7 +1700,7 @@
 
                         <div className="info-grid">
                             <div className="info-card">
-                                <h3>Why It Exists</h3>
+                                <h3>🎯 Why It Exists</h3>
                                 <p>
                                     Community Captioner was created for Brookline Interactive Group (BIG), a community media organization in Brookline, MA. They needed live captions for town meetings and local programming but couldn't afford commercial solutions.
                                 </p>
@@ -1708,7 +1710,7 @@
                             </div>
 
                             <div className="info-card">
-                                <h3>What Makes It Unique</h3>
+                                <h3>✨ What Makes It Unique</h3>
                                 <p>
                                     Generic speech recognition systems fail on local proper nouns. They transcribe "Bernard Greene" as "bernard green" and "Brookline" as "Brooklyn."
                                 </p>
@@ -1718,7 +1720,7 @@
                             </div>
 
                             <div className="info-card">
-                                <h3>How RAG Works</h3>
+                                <h3>🧠 How RAG Works</h3>
                                 <p>
                                     RAG stands for Retrieval Augmented Generation. Here's how it corrects captions:
                                 </p>
@@ -1731,7 +1733,7 @@
                             </div>
 
                             <div className="info-card">
-                                <h3>Design Values</h3>
+                                <h3>🏗️ Design Values</h3>
                                 <ul>
                                     <li><strong>Zero Dependencies:</strong> Works in any browser, no installation required</li>
                                     <li><strong>Privacy First:</strong> Can run 100% locally with Whisper AI</li>
@@ -1751,7 +1753,7 @@
 
                         <div className="info-grid">
                             <div className="info-card">
-                                <h3>Start Captioning</h3>
+                                <h3>1️⃣ Start Captioning</h3>
                                 <ul>
                                     <li>Click "Open Control Dashboard"</li>
                                     <li>Choose Browser Mode (fast, needs internet) or Whisper Mode (local, more accurate)</li>
@@ -1761,7 +1763,7 @@
                             </div>
 
                             <div className="info-card">
-                                <h3>Configure The Engine</h3>
+                                <h3>2️⃣ Configure The Engine</h3>
                                 <ul>
                                     <li>Upload meeting agendas or staff directories</li>
                                     <li>AI automatically extracts names, places, and organizations</li>
@@ -1771,7 +1773,7 @@
                             </div>
 
                             <div className="info-card">
-                                <h3>Record Sessions</h3>
+                                <h3>3️⃣ Record Sessions</h3>
                                 <ul>
                                     <li>Click "Start Recording" before your event</li>
                                     <li>All captions are timestamped automatically</li>
@@ -1781,7 +1783,7 @@
                             </div>
 
                             <div className="info-card">
-                                <h3>Customize Appearance</h3>
+                                <h3>🎨 Customize Appearance</h3>
                                 <ul>
                                     <li>Adjust font size, family, and colors</li>
                                     <li>Position captions (top, middle, bottom)</li>
@@ -1853,7 +1855,7 @@
 
                             <div className="footer-logos">
                                 <img src="/big-logo.png" alt="Brookline Interactive Group" className="footer-logo" />
-                                <img src="/cc-logo.png" alt="Community Captioner" className="footer-logo" />
+                                <img src="/weird-machine-logo.png" alt="Weird Machine" className="footer-logo" />
                             </div>
 
                             <div className="footer-links">
