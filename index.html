@@ -4054,12 +4054,12 @@
 
                 const interval = setInterval(() => {
                     // Simulate confidence variations (75-95%)
-                    const baseConfidence = captionMode === 'browser' ? 85 : 90;
+                    const baseConfidence = browserListening ? 85 : 90;
                     const variance = Math.random() * 15 - 7.5; // ±7.5%
                     setCaptionConfidence(Math.round(Math.max(75, Math.min(95, baseConfidence + variance))));
 
                     // Simulate delay (browser: 0.1-0.5s, whisper: 2-4s)
-                    if (captionMode === 'browser') {
+                    if (browserListening) {
                         setCaptionDelay(0.1 + Math.random() * 0.4);
                     } else {
                         setCaptionDelay(2.0 + Math.random() * 2.0);
@@ -4067,7 +4067,7 @@
                 }, 2000); // Update every 2 seconds
 
                 return () => clearInterval(interval);
-            }, [browserListening, whisperListening, captionMode]);
+            }, [browserListening, whisperListening]);
 
             const loadWhisperModel = () => {
                 setModelLoading(true);
