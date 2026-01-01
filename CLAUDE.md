@@ -497,11 +497,33 @@ community-captioner/
 
 ## Roadmap (v4.1 and Beyond)
 
-### Next Steps - Frontend UI for v4.0 Features
-1. **RAG Suggestions Panel** - Review and accept/reject low-confidence suggestions (0.60-0.85)
-2. **Knowledge Base UI** - Document upload panel, entity viewer, sync button
-3. **Video Intelligence Panel** - Upload video, generate highlights, download reel
-4. **Editable Corrections** - Allow editing corrections in post-session analysis
+### Completed - v4.0 Frontend UI (January 2026)
+1. **RAG Suggestions Panel** - COMPLETED
+   - Collapsible panel in Dashboard sidebar
+   - Displays pending low-confidence corrections (0.60-0.85 confidence)
+   - One-click Accept/Reject buttons
+   - Real-time polling for new suggestions
+   - Purple accent border when suggestions pending
+
+2. **Knowledge Base UI** - COMPLETED
+   - Full-width collapsible panel in Dashboard
+   - Upload PDF/DOCX files or paste text
+   - View extracted entities with category color coding
+   - Sync entities to caption engine with one click
+   - Document list with entity counts and remove button
+
+3. **Video Intelligence Panel** - COMPLETED
+   - Full-width collapsible panel in Dashboard
+   - Upload MP4/MOV video files
+   - Generate AI-powered highlights from transcript
+   - Create highlight reel (requires ffmpeg)
+   - Display detected highlights with timestamps and scores
+
+4. **Editable Corrections** - COMPLETED
+   - Edit/Undo buttons on each correction in SessionAnalysisPage
+   - Inline editing with Save/Cancel
+   - Changes automatically update the transcript
+   - Undo restores original ASR text
 
 ### High Priority - UX Polish
 1. **Mobile Responsive** - Test and fix layout on tablets/phones

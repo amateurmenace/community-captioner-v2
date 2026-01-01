@@ -2975,6 +2975,11 @@
             const [editingSegment, setEditingSegment] = useState(null);
             const [editedCaptions, setEditedCaptions] = useState(data.captions || []);
 
+            // Editable corrections state
+            const [editedCorrections, setEditedCorrections] = useState(data.corrections || []);
+            const [editingCorrection, setEditingCorrection] = useState(null);
+            const [correctionEditValue, setCorrectionEditValue] = useState('');
+
             const formatTime = (seconds) => {
                 const h = Math.floor(seconds / 3600);
                 const m = Math.floor((seconds % 3600) / 60);
@@ -3099,6 +3104,64 @@
                 }
                 setEditedCaptions(updated);
                 setEditingSegment(null);
+            };
+
+            // Edit correction functions
+            const startEditingCorrection = (index, correction) => {
+                setEditingCorrection(index);
+                setCorrectionEditValue(correction.to);
+            };
+
+            const saveCorrectionEdit = (index) => {
+                const updated = [...editedCorrections];
+                const oldTo = updated[index].to;
+                updated[index] = { ...updated[index], to: correctionEditValue };
+                setEditedCorrections(updated);
+
+                // Also update the transcript where this correction was applied
+                const updatedCaptions = editedCaptions.map(c => {
+                    const text = c.corrected || c.text || (typeof c === 'string' ? c : '');
+                    if (text.includes(oldTo)) {
+                        const newText = text.replace(new RegExp(oldTo.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g'), correctionEditValue);
+                        if (typeof c === 'object') {
+                            return { ...c, corrected: newText, text: newText };
+                        }
+                        return newText;
+                    }
+                    return c;
+                });
+                setEditedCaptions(updatedCaptions);
+
+                setEditingCorrection(null);
+                setCorrectionEditValue('');
+            };
+
+            const cancelCorrectionEdit = () => {
+                setEditingCorrection(null);
+                setCorrectionEditValue('');
+            };
+
+            const deleteCorrection = (index) => {
+                if (!confirm('Remove this correction? The original text will be restored in the transcript.')) return;
+                const correction = editedCorrections[index];
+
+                // Restore original text in transcript
+                const updatedCaptions = editedCaptions.map(c => {
+                    const text = c.corrected || c.text || (typeof c === 'string' ? c : '');
+                    if (text.includes(correction.to)) {
+                        const restoredText = text.replace(new RegExp(correction.to.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g'), correction.from);
+                        if (typeof c === 'object') {
+                            return { ...c, corrected: restoredText, text: restoredText };
+                        }
+                        return restoredText;
+                    }
+                    return c;
+                });
+                setEditedCaptions(updatedCaptions);
+
+                // Remove correction from list
+                const updated = editedCorrections.filter((_, i) => i !== index);
+                setEditedCorrections(updated);
             };
 
             // Collapsible section component
@@ -3411,20 +3474,74 @@
                         </div>
                     </CollapsibleSection>
 
-                    {/* Collapsible Corrections Section */}
-                    <CollapsibleSection title="AI Corrections" isOpen={showCorrections} onToggle={() => setShowCorrections(!showCorrections)} badge={data.corrections?.length || 0}>
+                    {/* Collapsible Corrections Section - Editable */}
+                    <CollapsibleSection title="AI Corrections" isOpen={showCorrections} onToggle={() => setShowCorrections(!showCorrections)} badge={editedCorrections.length || 0}>
+                        <p style={{fontSize: '13px', color: 'var(--text-light)', marginBottom: '12px'}}>
+                            Click the edit button to modify corrections. Changes will update the transcript.
+                        </p>
                         <div style={{maxHeight: '300px', overflowY: 'auto'}}>
-                            {data.corrections && data.corrections.length > 0 ? (
-                                data.corrections.map((c, i) => (
-                                    <div key={i} style={{padding: '12px 16px', borderBottom: '1px solid var(--border-light)', display: 'flex', justifyContent: 'space-between', alignItems: 'center'}}>
-                                        <div>
-                                            <span style={{color: '#DC2626', textDecoration: 'line-through', marginRight: '12px'}}>{c.from}</span>
-                                            <span style={{color: 'var(--text-medium)'}}>→</span>
-                                            <span style={{color: '#00A676', fontWeight: '600', marginLeft: '12px'}}>{c.to}</span>
-                                        </div>
-                                        <span style={{fontSize: '12px', color: 'var(--text-medium)', background: 'var(--bg-sage-light)', padding: '2px 8px', borderRadius: '4px'}}>
-                                            {c.category || 'term'}
-                                        </span>
+                            {editedCorrections && editedCorrections.length > 0 ? (
+                                editedCorrections.map((c, i) => (
+                                    <div key={i} style={{padding: '12px 16px', borderBottom: '1px solid var(--border-light)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '12px'}}>
+                                        {editingCorrection === i ? (
+                                            // Editing mode
+                                            <div style={{flex: 1, display: 'flex', alignItems: 'center', gap: '12px'}}>
+                                                <span style={{color: '#DC2626', textDecoration: 'line-through'}}>{c.from}</span>
+                                                <span style={{color: 'var(--text-medium)'}}>→</span>
+                                                <input
+                                                    type="text"
+                                                    className="setting-input"
+                                                    value={correctionEditValue}
+                                                    onChange={(e) => setCorrectionEditValue(e.target.value)}
+                                                    autoFocus
+                                                    onKeyDown={(e) => {
+                                                        if (e.key === 'Enter') saveCorrectionEdit(i);
+                                                        if (e.key === 'Escape') cancelCorrectionEdit();
+                                                    }}
+                                                    style={{flex: 1, maxWidth: '200px', padding: '6px 10px', fontSize: '14px'}}
+                                                />
+                                                <button
+                                                    onClick={() => saveCorrectionEdit(i)}
+                                                    style={{padding: '6px 12px', background: 'var(--sage-primary)', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '12px', fontWeight: '600'}}
+                                                >
+                                                    Save
+                                                </button>
+                                                <button
+                                                    onClick={cancelCorrectionEdit}
+                                                    style={{padding: '6px 12px', background: 'transparent', border: '1px solid var(--border-light)', borderRadius: '4px', cursor: 'pointer', fontSize: '12px'}}
+                                                >
+                                                    Cancel
+                                                </button>
+                                            </div>
+                                        ) : (
+                                            // Display mode
+                                            <>
+                                                <div style={{flex: 1}}>
+                                                    <span style={{color: '#DC2626', textDecoration: 'line-through', marginRight: '12px'}}>{c.from}</span>
+                                                    <span style={{color: 'var(--text-medium)'}}>→</span>
+                                                    <span style={{color: '#00A676', fontWeight: '600', marginLeft: '12px'}}>{c.to}</span>
+                                                </div>
+                                                <div style={{display: 'flex', alignItems: 'center', gap: '8px'}}>
+                                                    <span style={{fontSize: '12px', color: 'var(--text-medium)', background: 'var(--bg-sage-light)', padding: '2px 8px', borderRadius: '4px'}}>
+                                                        {c.category || 'term'}
+                                                    </span>
+                                                    <button
+                                                        onClick={() => startEditingCorrection(i, c)}
+                                                        style={{padding: '4px 8px', background: 'transparent', border: '1px solid var(--border-light)', borderRadius: '4px', cursor: 'pointer', fontSize: '11px'}}
+                                                        title="Edit this correction"
+                                                    >
+                                                        Edit
+                                                    </button>
+                                                    <button
+                                                        onClick={() => deleteCorrection(i)}
+                                                        style={{padding: '4px 8px', background: 'transparent', border: '1px solid #DC2626', color: '#DC2626', borderRadius: '4px', cursor: 'pointer', fontSize: '11px'}}
+                                                        title="Remove this correction and restore original"
+                                                    >
+                                                        Undo
+                                                    </button>
+                                                </div>
+                                            </>
+                                        )}
                                     </div>
                                 ))
                             ) : (
@@ -3507,6 +3624,23 @@
             const [showAnalysis, setShowAnalysis] = useState(false);
             const [analysisData, setAnalysisData] = useState(null);
 
+            // RAG Suggestions state
+            const [ragSuggestions, setRagSuggestions] = useState([]);
+            const [showSuggestionsPanel, setShowSuggestionsPanel] = useState(false);
+
+            // Knowledge Base state
+            const [showKnowledgePanel, setShowKnowledgePanel] = useState(false);
+            const [knowledgeStatus, setKnowledgeStatus] = useState({ documents: [], entity_count: 0 });
+            const [knowledgeEntities, setKnowledgeEntities] = useState([]);
+            const [knowledgeUploadText, setKnowledgeUploadText] = useState('');
+            const [knowledgeUploading, setKnowledgeUploading] = useState(false);
+
+            // Video Intelligence state
+            const [showVideoPanel, setShowVideoPanel] = useState(false);
+            const [videoStatus, setVideoStatus] = useState({ has_video: false, ffmpeg_available: false });
+            const [videoUploading, setVideoUploading] = useState(false);
+            const [videoHighlights, setVideoHighlights] = useState([]);
+
             // Speech recognition ref
             const recognitionRef = useRef(null);
 
@@ -3587,6 +3721,14 @@
                             setEngineName(data.name || 'Default Engine');
                         })
                         .catch(err => console.error('Error fetching engine status:', err));
+
+                    // Fetch RAG suggestions
+                    fetch('/api/engine/suggestions')
+                        .then(r => r.json())
+                        .then(data => {
+                            setRagSuggestions(data.suggestions || []);
+                        })
+                        .catch(err => console.error('Error fetching suggestions:', err));
                 }, 500);
 
                 // Fetch Whisper devices on mount
@@ -3829,6 +3971,206 @@
 
                 // Reset input so same file can be uploaded again
                 event.target.value = '';
+            };
+
+            const acceptSuggestion = (suggestion) => {
+                fetch('/api/engine/suggestion/accept', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ from: suggestion.from, to: suggestion.to })
+                })
+                .then(r => r.json())
+                .then(() => {
+                    // Remove from local state immediately for better UX
+                    setRagSuggestions(prev => prev.filter(s =>
+                        !(s.from === suggestion.from && s.to === suggestion.to)
+                    ));
+                })
+                .catch(err => console.error('Error accepting suggestion:', err));
+            };
+
+            const rejectSuggestion = (suggestion) => {
+                fetch('/api/engine/suggestion/reject', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ from: suggestion.from, to: suggestion.to })
+                })
+                .then(r => r.json())
+                .then(() => {
+                    // Remove from local state immediately
+                    setRagSuggestions(prev => prev.filter(s =>
+                        !(s.from === suggestion.from && s.to === suggestion.to)
+                    ));
+                })
+                .catch(err => console.error('Error rejecting suggestion:', err));
+            };
+
+            // Knowledge Base functions
+            const loadKnowledgeStatus = () => {
+                fetch('/api/knowledge/status')
+                    .then(r => r.json())
+                    .then(data => setKnowledgeStatus(data))
+                    .catch(err => console.error('Error fetching knowledge status:', err));
+
+                fetch('/api/knowledge/entities')
+                    .then(r => r.json())
+                    .then(data => setKnowledgeEntities(data.entities || []))
+                    .catch(err => console.error('Error fetching knowledge entities:', err));
+            };
+
+            const uploadKnowledgeText = () => {
+                if (!knowledgeUploadText.trim()) return;
+                setKnowledgeUploading(true);
+                fetch('/api/knowledge/upload', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        filename: 'pasted_text.txt',
+                        text: knowledgeUploadText
+                    })
+                })
+                .then(r => r.json())
+                .then(data => {
+                    setKnowledgeUploading(false);
+                    if (data.status === 'ok' || data.doc_id) {
+                        setKnowledgeUploadText('');
+                        loadKnowledgeStatus();
+                        alert('Document added! Entities extracted: ' + (data.entity_count || 0));
+                    } else {
+                        alert('Error: ' + (data.error || 'Unknown error'));
+                    }
+                })
+                .catch(err => {
+                    setKnowledgeUploading(false);
+                    console.error('Error uploading:', err);
+                });
+            };
+
+            const uploadKnowledgeFile = (event) => {
+                const file = event.target.files[0];
+                if (!file) return;
+                setKnowledgeUploading(true);
+
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    const base64 = e.target.result.split(',')[1];
+                    fetch('/api/knowledge/upload', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            filename: file.name,
+                            content: base64
+                        })
+                    })
+                    .then(r => r.json())
+                    .then(data => {
+                        setKnowledgeUploading(false);
+                        if (data.status === 'ok' || data.doc_id) {
+                            loadKnowledgeStatus();
+                            alert('Document uploaded! Entities extracted: ' + (data.entity_count || 0));
+                        } else {
+                            alert('Error: ' + (data.error || 'Unknown error'));
+                        }
+                    })
+                    .catch(err => {
+                        setKnowledgeUploading(false);
+                        console.error('Error uploading:', err);
+                    });
+                };
+                reader.readAsDataURL(file);
+                event.target.value = '';
+            };
+
+            const removeKnowledgeDocument = (docId) => {
+                if (!confirm('Remove this document from the knowledge base?')) return;
+                fetch('/api/knowledge/remove', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ doc_id: docId })
+                })
+                .then(r => r.json())
+                .then(() => loadKnowledgeStatus())
+                .catch(err => console.error('Error removing document:', err));
+            };
+
+            const syncKnowledgeToEngine = () => {
+                fetch('/api/knowledge/sync', { method: 'POST' })
+                    .then(r => r.json())
+                    .then(data => {
+                        if (data.synced_count !== undefined) {
+                            alert('Synced ' + data.synced_count + ' entities to caption engine!');
+                        }
+                    })
+                    .catch(err => console.error('Error syncing:', err));
+            };
+
+            // Video Intelligence functions
+            const loadVideoStatus = () => {
+                fetch('/api/video/status')
+                    .then(r => r.json())
+                    .then(data => setVideoStatus(data))
+                    .catch(err => console.error('Error fetching video status:', err));
+            };
+
+            const uploadVideo = (event) => {
+                const file = event.target.files[0];
+                if (!file) return;
+                setVideoUploading(true);
+
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    const base64 = e.target.result.split(',')[1];
+                    fetch('/api/video/upload', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            filename: file.name,
+                            content: base64
+                        })
+                    })
+                    .then(r => r.json())
+                    .then(data => {
+                        setVideoUploading(false);
+                        if (data.status === 'ok') {
+                            loadVideoStatus();
+                            alert('Video uploaded successfully!');
+                        } else {
+                            alert('Error: ' + (data.error || 'Unknown error'));
+                        }
+                    })
+                    .catch(err => {
+                        setVideoUploading(false);
+                        console.error('Error uploading video:', err);
+                    });
+                };
+                reader.readAsDataURL(file);
+                event.target.value = '';
+            };
+
+            const generateHighlights = () => {
+                fetch('/api/video/highlights', { method: 'POST' })
+                    .then(r => r.json())
+                    .then(data => {
+                        if (data.highlights) {
+                            setVideoHighlights(data.highlights);
+                        } else {
+                            alert('Error: ' + (data.error || 'Could not generate highlights'));
+                        }
+                    })
+                    .catch(err => console.error('Error generating highlights:', err));
+            };
+
+            const generateHighlightReel = () => {
+                fetch('/api/video/highlight-reel', { method: 'POST' })
+                    .then(r => r.json())
+                    .then(data => {
+                        if (data.reel_path) {
+                            alert('Highlight reel created: ' + data.reel_path);
+                        } else {
+                            alert('Error: ' + (data.error || 'Could not generate reel'));
+                        }
+                    })
+                    .catch(err => console.error('Error generating highlight reel:', err));
             };
 
             // Show analysis page if post-session
@@ -4145,6 +4487,99 @@
                                 </div>
                             </div>
 
+                            {/* RAG Suggestions Panel */}
+                            <div className="card" style={{border: ragSuggestions.length > 0 ? '2px solid var(--purple-accent)' : '1px solid var(--border-light)'}}>
+                                <div
+                                    style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer'}}
+                                    onClick={() => setShowSuggestionsPanel(!showSuggestionsPanel)}
+                                >
+                                    <h2 className="card-title" style={{margin: 0, borderBottom: 'none', paddingBottom: 0, display: 'flex', alignItems: 'center', gap: '8px'}}>
+                                        AI Suggestions
+                                        {ragSuggestions.length > 0 && (
+                                            <span style={{
+                                                background: 'var(--purple-accent)',
+                                                color: 'white',
+                                                fontSize: '12px',
+                                                fontWeight: '600',
+                                                padding: '2px 8px',
+                                                borderRadius: '12px'
+                                            }}>
+                                                {ragSuggestions.length}
+                                            </span>
+                                        )}
+                                    </h2>
+                                    <span style={{fontSize: '18px', color: 'var(--text-medium)'}}>{showSuggestionsPanel ? '▼' : '▶'}</span>
+                                </div>
+
+                                {showSuggestionsPanel && (
+                                    <div style={{marginTop: '16px'}}>
+                                        {ragSuggestions.length === 0 ? (
+                                            <div style={{padding: '20px', textAlign: 'center', color: 'var(--text-light)', fontSize: '14px'}}>
+                                                No pending suggestions. The AI engine suggests corrections when confidence is between 60-85%.
+                                            </div>
+                                        ) : (
+                                            <div style={{display: 'flex', flexDirection: 'column', gap: '8px', maxHeight: '300px', overflowY: 'auto'}}>
+                                                {ragSuggestions.slice(0, 20).map((suggestion, i) => (
+                                                    <div key={i} style={{
+                                                        padding: '12px',
+                                                        background: 'var(--bg-sage-light)',
+                                                        borderRadius: '8px',
+                                                        border: '1px solid var(--border-sage)'
+                                                    }}>
+                                                        <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '8px'}}>
+                                                            <div style={{flex: 1}}>
+                                                                <div style={{fontSize: '13px', color: 'var(--text-medium)', marginBottom: '4px'}}>
+                                                                    <span style={{textDecoration: 'line-through', opacity: 0.7}}>{suggestion.from}</span>
+                                                                    <span style={{margin: '0 8px'}}>→</span>
+                                                                    <span style={{fontWeight: '600', color: 'var(--sage-darker)'}}>{suggestion.to}</span>
+                                                                </div>
+                                                                <div style={{fontSize: '11px', color: 'var(--text-light)'}}>
+                                                                    Confidence: {suggestion.confidence ? `${Math.round(suggestion.confidence * 100)}%` : 'N/A'}
+                                                                    {suggestion.method && <span> • {suggestion.method}</span>}
+                                                                </div>
+                                                            </div>
+                                                            <div style={{display: 'flex', gap: '6px', marginLeft: '12px'}}>
+                                                                <button
+                                                                    onClick={(e) => { e.stopPropagation(); acceptSuggestion(suggestion); }}
+                                                                    style={{
+                                                                        padding: '4px 10px',
+                                                                        fontSize: '12px',
+                                                                        background: 'var(--sage-primary)',
+                                                                        color: 'white',
+                                                                        border: 'none',
+                                                                        borderRadius: '4px',
+                                                                        cursor: 'pointer',
+                                                                        fontWeight: '600'
+                                                                    }}
+                                                                    title="Accept this correction and add to engine"
+                                                                >
+                                                                    Accept
+                                                                </button>
+                                                                <button
+                                                                    onClick={(e) => { e.stopPropagation(); rejectSuggestion(suggestion); }}
+                                                                    style={{
+                                                                        padding: '4px 10px',
+                                                                        fontSize: '12px',
+                                                                        background: 'transparent',
+                                                                        color: 'var(--text-medium)',
+                                                                        border: '1px solid var(--border-light)',
+                                                                        borderRadius: '4px',
+                                                                        cursor: 'pointer'
+                                                                    }}
+                                                                    title="Reject this suggestion"
+                                                                >
+                                                                    Reject
+                                                                </button>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        )}
+                                    </div>
+                                )}
+                            </div>
+
                         </div>
 
                         {/* AI Caption Engine Configuration Panel - Full Width */}
@@ -4165,6 +4600,267 @@
                                 </div>
                             </div>
                             {showEnginePanel && <EngineWizardInline onClose={() => setShowEnginePanel(false)} />}
+                        </div>
+
+                        {/* Knowledge Base Panel - Full Width */}
+                        <div className="card" style={{gridColumn: '1 / -1', border: '1px solid var(--border-sage)'}}>
+                            <div
+                                style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer'}}
+                                onClick={() => { setShowKnowledgePanel(!showKnowledgePanel); if (!showKnowledgePanel) loadKnowledgeStatus(); }}
+                            >
+                                <h2 className="card-title" style={{margin: 0, borderBottom: 'none', paddingBottom: 0, display: 'flex', alignItems: 'center', gap: '12px'}}>
+                                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--sage-primary)" strokeWidth="2">
+                                        <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path>
+                                        <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path>
+                                    </svg>
+                                    Knowledge Base
+                                    {knowledgeStatus.documents?.length > 0 && (
+                                        <span style={{
+                                            background: 'var(--sage-primary)',
+                                            color: 'white',
+                                            fontSize: '12px',
+                                            fontWeight: '600',
+                                            padding: '2px 8px',
+                                            borderRadius: '12px'
+                                        }}>
+                                            {knowledgeStatus.documents.length} docs
+                                        </span>
+                                    )}
+                                </h2>
+                                <button className="btn-large btn-outline" style={{padding: '8px 16px'}}>
+                                    {showKnowledgePanel ? 'Collapse ▲' : 'Expand ▼'}
+                                </button>
+                            </div>
+
+                            {showKnowledgePanel && (
+                                <div style={{marginTop: '20px'}}>
+                                    <p style={{fontSize: '14px', color: 'var(--text-medium)', marginBottom: '20px'}}>
+                                        Upload documents (PDFs, DOCX, or text) to automatically extract proper nouns for the caption engine.
+                                    </p>
+
+                                    <div style={{display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '20px'}}>
+                                        {/* Upload Section */}
+                                        <div className="card" style={{background: 'var(--bg-sage-light)', border: 'none'}}>
+                                            <h3 style={{fontSize: '16px', fontWeight: '600', marginBottom: '12px'}}>Add Documents</h3>
+                                            <div style={{display: 'flex', flexDirection: 'column', gap: '12px'}}>
+                                                <label className="btn-large btn-primary" style={{display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer'}}>
+                                                    {knowledgeUploading ? 'Uploading...' : 'Upload PDF / DOCX'}
+                                                    <input type="file" accept=".pdf,.docx,.doc,.txt" onChange={uploadKnowledgeFile} style={{display: 'none'}} disabled={knowledgeUploading} />
+                                                </label>
+                                                <div style={{textAlign: 'center', fontSize: '13px', color: 'var(--text-light)'}}>or paste text below</div>
+                                                <textarea
+                                                    className="setting-input"
+                                                    rows="4"
+                                                    placeholder="Paste meeting agenda, roster, or any document with names..."
+                                                    value={knowledgeUploadText}
+                                                    onChange={(e) => setKnowledgeUploadText(e.target.value)}
+                                                    style={{fontSize: '13px'}}
+                                                />
+                                                <button className="btn-large btn-outline" onClick={uploadKnowledgeText} disabled={knowledgeUploading || !knowledgeUploadText.trim()}>
+                                                    Extract Entities from Text
+                                                </button>
+                                            </div>
+                                        </div>
+
+                                        {/* Documents List */}
+                                        <div className="card" style={{background: 'white'}}>
+                                            <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px'}}>
+                                                <h3 style={{fontSize: '16px', fontWeight: '600'}}>Documents ({knowledgeStatus.documents?.length || 0})</h3>
+                                                <button className="btn-large btn-primary" onClick={syncKnowledgeToEngine} style={{padding: '8px 16px', fontSize: '13px'}}>
+                                                    Sync to Engine
+                                                </button>
+                                            </div>
+                                            {(!knowledgeStatus.documents || knowledgeStatus.documents.length === 0) ? (
+                                                <div style={{padding: '20px', textAlign: 'center', color: 'var(--text-light)', fontSize: '14px'}}>
+                                                    No documents uploaded yet
+                                                </div>
+                                            ) : (
+                                                <div style={{display: 'flex', flexDirection: 'column', gap: '8px', maxHeight: '200px', overflowY: 'auto'}}>
+                                                    {knowledgeStatus.documents.map((doc, i) => (
+                                                        <div key={i} style={{
+                                                            display: 'flex',
+                                                            justifyContent: 'space-between',
+                                                            alignItems: 'center',
+                                                            padding: '10px 12px',
+                                                            background: 'var(--bg-warm)',
+                                                            borderRadius: '6px',
+                                                            fontSize: '13px'
+                                                        }}>
+                                                            <span style={{flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap'}}>
+                                                                {doc.filename || doc.doc_id}
+                                                            </span>
+                                                            <span style={{color: 'var(--text-light)', marginLeft: '12px'}}>
+                                                                {doc.entity_count || 0} entities
+                                                            </span>
+                                                            <button
+                                                                onClick={() => removeKnowledgeDocument(doc.doc_id)}
+                                                                style={{marginLeft: '12px', padding: '4px 8px', fontSize: '11px', background: 'transparent', border: '1px solid var(--border-light)', borderRadius: '4px', cursor: 'pointer'}}
+                                                            >
+                                                                Remove
+                                                            </button>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            )}
+                                        </div>
+
+                                        {/* Entities Preview */}
+                                        <div className="card" style={{background: 'white', gridColumn: 'span 2'}}>
+                                            <h3 style={{fontSize: '16px', fontWeight: '600', marginBottom: '12px'}}>
+                                                Extracted Entities ({knowledgeEntities.length})
+                                            </h3>
+                                            {knowledgeEntities.length === 0 ? (
+                                                <div style={{padding: '20px', textAlign: 'center', color: 'var(--text-light)', fontSize: '14px'}}>
+                                                    No entities extracted yet. Upload a document to get started.
+                                                </div>
+                                            ) : (
+                                                <div style={{display: 'flex', flexWrap: 'wrap', gap: '8px', maxHeight: '150px', overflowY: 'auto'}}>
+                                                    {knowledgeEntities.slice(0, 50).map((entity, i) => (
+                                                        <span key={i} style={{
+                                                            padding: '4px 10px',
+                                                            background: entity.category === 'person' ? '#E8F5E9' : entity.category === 'place' ? '#E3F2FD' : '#FFF3E0',
+                                                            color: entity.category === 'person' ? '#2E7D32' : entity.category === 'place' ? '#1565C0' : '#E65100',
+                                                            borderRadius: '12px',
+                                                            fontSize: '12px',
+                                                            fontWeight: '500'
+                                                        }}>
+                                                            {entity.term || entity.name}
+                                                        </span>
+                                                    ))}
+                                                    {knowledgeEntities.length > 50 && (
+                                                        <span style={{padding: '4px 10px', color: 'var(--text-light)', fontSize: '12px'}}>
+                                                            +{knowledgeEntities.length - 50} more
+                                                        </span>
+                                                    )}
+                                                </div>
+                                            )}
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+
+                        {/* Video Intelligence Panel - Full Width */}
+                        <div className="card" style={{gridColumn: '1 / -1', border: '1px solid var(--border-sage)'}}>
+                            <div
+                                style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer'}}
+                                onClick={() => { setShowVideoPanel(!showVideoPanel); if (!showVideoPanel) loadVideoStatus(); }}
+                            >
+                                <h2 className="card-title" style={{margin: 0, borderBottom: 'none', paddingBottom: 0, display: 'flex', alignItems: 'center', gap: '12px'}}>
+                                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--sage-primary)" strokeWidth="2">
+                                        <polygon points="23 7 16 12 23 17 23 7"></polygon>
+                                        <rect x="1" y="5" width="15" height="14" rx="2" ry="2"></rect>
+                                    </svg>
+                                    Video Intelligence
+                                    {videoStatus.has_video && (
+                                        <span style={{
+                                            background: 'var(--sage-primary)',
+                                            color: 'white',
+                                            fontSize: '12px',
+                                            fontWeight: '600',
+                                            padding: '2px 8px',
+                                            borderRadius: '12px'
+                                        }}>
+                                            Video Ready
+                                        </span>
+                                    )}
+                                </h2>
+                                <button className="btn-large btn-outline" style={{padding: '8px 16px'}}>
+                                    {showVideoPanel ? 'Collapse ▲' : 'Expand ▼'}
+                                </button>
+                            </div>
+
+                            {showVideoPanel && (
+                                <div style={{marginTop: '20px'}}>
+                                    <p style={{fontSize: '14px', color: 'var(--text-medium)', marginBottom: '20px'}}>
+                                        Upload video recordings to generate AI-powered highlight clips and reels.
+                                        {!videoStatus.ffmpeg_available && (
+                                            <span style={{color: '#B45309', marginLeft: '8px'}}>
+                                                (ffmpeg required for clip extraction)
+                                            </span>
+                                        )}
+                                    </p>
+
+                                    <div style={{display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '20px'}}>
+                                        {/* Upload Section */}
+                                        <div className="card" style={{background: 'var(--bg-sage-light)', border: 'none'}}>
+                                            <h3 style={{fontSize: '16px', fontWeight: '600', marginBottom: '12px'}}>Upload Video</h3>
+                                            <div style={{display: 'flex', flexDirection: 'column', gap: '12px'}}>
+                                                <label className="btn-large btn-primary" style={{display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer'}}>
+                                                    {videoUploading ? 'Uploading...' : 'Select MP4 / MOV'}
+                                                    <input type="file" accept=".mp4,.mov,.webm" onChange={uploadVideo} style={{display: 'none'}} disabled={videoUploading} />
+                                                </label>
+                                                <div style={{fontSize: '12px', color: 'var(--text-light)', textAlign: 'center'}}>
+                                                    Status: {videoStatus.has_video ? 'Video loaded' : 'No video'}
+                                                    {videoStatus.duration && ` (${Math.round(videoStatus.duration / 60)} min)`}
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        {/* Generate Highlights */}
+                                        <div className="card" style={{background: 'white'}}>
+                                            <h3 style={{fontSize: '16px', fontWeight: '600', marginBottom: '12px'}}>Generate Highlights</h3>
+                                            <div style={{display: 'flex', flexDirection: 'column', gap: '12px'}}>
+                                                <button
+                                                    className="btn-large btn-outline"
+                                                    onClick={generateHighlights}
+                                                    disabled={!videoStatus.has_video}
+                                                    style={{opacity: videoStatus.has_video ? 1 : 0.5}}
+                                                >
+                                                    Detect Key Moments
+                                                </button>
+                                                <button
+                                                    className="btn-large btn-primary"
+                                                    onClick={generateHighlightReel}
+                                                    disabled={!videoStatus.has_video || !videoStatus.ffmpeg_available}
+                                                    style={{opacity: (videoStatus.has_video && videoStatus.ffmpeg_available) ? 1 : 0.5}}
+                                                >
+                                                    Create Highlight Reel
+                                                </button>
+                                            </div>
+                                        </div>
+
+                                        {/* Highlights List */}
+                                        {videoHighlights.length > 0 && (
+                                            <div className="card" style={{background: 'white', gridColumn: 'span 2'}}>
+                                                <h3 style={{fontSize: '16px', fontWeight: '600', marginBottom: '12px'}}>
+                                                    Detected Highlights ({videoHighlights.length})
+                                                </h3>
+                                                <div style={{display: 'flex', flexDirection: 'column', gap: '8px', maxHeight: '200px', overflowY: 'auto'}}>
+                                                    {videoHighlights.map((highlight, i) => (
+                                                        <div key={i} style={{
+                                                            padding: '12px',
+                                                            background: 'var(--bg-warm)',
+                                                            borderRadius: '8px',
+                                                            display: 'flex',
+                                                            justifyContent: 'space-between',
+                                                            alignItems: 'center'
+                                                        }}>
+                                                            <div>
+                                                                <div style={{fontWeight: '600', fontSize: '14px'}}>{highlight.title || `Highlight ${i + 1}`}</div>
+                                                                <div style={{fontSize: '12px', color: 'var(--text-light)'}}>
+                                                                    {highlight.start_time ? `${Math.floor(highlight.start_time / 60)}:${String(Math.floor(highlight.start_time % 60)).padStart(2, '0')}` : ''} -
+                                                                    {highlight.end_time ? ` ${Math.floor(highlight.end_time / 60)}:${String(Math.floor(highlight.end_time % 60)).padStart(2, '0')}` : ''}
+                                                                </div>
+                                                            </div>
+                                                            <span style={{
+                                                                padding: '4px 10px',
+                                                                background: 'var(--purple-accent)',
+                                                                color: 'white',
+                                                                borderRadius: '12px',
+                                                                fontSize: '11px',
+                                                                fontWeight: '600'
+                                                            }}>
+                                                                {highlight.score ? `${Math.round(highlight.score * 100)}%` : 'Key Moment'}
+                                                            </span>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+                            )}
                         </div>
                     </div>
                 </div>
