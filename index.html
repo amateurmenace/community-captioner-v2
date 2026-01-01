@@ -692,9 +692,8 @@
         /* How-To Section - Numbered Steps */
         .howto-section {
             background: linear-gradient(to bottom, transparent 0%, rgba(125,155,118,0.03) 100%);
-            padding: 60px 32px;
-            margin-left: -32px;
-            margin-right: -32px;
+            padding: 60px 0;
+            max-width: 100%;
         }
 
         .howto-section .info-card {
@@ -735,6 +734,7 @@
             border-left: 3px solid transparent;
             box-shadow: 0 2px 12px rgba(0,0,0,0.04);
             transition: all 0.3s;
+            cursor: pointer;
         }
 
         .faq-section .faq-item:hover {
@@ -746,6 +746,17 @@
         .faq-question {
             position: relative;
             padding-left: 24px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .faq-toggle {
+            font-size: 24px;
+            font-weight: 700;
+            color: var(--sage-primary);
+            margin-left: 12px;
+            flex-shrink: 0;
         }
 
         .faq-question::before {
@@ -1883,6 +1894,12 @@
         }
 
         function LandingPage({ onStartDashboard, onStartEngine, onShowAbout, onShowAISettings, language, setLanguage, t }) {
+            const [expandedFAQ, setExpandedFAQ] = useState(null);
+
+            const toggleFAQ = (index) => {
+                setExpandedFAQ(expandedFAQ === index ? null : index);
+            };
+
             return (
                 <div className="landing-page">
                     <div className="blob-container">
@@ -1948,8 +1965,6 @@
                             <TypeWriter text={t('AI for Accessibility')} delay={80} key={language + '-title'} />
                         </h1>
 
-                        <CaptionDemo />
-
                         <p className="hero-subtitle">
                             <TypeWriter
                                 text={t('Professional live captioning for community media. Zero cost. Powered by AI + Human intelligence.')}
@@ -1963,10 +1978,14 @@
                             <button className="cta-btn cta-btn-primary" onClick={onStartDashboard}>
                                 {t('Open Control Dashboard')}
                             </button>
-                            <button className="cta-btn cta-btn-secondary" onClick={onShowAbout}>
+                            <button className="cta-btn cta-btn-secondary" onClick={() => {
+                                document.getElementById('about-section')?.scrollIntoView({ behavior: 'smooth' });
+                            }}>
                                 {t('Learn More')}
                             </button>
                         </div>
+
+                        <CaptionDemo />
                     </section>
 
                     <div className="feature-cards">
@@ -1999,7 +2018,7 @@
                     </div>
 
                     {/* About Section */}
-                    <section className="info-section about-section">
+                    <section id="about-section" className="info-section about-section">
                         <h2 className="section-title">About Community Captioner</h2>
                         <p className="section-subtitle">
                             Free, open-source live captioning built for community media organizations
@@ -2113,48 +2132,136 @@
                     <section className="info-section faq-section">
                         <h2 className="section-title">Frequently Asked Questions</h2>
 
-                        <div className="faq-item">
-                            <div className="faq-question">Do I need an OpenAI API key?</div>
-                            <div className="faq-answer">
-                                No! The basic captioning features work without any AI. You only need an API key if you want AI-powered features like automatic term extraction from documents or session summaries. You can also use local AI providers like Ollama or LM Studio for free.
+                        <div className={`faq-item ${expandedFAQ === 0 ? 'expanded' : ''}`} onClick={() => toggleFAQ(0)}>
+                            <div className="faq-question">
+                                Do I need an OpenAI API key?
+                                <span className="faq-toggle">{expandedFAQ === 0 ? '−' : '+'}</span>
                             </div>
+                            {expandedFAQ === 0 && (
+                                <div className="faq-answer">
+                                    No! The basic captioning features work without any AI. You only need an API key if you want AI-powered features like automatic term extraction from documents or session summaries. You can also use local AI providers like Ollama or LM Studio for free.
+                                </div>
+                            )}
                         </div>
 
-                        <div className="faq-item">
-                            <div className="faq-question">What's the difference between Browser Mode and Whisper Mode?</div>
-                            <div className="faq-answer">
-                                <strong>Browser Mode:</strong> Uses your browser's built-in speech recognition (Web Speech API). Fast (~200ms latency) but requires Chrome/Edge and internet connection. Less accurate with proper nouns.<br/><br/>
-                                <strong>Whisper Mode:</strong> Uses OpenAI's Whisper AI model running locally on your computer. More accurate, works offline, but has 2-4 second latency. Requires Python and faster-whisper installation.
+                        <div className={`faq-item ${expandedFAQ === 1 ? 'expanded' : ''}`} onClick={() => toggleFAQ(1)}>
+                            <div className="faq-question">
+                                What's the difference between Browser Mode and Whisper Mode?
+                                <span className="faq-toggle">{expandedFAQ === 1 ? '−' : '+'}</span>
                             </div>
+                            {expandedFAQ === 1 && (
+                                <div className="faq-answer">
+                                    <strong>Browser Mode:</strong> Uses your browser's built-in speech recognition (Web Speech API). Fast (~200ms latency) but requires Chrome/Edge and internet connection. Less accurate with proper nouns.<br/><br/>
+                                    <strong>Whisper Mode:</strong> Uses OpenAI's Whisper AI model running locally on your computer. More accurate, works offline, but has 2-4 second latency. Requires Python and faster-whisper installation.
+                                </div>
+                            )}
                         </div>
 
-                        <div className="faq-item">
-                            <div className="faq-question">Can I use this for live streaming?</div>
-                            <div className="faq-answer">
-                                Yes! The overlay URL can be added to OBS, vMix, or any streaming software that supports browser sources. Captions will appear live on your stream.
+                        <div className={`faq-item ${expandedFAQ === 2 ? 'expanded' : ''}`} onClick={() => toggleFAQ(2)}>
+                            <div className="faq-question">
+                                Can I use this for live streaming?
+                                <span className="faq-toggle">{expandedFAQ === 2 ? '−' : '+'}</span>
                             </div>
+                            {expandedFAQ === 2 && (
+                                <div className="faq-answer">
+                                    Yes! The overlay URL can be added to OBS, vMix, or any streaming software that supports browser sources. Captions will appear live on your stream.
+                                </div>
+                            )}
                         </div>
 
-                        <div className="faq-item">
-                            <div className="faq-question">How do I share my correction engine with other organizations?</div>
-                            <div className="faq-answer">
-                                Click "Configure Engine" → "Download Engine" to export your correction rules as a JSON file. Other organizations can import this file to instantly get your community's vocabulary. Perfect for sharing between towns or sister organizations.
+                        <div className={`faq-item ${expandedFAQ === 3 ? 'expanded' : ''}`} onClick={() => toggleFAQ(3)}>
+                            <div className="faq-question">
+                                How do I share my correction engine with other organizations?
+                                <span className="faq-toggle">{expandedFAQ === 3 ? '−' : '+'}</span>
                             </div>
+                            {expandedFAQ === 3 && (
+                                <div className="faq-answer">
+                                    Click "Configure Engine" → "Download Engine" to export your correction rules as a JSON file. Other organizations can import this file to instantly get your community's vocabulary. Perfect for sharing between towns or sister organizations.
+                                </div>
+                            )}
                         </div>
 
-                        <div className="faq-item">
-                            <div className="faq-question">Is my data private?</div>
-                            <div className="faq-answer">
-                                <strong>Browser Mode:</strong> Audio is sent to Google/Microsoft's servers for transcription.<br/>
-                                <strong>Whisper Mode:</strong> Everything stays on your computer. No data leaves your machine.<br/>
-                                <strong>AI Features:</strong> If using OpenAI, document text is sent for processing. If using Ollama/LM Studio, everything stays local.
+                        <div className={`faq-item ${expandedFAQ === 4 ? 'expanded' : ''}`} onClick={() => toggleFAQ(4)}>
+                            <div className="faq-question">
+                                Is my data private?
+                                <span className="faq-toggle">{expandedFAQ === 4 ? '−' : '+'}</span>
                             </div>
+                            {expandedFAQ === 4 && (
+                                <div className="faq-answer">
+                                    <strong>Browser Mode:</strong> Audio is sent to Google/Microsoft's servers for transcription.<br/>
+                                    <strong>Whisper Mode:</strong> Everything stays on your computer. No data leaves your machine.<br/>
+                                    <strong>AI Features:</strong> If using OpenAI, document text is sent for processing. If using Ollama/LM Studio, everything stays local.
+                                </div>
+                            )}
                         </div>
 
-                        <div className="faq-item">
-                            <div className="faq-question">What file formats can I export?</div>
-                            <div className="faq-answer">
-                                Sessions can be exported as SRT (subtitles), VTT (web video), TXT (plain transcript), or JSON (full data including corrections and timestamps). Perfect for archival or post-production editing.
+                        <div className={`faq-item ${expandedFAQ === 5 ? 'expanded' : ''}`} onClick={() => toggleFAQ(5)}>
+                            <div className="faq-question">
+                                What file formats can I export?
+                                <span className="faq-toggle">{expandedFAQ === 5 ? '−' : '+'}</span>
+                            </div>
+                            {expandedFAQ === 5 && (
+                                <div className="faq-answer">
+                                    Sessions can be exported as SRT (subtitles), VTT (web video), TXT (plain transcript), or JSON (full data including corrections and timestamps). Perfect for archival or post-production editing.
+                                </div>
+                            )}
+                        </div>
+
+                        <div style={{textAlign: 'center', marginTop: '40px'}}>
+                            <button className="cta-btn cta-btn-secondary" onClick={onShowAbout}>
+                                Learn More About the Technology + Design Philosophy
+                            </button>
+                        </div>
+                    </section>
+
+                    {/* Values Section */}
+                    <section className="info-section values-section">
+                        <h2 className="section-title">Our Values</h2>
+                        <p className="section-subtitle">
+                            Community Captioner is built on principles of accessibility, openness, and empowerment
+                        </p>
+
+                        <div className="info-grid">
+                            <div className="info-card">
+                                <h3>🌍 Accessibility First</h3>
+                                <p>
+                                    Everyone deserves access to information. Captioning shouldn't be a luxury for those who can afford expensive equipment. We're democratizing accessibility technology for community organizations worldwide.
+                                </p>
+                            </div>
+
+                            <div className="info-card">
+                                <h3>🔓 Truly Open Source</h3>
+                                <p>
+                                    No vendor lock-in, no hidden costs, no paywalls. Our code is open (CC BY-SA 4.0), our data stays with you, and you can modify everything to fit your needs. This is your tool, not ours.
+                                </p>
+                            </div>
+
+                            <div className="info-card">
+                                <h3>🤝 Community-Powered</h3>
+                                <p>
+                                    Built by community media for community media. We understand your workflows, budgets, and challenges because we live them. Share your correction engines, help each other, lift all boats together.
+                                </p>
+                            </div>
+
+                            <div className="info-card">
+                                <h3>🔒 Privacy by Design</h3>
+                                <p>
+                                    Your content, your control. Run everything locally with Whisper mode. Use local AI providers. No telemetry, no tracking, no data mining. Government meetings and sensitive content stay private.
+                                </p>
+                            </div>
+
+                            <div className="info-card">
+                                <h3>🧠 Human + AI Collaboration</h3>
+                                <p>
+                                    AI isn't magic and it's not perfect. We combine the speed of AI with human knowledge of local communities. You teach the engine your vocabulary - it handles the repetitive corrections.
+                                </p>
+                            </div>
+
+                            <div className="info-card">
+                                <h3>⚖️ Legal Compliance Made Simple</h3>
+                                <p>
+                                    FCC CVAA requirements and state captioning laws apply to you. Commercial solutions cost tens of thousands. We provide the same compliance for free, because accessibility is a right, not a privilege.
+                                </p>
                             </div>
                         </div>
                     </section>
