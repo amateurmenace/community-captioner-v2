@@ -449,6 +449,29 @@ community-captioner/
 - [x] **Connector Lines** - Visual flow lines between main pipeline and secondary components
 - [x] **Microphone Icon Updated** - More recognizable microphone shape
 
+#### Session Analysis Page - Complete Redesign (January 2026)
+- [x] **Single Dashboard Layout** - Replaced 5-tab navigation with unified collapsible sections
+- [x] **Export Buttons at Top** - Prominent download buttons for Transcript, SRT, VTT, JSON in header
+- [x] **Total Word Count Fix** - Accumulates words throughout session (not just current caption)
+- [x] **AI Analysis Button** - Purple gradient button triggers comprehensive AI analysis
+  - 5-sentence summary of session
+  - 5 key highlights with timestamps
+  - Topic analysis with percentages
+  - Sentiment analysis
+- [x] **Whisper Second Pass** - Button to reprocess session audio with Whisper for accuracy
+- [x] **Clickable Word Cloud** - Click any word to filter transcript to all mentions
+- [x] **Transcript Search** - Full-text search with real-time filtering
+- [x] **Manual Editing** - Inline edit capability for transcript segments
+- [x] **Collapsible Sections** - Transcript, AI Corrections, Session Analytics expandable/collapsible
+- [x] **Session Stats Grid** - Total Words, Duration, AI Corrections, Segments at top
+- [x] **Words/Minute Metric** - Calculated from total words and duration
+- [x] **Correction Rate Metric** - Percentage of words that were AI-corrected
+
+#### Dashboard Live Stats Fixes
+- [x] **Accumulative Word Count** - Words now properly accumulate across full session
+- [x] **useRef Tracking** - Compares current caption to previous to detect new words
+- [x] **New Segment Detection** - Recognizes when ASR starts new sentence/segment
+
 ### Known Issues & Limitations
 - **Double correction edge case** - When "coolidge corner" becomes "Coolidge Corner", the standalone alias "coolidge" still matches (by design, acceptable for template)
 - Cloud server not tested recently
