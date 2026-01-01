@@ -183,4 +183,4 @@ A community AI project from [Brookline Interactive Group](https://brooklineinter
 
 Designed and developed by [Stephen Walter](https://weirdmachine.org)
 
-Licensed under CC BY-SA 4.0
+Licensed under CC BY-NC-SA 4.0 (non-commercial use only)

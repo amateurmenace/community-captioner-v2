@@ -355,7 +355,7 @@ community-captioner/
 - [x] **Installation instructions** - Basic and full (with Whisper)
 - [x] **Six detailed use cases** - Town meetings, events, news, education, accessibility, archival
 - [x] **Credits section** - Developer, powered by, special thanks
-- [x] **CC BY-SA 4.0 license** - Full license details and terms
+- [x] **CC BY-NC-SA 4.0 license** - Full license details and terms (non-commercial use only)
 
 #### Live Overlay (overlay.html)
 - [x] **Caption display** with customizable styling
@@ -646,4 +646,4 @@ POST /api/engine/term
 
 - **Organization:** Brookline Interactive Group
 - **Developer:** Stephen Walter (weirdmachine.org)
-- **License:** CC BY-SA 4.0
+- **License:** CC BY-NC-SA 4.0 (non-commercial use only)

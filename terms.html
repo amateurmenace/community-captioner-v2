@@ -1,0 +1,405 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Terms of Service - Community Captioner</title>
+    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700;800&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            /* Sage green & warm background palette */
+            --bg-warm: #F5F3EE;
+            --bg-sage-light: #E8EDE7;
+            --bg-white: #F5F3EE;
+            --sage-primary: #7D9B76;
+            --sage-dark: #5A7C55;
+            --sage-darker: #3D5A47;
+            --sage-muted: #A8BAA3;
+            --text-dark: #2D3A2E;
+            --text-medium: #5A6B5E;
+            --text-light: #8A9A8E;
+            --border-light: #D4D2CD;
+            --border-sage: #C4D3BE;
+
+            /* Accent colors */
+            --purple-accent: #8B7FC7;
+            --purple-light: #A69DD6;
+
+            /* Spacing */
+            --radius-sm: 10px;
+            --radius-md: 14px;
+            --radius-lg: 18px;
+            --radius-xl: 24px;
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: 'DM Sans', 'Inter', -apple-system, sans-serif;
+            background: var(--bg-warm);
+            color: var(--text-dark);
+            line-height: 1.6;
+            min-height: 100vh;
+        }
+
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+            padding: 60px 24px;
+        }
+
+        header {
+            background: white;
+            border-bottom: 2px solid var(--border-sage);
+            padding: 24px 0;
+            margin-bottom: 48px;
+        }
+
+        .header-content {
+            max-width: 900px;
+            margin: 0 auto;
+            padding: 0 24px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .logo-container {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            text-decoration: none;
+            color: inherit;
+        }
+
+        .logo-box {
+            width: 48px;
+            height: 48px;
+            background: linear-gradient(135deg, var(--sage-primary) 0%, var(--sage-dark) 100%);
+            border-radius: var(--radius-md);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            padding: 6px;
+            gap: 2px;
+        }
+
+        .logo-bar {
+            width: 100%;
+            height: 3px;
+            background: white;
+            border-radius: 2px;
+        }
+
+        .logo-text {
+            font-size: 20px;
+            font-weight: 700;
+            color: var(--text-dark);
+        }
+
+        h1 {
+            font-size: 48px;
+            font-weight: 800;
+            color: var(--sage-darker);
+            margin-bottom: 16px;
+            line-height: 1.2;
+        }
+
+        .last-updated {
+            color: var(--text-medium);
+            font-size: 14px;
+            margin-bottom: 32px;
+        }
+
+        .section {
+            background: white;
+            border-radius: var(--radius-lg);
+            padding: 32px;
+            margin-bottom: 24px;
+            border: 2px solid var(--border-light);
+        }
+
+        h2 {
+            font-size: 28px;
+            font-weight: 700;
+            color: var(--sage-darker);
+            margin-bottom: 16px;
+        }
+
+        h3 {
+            font-size: 20px;
+            font-weight: 600;
+            color: var(--sage-dark);
+            margin: 24px 0 12px 0;
+        }
+
+        p {
+            color: var(--text-medium);
+            margin-bottom: 16px;
+            font-size: 16px;
+        }
+
+        ul {
+            margin-left: 24px;
+            margin-bottom: 16px;
+        }
+
+        li {
+            color: var(--text-medium);
+            margin-bottom: 8px;
+        }
+
+        strong {
+            color: var(--text-dark);
+            font-weight: 600;
+        }
+
+        .highlight-box {
+            background: rgba(125, 155, 118, 0.1);
+            border-left: 4px solid var(--sage-primary);
+            padding: 20px;
+            margin: 24px 0;
+            border-radius: var(--radius-sm);
+        }
+
+        .warning-box {
+            background: rgba(220, 38, 38, 0.08);
+            border-left: 4px solid #DC2626;
+            padding: 20px;
+            margin: 24px 0;
+            border-radius: var(--radius-sm);
+        }
+
+        .back-link {
+            display: inline-block;
+            color: var(--sage-primary);
+            text-decoration: none;
+            font-weight: 600;
+            margin-top: 32px;
+            padding: 12px 24px;
+            background: white;
+            border: 2px solid var(--sage-primary);
+            border-radius: var(--radius-md);
+            transition: all 0.2s;
+        }
+
+        .back-link:hover {
+            background: var(--sage-primary);
+            color: white;
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <div class="header-content">
+            <a href="index.html" class="logo-container">
+                <div class="logo-box">
+                    <div class="logo-bar"></div>
+                    <div class="logo-bar"></div>
+                    <div class="logo-bar"></div>
+                </div>
+                <div class="logo-text">Community Captioner</div>
+            </a>
+        </div>
+    </header>
+
+    <div class="container">
+        <h1>Terms of Service</h1>
+        <p class="last-updated"><strong>Last Updated:</strong> January 1, 2026</p>
+
+        <div class="section">
+            <h2>1. Acceptance of Terms</h2>
+            <p>
+                By using Community Captioner ("the Software"), you agree to these Terms of Service. If you do not agree to these terms, please do not use the Software.
+            </p>
+            <p>
+                Community Captioner is provided by Brookline Interactive Group (BIG), a nonprofit community media organization. The Software is free and open source, licensed under CC BY-NC-SA 4.0.
+            </p>
+        </div>
+
+        <div class="section">
+            <h2>2. No Warranty or Guarantee</h2>
+            <div class="warning-box">
+                <strong>IMPORTANT:</strong> Community Captioner is provided "AS IS" without warranty of any kind, either express or implied.
+            </div>
+            <p>
+                Brookline Interactive Group (BIG) makes no guarantees about:
+            </p>
+            <ul>
+                <li>The accuracy or completeness of captions generated by the Software</li>
+                <li>Compliance with any specific legal requirements (including but not limited to FCC CVAA, ADA, state captioning laws)</li>
+                <li>The reliability, availability, or performance of the Software</li>
+                <li>The suitability of the Software for any particular purpose</li>
+                <li>Freedom from errors, bugs, or security vulnerabilities</li>
+            </ul>
+        </div>
+
+        <div class="section">
+            <h2>3. Limitation of Liability</h2>
+            <p>
+                <strong>BY USING THIS SOFTWARE, YOU AGREE TO HOLD BROOKLINE INTERACTIVE GROUP (BIG), ITS OFFICERS, DIRECTORS, EMPLOYEES, VOLUNTEERS, AND CONTRIBUTORS HARMLESS FROM ANY AND ALL LIABILITY.</strong>
+            </p>
+            <p>
+                In no event shall BIG be liable for any:
+            </p>
+            <ul>
+                <li>Direct, indirect, incidental, special, consequential, or punitive damages</li>
+                <li>Loss of profits, revenue, data, or use</li>
+                <li>Legal penalties or fines resulting from non-compliance with captioning laws</li>
+                <li>Claims arising from inaccurate, incomplete, or missing captions</li>
+                <li>Technical failures, data loss, or security breaches</li>
+                <li>Any other damages or losses arising from your use of the Software</li>
+            </ul>
+            <p>
+                This limitation applies regardless of the legal theory (contract, tort, negligence, strict liability, or otherwise) and even if BIG has been advised of the possibility of such damages.
+            </p>
+        </div>
+
+        <div class="section">
+            <h2>4. Legal Compliance Responsibility</h2>
+            <div class="highlight-box">
+                <strong>You are solely responsible</strong> for ensuring that your use of Community Captioner complies with all applicable laws and regulations, including:
+            </div>
+            <ul>
+                <li>FCC 21st Century Communications and Video Accessibility Act (CVAA)</li>
+                <li>Americans with Disabilities Act (ADA)</li>
+                <li>State and local captioning requirements</li>
+                <li>Broadcast regulations and licensing requirements</li>
+                <li>Privacy and data protection laws</li>
+            </ul>
+            <p>
+                BIG does not guarantee that use of this Software will satisfy any legal requirements. You should consult with legal counsel to determine your compliance obligations.
+            </p>
+        </div>
+
+        <div class="section">
+            <h2>5. Accuracy and Quality Control</h2>
+            <p>
+                The Software uses automatic speech recognition (ASR) and AI-powered correction, which are inherently imperfect technologies. Captions may contain:
+            </p>
+            <ul>
+                <li>Spelling and grammar errors</li>
+                <li>Incorrect proper nouns (names, places, organizations)</li>
+                <li>Misheard or missing words</li>
+                <li>Formatting inconsistencies</li>
+                <li>Delays or timing issues</li>
+            </ul>
+            <p>
+                <strong>You are responsible for:</strong>
+            </p>
+            <ul>
+                <li>Training the AI Caption Engine with appropriate terminology</li>
+                <li>Monitoring caption quality during live broadcasts</li>
+                <li>Implementing quality control processes appropriate to your use case</li>
+                <li>Correcting errors in post-production when necessary</li>
+            </ul>
+        </div>
+
+        <div class="section">
+            <h2>6. Third-Party Services</h2>
+            <p>
+                Community Captioner may integrate with third-party services, including:
+            </p>
+            <ul>
+                <li><strong>Web Speech API:</strong> Google/Microsoft speech recognition (Browser Mode)</li>
+                <li><strong>OpenAI Whisper:</strong> Open source speech recognition model</li>
+                <li><strong>OpenAI API:</strong> Optional AI-powered features (document extraction, summaries)</li>
+                <li><strong>Local AI providers:</strong> Ollama, LM Studio, etc.</li>
+            </ul>
+            <p>
+                Your use of these third-party services is subject to their respective terms of service and privacy policies. BIG is not responsible for the performance, availability, or policies of any third-party services.
+            </p>
+        </div>
+
+        <div class="section">
+            <h2>7. Privacy and Data</h2>
+            <p>
+                <strong>Browser Mode:</strong> When using Web Speech API, your audio data is sent to Google or Microsoft servers for processing. BIG has no control over this data transmission.
+            </p>
+            <p>
+                <strong>Whisper Mode:</strong> When using local Whisper AI, all processing occurs on your computer. No audio data leaves your machine.
+            </p>
+            <p>
+                <strong>AI Features:</strong> If you use OpenAI API for document extraction or summaries, document text is sent to OpenAI for processing. If using local AI providers (Ollama, LM Studio), data stays on your machine.
+            </p>
+            <p>
+                <strong>Your Responsibility:</strong> You are responsible for understanding the privacy implications of your chosen configuration and for complying with applicable privacy laws (GDPR, CCPA, etc.).
+            </p>
+        </div>
+
+        <div class="section">
+            <h2>8. Modifications and Updates</h2>
+            <p>
+                BIG reserves the right to modify, update, or discontinue the Software at any time without notice. BIG is under no obligation to provide updates, bug fixes, or technical support.
+            </p>
+            <p>
+                These Terms of Service may be updated periodically. Continued use of the Software constitutes acceptance of any revised terms.
+            </p>
+        </div>
+
+        <div class="section">
+            <h2>9. Open Source License</h2>
+            <p>
+                Community Captioner is licensed under the Creative Commons Attribution-NonCommercial-ShareAlike 4.0 International License (CC BY-NC-SA 4.0).
+            </p>
+            <p>
+                You are free to:
+            </p>
+            <ul>
+                <li>Use the Software for non-commercial purposes</li>
+                <li>Modify and adapt the Software</li>
+                <li>Distribute the Software and your modifications</li>
+            </ul>
+            <p>
+                Under the following conditions:
+            </p>
+            <ul>
+                <li><strong>Attribution:</strong> You must give appropriate credit to Brookline Interactive Group</li>
+                <li><strong>NonCommercial:</strong> You may not use the Software for commercial purposes or profit from it in any way. This includes, but is not limited to: selling the Software, offering it as a paid service, using it in commercial products, or deploying it for profit-generating activities. The Software must remain free and accessible to all.</li>
+                <li><strong>ShareAlike:</strong> Your modifications must be distributed under the same CC BY-NC-SA 4.0 license</li>
+            </ul>
+            <div class="highlight-box">
+                <strong>Non-Commercial Use Only:</strong> This license ensures that no individual or organization can profit from Community Captioner. The software is provided free for community media organizations, educational institutions, non-profit organizations, and government entities. Any commercial use, including resale, subscription services, or commercial deployment, is strictly prohibited.
+            </div>
+        </div>
+
+        <div class="section">
+            <h2>10. Indemnification</h2>
+            <p>
+                You agree to indemnify, defend, and hold harmless Brookline Interactive Group, its officers, directors, employees, volunteers, and contributors from any claims, damages, losses, liabilities, and expenses (including attorney fees) arising from:
+            </p>
+            <ul>
+                <li>Your use or misuse of the Software</li>
+                <li>Your violation of these Terms of Service</li>
+                <li>Your violation of any applicable laws or regulations</li>
+                <li>Claims by third parties related to captions you generate using the Software</li>
+            </ul>
+        </div>
+
+        <div class="section">
+            <h2>11. Contact Information</h2>
+            <p>
+                Community Captioner is developed and maintained by Stephen Walter at Brookline Interactive Group.
+            </p>
+            <p>
+                <strong>For questions or feedback:</strong> Stephen@weirdmachine.org
+            </p>
+            <p>
+                <strong>Organization:</strong> Brookline Interactive Group (BIG)<br>
+                <strong>Location:</strong> Brookline, MA<br>
+                <strong>Website:</strong> <a href="http://brooklineinteractive.org" style="color: var(--sage-primary);">brooklineinteractive.org</a>
+            </p>
+        </div>
+
+        <div class="section">
+            <h2>12. Governing Law</h2>
+            <p>
+                These Terms of Service shall be governed by and construed in accordance with the laws of the Commonwealth of Massachusetts, without regard to its conflict of law principles.
+            </p>
+        </div>
+
+        <a href="index.html" class="back-link">← Back to Community Captioner</a>
+    </div>
+</body>
+</html>
