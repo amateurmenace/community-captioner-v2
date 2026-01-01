@@ -371,10 +371,7 @@
         .hero-title {
             font-size: 96px;
             font-weight: 900;
-            background: linear-gradient(135deg, #2E7D32 0%, #388E3C 50%, #43A047 100%);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            background-clip: text;
+            color: var(--sage-darker);
             line-height: 1.05;
             margin-bottom: 36px;
             letter-spacing: -3px;
@@ -461,14 +458,14 @@
         }
 
         .cta-btn-primary {
-            background: linear-gradient(135deg, #2E7D32 0%, #43A047 100%);
+            background: var(--sage-darker);
             color: white;
-            box-shadow: 0 4px 15px rgba(46, 125, 50, 0.3);
+            box-shadow: 0 4px 15px rgba(61, 90, 71, 0.3);
         }
 
         .cta-btn-primary:hover {
             transform: translateY(-3px);
-            box-shadow: 0 12px 30px rgba(46, 125, 50, 0.4);
+            box-shadow: 0 12px 30px rgba(61, 90, 71, 0.4);
         }
 
         .cta-btn-secondary {
@@ -2213,7 +2210,7 @@
                 <div className="demo-section">
                     <div className="demo-card">
                         <div className="demo-header">
-                            <h2 className="demo-title">AI Correction Engine</h2>
+                            <h2 className="demo-title">With AI Context Correction Engine</h2>
                             <div className="demo-indicator">
                                 <div className={`indicator-dot ${phase === 'correcting' ? 'active' : ''}`}></div>
                                 <span className="indicator-text">
