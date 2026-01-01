@@ -49,7 +49,7 @@
         var currentSettings = {
             fontSize: 48, fontFamily: 'DM Sans', textColor: '#FFFFFF', backgroundColor: '#000000',
             backgroundOpacity: 75, textAlign: 'center', position: 'bottom', maxLines: 2, maxWidth: 80,
-            showBackground: true, textShadow: true, paddingH: 32, paddingV: 16,
+            showBackground: true, textShadow: true, paddingH: 32, paddingV: 16, lineHeight: 1.4,
             logoUrl: '', logoPosition: 'bottom-right', logoSize: 100, logoOpacity: 100
         };
 
@@ -87,6 +87,7 @@
             captionText.style.color = currentSettings.textColor;
             captionText.style.textAlign = currentSettings.textAlign;
             captionText.style.maxWidth = currentSettings.maxWidth + '%';
+            captionText.style.lineHeight = currentSettings.lineHeight || 1.4;
 
             if (currentSettings.showBackground) {
                 var hex = currentSettings.backgroundColor;

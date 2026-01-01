@@ -37,6 +37,14 @@ from datetime import datetime, timedelta
 from urllib.parse import urlparse, parse_qs
 from collections import deque
 
+# OpenAI for AI features
+OPENAI_AVAILABLE = False
+try:
+    from openai import OpenAI
+    OPENAI_AVAILABLE = True
+except ImportError:
+    pass
+
 # =============================================================================
 # CONFIGURATION
 # =============================================================================
@@ -51,6 +59,104 @@ ENGINES_DIR = SCRIPT_DIR / "engines"
 
 for d in [DATA_DIR, SESSIONS_DIR, ENGINES_DIR]:
     d.mkdir(exist_ok=True)
+
+# AI Configuration
+AI_CONFIG_FILE = DATA_DIR / "ai_config.json"
+
+# Default AI configuration
+ai_config = {
+    "provider": "none",  # none|openai|ollama|lmstudio|custom
+    "openai_api_key": os.getenv('OPENAI_API_KEY', ''),
+    "openai_model": "gpt-4o-mini",
+    "ollama_base_url": "http://localhost:11434",
+    "ollama_model": "llama3.2",
+    "lmstudio_base_url": "http://localhost:1234/v1",
+    "lmstudio_model": "local-model",
+    "custom_base_url": "",
+    "custom_api_key": "",
+    "custom_model": ""
+}
+
+# Load saved AI config
+if AI_CONFIG_FILE.exists():
+    try:
+        with open(AI_CONFIG_FILE) as f:
+            saved_config = json.load(f)
+            ai_config.update(saved_config)
+    except:
+        pass
+
+# Initialize AI client based on config
+openai_client = None
+
+def init_ai_client():
+    """Initialize AI client based on current configuration"""
+    global openai_client
+    openai_client = None
+
+    if ai_config["provider"] == "openai" and OPENAI_AVAILABLE:
+        api_key = ai_config.get("openai_api_key", "")
+        if api_key:
+            try:
+                openai_client = OpenAI(api_key=api_key)
+                print(f"✓ OpenAI client initialized (cloud)")
+            except Exception as e:
+                print(f"✗ OpenAI client failed: {e}")
+
+    elif ai_config["provider"] == "ollama" and OPENAI_AVAILABLE:
+        try:
+            openai_client = OpenAI(
+                base_url=ai_config.get("ollama_base_url", "http://localhost:11434/v1"),
+                api_key="ollama"  # Ollama doesn't require real key
+            )
+            print(f"✓ Ollama client initialized (local)")
+        except Exception as e:
+            print(f"✗ Ollama client failed: {e}")
+
+    elif ai_config["provider"] == "lmstudio" and OPENAI_AVAILABLE:
+        try:
+            openai_client = OpenAI(
+                base_url=ai_config.get("lmstudio_base_url", "http://localhost:1234/v1"),
+                api_key="lmstudio"  # LM Studio doesn't require real key
+            )
+            print(f"✓ LM Studio client initialized (local)")
+        except Exception as e:
+            print(f"✗ LM Studio client failed: {e}")
+
+    elif ai_config["provider"] == "custom" and OPENAI_AVAILABLE:
+        base_url = ai_config.get("custom_base_url", "")
+        api_key = ai_config.get("custom_api_key", "")
+        if base_url:
+            try:
+                openai_client = OpenAI(base_url=base_url, api_key=api_key or "none")
+                is_local = "localhost" in base_url or "127.0.0.1" in base_url
+                print(f"✓ Custom AI client initialized ({'local' if is_local else 'cloud'})")
+            except Exception as e:
+                print(f"✗ Custom AI client failed: {e}")
+
+init_ai_client()
+
+def get_ai_model():
+    """Get the model name based on provider"""
+    if ai_config["provider"] == "openai":
+        return ai_config.get("openai_model", "gpt-4o-mini")
+    elif ai_config["provider"] == "ollama":
+        return ai_config.get("ollama_model", "llama3.2")
+    elif ai_config["provider"] == "lmstudio":
+        return ai_config.get("lmstudio_model", "local-model")
+    elif ai_config["provider"] == "custom":
+        return ai_config.get("custom_model", "unknown")
+    return "none"
+
+def is_ai_local():
+    """Check if current AI provider is local (not cloud)"""
+    provider = ai_config["provider"]
+    if provider in ["ollama", "lmstudio"]:
+        return True
+    if provider == "custom":
+        base_url = ai_config.get("custom_base_url", "")
+        return "localhost" in base_url or "127.0.0.1" in base_url
+    return False
 
 def get_local_ip():
     try:
@@ -143,85 +249,120 @@ class CaptionEngine:
     def _rebuild_rules(self):
         """Build correction rules from terms and custom rules"""
         self.correction_rules = []
-        
+
         # Add Brooklyn → Brookline rule (common ASR error)
         self.correction_rules.append({
             "pattern": r'\b[Bb]rooklyn\b(?!\s+(NY|New York|Bridge|Nets|Dodgers))',
             "replacement": "Brookline",
             "category": "place",
-            "description": "ASR commonly mishears Brookline as Brooklyn"
+            "description": "ASR commonly mishears Brookline as Brooklyn",
+            "pattern_length": len("brooklyn")
         })
-        
+
         # Add rules from terms
         for key, info in self.terms.items():
             term = info["term"]
             category = info.get("category", "other")
-            
+
             # Main term pattern
             self.correction_rules.append({
                 "pattern": rf'\b{re.escape(key)}\b',
                 "replacement": term,
                 "category": category,
-                "description": f"Correct capitalization for {term}"
+                "description": f"Correct capitalization for {term}",
+                "pattern_length": len(key)
             })
-            
+
             # Aliases
             for alias in info.get("aliases", []):
                 self.correction_rules.append({
                     "pattern": rf'\b{re.escape(alias.lower())}\b',
                     "replacement": term,
                     "category": category,
-                    "description": f"Alias '{alias}' → {term}"
+                    "description": f"Alias '{alias}' → {term}",
+                    "pattern_length": len(alias)
                 })
-        
+
         # Add custom rules
         for rule in self.custom_rules:
             self.correction_rules.append({
                 "pattern": rule[0],
                 "replacement": rule[1],
                 "category": "custom",
-                "description": rule[2] if len(rule) > 2 else "Custom rule"
+                "description": rule[2] if len(rule) > 2 else "Custom rule",
+                "pattern_length": len(rule[0])
             })
-        
-        # Sort by replacement length (longer first)
-        self.correction_rules.sort(key=lambda x: len(x["replacement"]), reverse=True)
+
+        # Sort by pattern length (longer patterns first to match longest phrases first)
+        self.correction_rules.sort(key=lambda x: x.get("pattern_length", 0), reverse=True)
     
     def correct(self, text: str, log=True) -> dict:
         """Apply corrections to text"""
         if not self.enabled or not text:
             return {"raw": text, "corrected": text, "corrections": []}
-        
+
         self.stats["captions_processed"] += 1
         corrected = text
         corrections = []
-        
+        protected_ranges = []  # Track ranges in the corrected text that shouldn't be modified
+
         for rule in self.correction_rules:
             try:
                 pattern = rule["pattern"]
                 replacement = rule["replacement"]
-                
-                matches = list(re.finditer(pattern, corrected, re.IGNORECASE))
-                for match in matches:
+
+                # Find matches in CURRENT corrected text
+                new_corrected = corrected
+                offset = 0
+
+                for match in re.finditer(pattern, corrected, re.IGNORECASE):
                     original = match.group()
-                    if original != replacement:
-                        if not any(c["from"] == original for c in corrections):
-                            correction = {
-                                "from": original,
-                                "to": replacement,
-                                "category": rule["category"],
-                                "timestamp": datetime.now().isoformat()
-                            }
-                            corrections.append(correction)
-                            if log:
-                                self.corrections_log.append(correction)
-                
-                corrected = re.sub(pattern, replacement, corrected, flags=re.IGNORECASE)
-            except re.error:
+                    start, end = match.span()
+
+                    # Adjust for offset from previous replacements in this rule
+                    actual_start = start + offset
+                    actual_end = end + offset
+
+                    # Check if this position is in a protected range
+                    is_protected = False
+                    for prot_start, prot_end in protected_ranges:
+                        if not (actual_end <= prot_start or actual_start >= prot_end):
+                            is_protected = True
+                            break
+
+                    if is_protected or original.lower() == replacement.lower():
+                        continue
+
+                    # Record the correction
+                    if not any(c["from"] == original and c["to"] == replacement for c in corrections):
+                        correction = {
+                            "from": original,
+                            "to": replacement,
+                            "category": rule["category"],
+                            "timestamp": datetime.now().isoformat()
+                        }
+                        corrections.append(correction)
+                        if log:
+                            self.corrections_log.append(correction)
+
+                    # Apply the correction with offset
+                    new_corrected = new_corrected[:actual_start] + replacement + new_corrected[actual_end:]
+
+                    # Add this replacement to protected ranges
+                    new_end = actual_start + len(replacement)
+                    protected_ranges.append((actual_start, new_end))
+
+                    # Update offset for next match in this rule
+                    offset += len(replacement) - len(original)
+
+                corrected = new_corrected
+
+            except (re.error, IndexError):
                 continue
-        
+
         if corrections:
             self.stats["corrections_applied"] += len(corrections)
-        
+
         return {"raw": text, "corrected": corrected, "corrections": corrections}
     
     def get_status(self):
@@ -287,7 +428,7 @@ class CaptionEngine:
             ],
             "place": [
                 ("Brookline", []),
-                ("Coolidge Corner", ["coolidge"]),
+                ("Coolidge Corner", []),
                 ("Brookline Village", []),
                 ("Washington Square", []),
                 ("Chestnut Hill", []),
@@ -502,54 +643,129 @@ class SessionManager:
         }, indent=2)
     
     def generate_summary(self):
-        """Generate a summary of the session"""
+        """Generate a summary of the session using AI if available"""
         if not self.captions:
             return {"summary": "No captions recorded.", "highlights": []}
-        
+
         # Combine all text
         full_text = " ".join(cap["corrected"] for cap in self.captions)
         word_count = len(full_text.split())
-        
-        # Extract key entities mentioned
-        entities = {"people": set(), "places": set(), "organizations": set()}
-        
-        # Simple extraction based on capitalization patterns
-        words = full_text.split()
-        for i, word in enumerate(words):
-            if word[0].isupper() and len(word) > 2:
-                # Check if it's part of a name (next word also capitalized)
-                if i + 1 < len(words) and words[i + 1][0].isupper():
-                    entities["people"].add(f"{word} {words[i + 1]}")
-        
+
         # Calculate stats
         total_corrections = sum(len(c.get("corrections", [])) for c in self.captions)
         duration = self.current_session.get("duration", 0) if self.current_session else 0
-        
-        summary = {
-            "summary": f"Session recorded {len(self.captions)} caption segments over {int(duration // 60)} minutes. "
-                      f"Approximately {word_count} words were transcribed with {total_corrections} automatic corrections applied.",
-            "stats": {
-                "duration_minutes": round(duration / 60, 1),
-                "caption_count": len(self.captions),
-                "word_count": word_count,
-                "corrections_made": total_corrections
-            },
-            "highlights": [],
-            "entities": {k: list(v)[:10] for k, v in entities.items()}
+
+        # Base stats
+        stats = {
+            "duration_minutes": round(duration / 60, 1),
+            "caption_count": len(self.captions),
+            "word_count": word_count,
+            "corrections_made": total_corrections
         }
-        
+
+        # Try AI-powered summary first
+        if openai_client:
+            try:
+                # Generate AI summary
+                response = openai_client.chat.completions.create(
+                    model=get_ai_model(),
+                    messages=[
+                        {
+                            "role": "system",
+                            "content": "You are an expert at summarizing meeting transcripts and civic proceedings. "
+                                      "Extract key topics, decisions, speakers mentioned, and notable quotes. "
+                                      "Provide a concise executive summary, list of topics discussed, and key highlights."
+                        },
+                        {
+                            "role": "user",
+                            "content": f"Please summarize this meeting transcript:\n\n{full_text[:8000]}"  # Limit to avoid token limits
+                        }
+                    ],
+                    temperature=0.3,
+                    max_tokens=800
+                )
+
+                ai_summary = response.choices[0].message.content
+
+                # Extract entities with AI
+                entity_response = openai_client.chat.completions.create(
+                    model=get_ai_model(),
+                    messages=[
+                        {
+                            "role": "system",
+                            "content": "Extract people names, places, and organizations mentioned in the text. "
+                                      "Return ONLY a JSON object with three arrays: people, places, organizations. "
+                                      "Each array should contain unique strings."
+                        },
+                        {
+                            "role": "user",
+                            "content": full_text[:4000]
+                        }
+                    ],
+                    temperature=0.1,
+                    max_tokens=500
+                )
+
+                try:
+                    entities = json.loads(entity_response.choices[0].message.content)
+                except:
+                    entities = {"people": [], "places": [], "organizations": []}
+
+                # Find highlights (captions with corrections)
+                highlights = []
+                for cap in self.captions:
+                    if len(cap.get("corrections", [])) > 0:
+                        highlights.append({
+                            "time": cap["time_str"][:8],
+                            "text": cap["corrected"],
+                            "corrections": cap["corrections"]
+                        })
+
+                return {
+                    "summary": ai_summary,
+                    "stats": stats,
+                    "highlights": highlights[:10],
+                    "entities": entities,
+                    "ai_generated": True
+                }
+
+            except Exception as e:
+                print(f"AI summary failed: {e}")
+                # Fall through to basic summary
+
+        # Fallback: Basic summary without AI
+        entities = {"people": set(), "places": set(), "organizations": set()}
+
+        # Simple extraction based on capitalization patterns
+        words = full_text.split()
+        for i, word in enumerate(words):
+            if word and word[0].isupper() and len(word) > 2:
+                # Check if it's part of a name (next word also capitalized)
+                if i + 1 < len(words) and words[i + 1][0].isupper():
+                    entities["people"].add(f"{word} {words[i + 1]}")
+
+        basic_summary = (
+            f"Session recorded {len(self.captions)} caption segments over {int(duration // 60)} minutes. "
+            f"Approximately {word_count} words were transcribed with {total_corrections} automatic corrections applied."
+        )
+
         # Extract potential highlights (longer captions, ones with corrections)
+        highlights = []
         for cap in self.captions:
             if len(cap.get("corrections", [])) > 0:
-                summary["highlights"].append({
+                highlights.append({
                     "time": cap["time_str"][:8],
                     "text": cap["corrected"],
                     "corrections": cap["corrections"]
                 })
-        
-        summary["highlights"] = summary["highlights"][:10]  # Limit to 10
-        
-        return summary
+
+        return {
+            "summary": basic_summary,
+            "stats": stats,
+            "highlights": highlights[:10],
+            "entities": {k: list(v)[:10] for k, v in entities.items()},
+            "ai_generated": False
+        }
 
 
 # =============================================================================
@@ -956,7 +1172,158 @@ class Handler(http.server.SimpleHTTPRequestHandler):
                 self.send_json(result)
             else:
                 self.send_json({"error": "Engine not found"}, 404)
-        
+
+        elif path == '/api/engine/document/extract':
+            # Extract terms from document text using AI
+            if not openai_client:
+                self.send_json({"error": "OpenAI not available. Set OPENAI_API_KEY environment variable."}, 400)
+                return
+
+            text = data.get('text', '')
+            if not text:
+                self.send_json({"error": "No text provided"}, 400)
+                return
+
+            try:
+                response = openai_client.chat.completions.create(
+                    model=get_ai_model(),
+                    messages=[
+                        {
+                            "role": "system",
+                            "content": "You are an expert at extracting proper nouns from documents. "
+                                      "Extract all person names, place names, and organization names from the text. "
+                                      "Return ONLY a JSON object with this structure:\n"
+                                      '{"terms": [{"term": "Name", "category": "person|place|organization", "aliases": ["alternate spelling"]}, ...]}\n'
+                                      "Include common misspellings or alternate forms in aliases. "
+                                      "Only include proper nouns that appear in the text."
+                        },
+                        {
+                            "role": "user",
+                            "content": f"Extract proper nouns from this text:\n\n{text[:6000]}"
+                        }
+                    ],
+                    temperature=0.1,
+                    max_tokens=2000
+                )
+
+                result_text = response.choices[0].message.content
+
+                # Parse JSON from response
+                try:
+                    extracted = json.loads(result_text)
+                    terms = extracted.get('terms', [])
+
+                    # Add terms to engine
+                    added = 0
+                    for term_data in terms:
+                        term = term_data.get('term', '')
+                        category = term_data.get('category', 'other')
+                        aliases = term_data.get('aliases', [])
+
+                        if term:
+                            caption_engine.add_term(term, category, aliases, source="document")
+                            added += 1
+
+                    self.send_json({
+                        "status": "ok",
+                        "terms_extracted": len(terms),
+                        "terms_added": added,
+                        "terms": terms
+                    })
+
+                except json.JSONDecodeError:
+                    self.send_json({"error": "Failed to parse AI response", "raw": result_text}, 500)
+
+            except Exception as e:
+                self.send_json({"error": str(e)}, 500)
+
+        elif path == '/api/engine/web/extract':
+            # Extract terms from web URL using AI
+            if not openai_client:
+                self.send_json({"error": "OpenAI not available. Set OPENAI_API_KEY environment variable."}, 400)
+                return
+
+            url = data.get('url', '')
+            if not url:
+                self.send_json({"error": "No URL provided"}, 400)
+                return
+
+            try:
+                # Fetch web page content
+                import urllib.request
+
+                req = urllib.request.Request(
+                    url,
+                    headers={'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'}
+                )
+
+                with urllib.request.urlopen(req, timeout=10) as response:
+                    html = response.read().decode('utf-8', errors='ignore')
+
+                # Extract text from HTML (simple approach)
+                import re
+                # Remove script and style elements
+                text = re.sub(r'<script[^>]*>.*?</script>', '', html, flags=re.DOTALL | re.IGNORECASE)
+                text = re.sub(r'<style[^>]*>.*?</style>', '', text, flags=re.DOTALL | re.IGNORECASE)
+                # Remove HTML tags
+                text = re.sub(r'<[^>]+>', ' ', text)
+                # Clean up whitespace
+                text = re.sub(r'\s+', ' ', text).strip()
+
+                # Use AI to extract terms
+                response = openai_client.chat.completions.create(
+                    model="gpt-4o-mini",
+                    messages=[
+                        {
+                            "role": "system",
+                            "content": "You are an expert at extracting proper nouns from web content. "
+                                      "Extract all person names, place names, and organization names from the text. "
+                                      "Return ONLY a JSON object with this structure:\n"
+                                      '{"terms": [{"term": "Name", "category": "person|place|organization", "aliases": ["alternate spelling"]}, ...]}\n'
+                                      "Include common misspellings or alternate forms in aliases. "
+                                      "Only include proper nouns that appear in the text."
+                        },
+                        {
+                            "role": "user",
+                            "content": f"Extract proper nouns from this webpage text:\n\n{text[:6000]}"
+                        }
+                    ],
+                    temperature=0.1,
+                    max_tokens=2000
+                )
+
+                result_text = response.choices[0].message.content
+
+                # Parse JSON from response
+                try:
+                    extracted = json.loads(result_text)
+                    terms = extracted.get('terms', [])
+
+                    # Add terms to engine
+                    added = 0
+                    for term_data in terms:
+                        term = term_data.get('term', '')
+                        category = term_data.get('category', 'other')
+                        aliases = term_data.get('aliases', [])
+
+                        if term:
+                            caption_engine.add_term(term, category, aliases, source="web")
+                            added += 1
+
+                    self.send_json({
+                        "status": "ok",
+                        "url": url,
+                        "terms_extracted": len(terms),
+                        "terms_added": added,
+                        "terms": terms
+                    })
+
+                except json.JSONDecodeError:
+                    self.send_json({"error": "Failed to parse AI response", "raw": result_text}, 500)
+
+            except Exception as e:
+                self.send_json({"error": str(e)}, 500)
+
         # Whisper controls
         elif path == '/api/whisper/load':
             self.send_json(whisper_engine.load_model(data.get('model', 'base')))
@@ -987,7 +1354,79 @@ class Handler(http.server.SimpleHTTPRequestHandler):
             # Reprocess session with Whisper for accuracy
             # This would need audio recording - for now just return the session
             self.send_json({"status": "ok", "message": "Reprocessing requires audio recording"})
-        
+
+        # AI Configuration endpoints
+        elif path == '/api/ai/config':
+            # Get current AI configuration
+            config_to_send = ai_config.copy()
+            # Don't send full API keys, just indicate if they're set
+            if config_to_send.get("openai_api_key"):
+                config_to_send["openai_api_key_set"] = True
+                config_to_send["openai_api_key"] = config_to_send["openai_api_key"][:8] + "..." if len(config_to_send["openai_api_key"]) > 8 else "***"
+            if config_to_send.get("custom_api_key"):
+                config_to_send["custom_api_key_set"] = True
+                config_to_send["custom_api_key"] = "***"
+
+            config_to_send["available"] = OPENAI_AVAILABLE
+            config_to_send["active"] = openai_client is not None
+            config_to_send["is_local"] = is_ai_local()
+            config_to_send["model"] = get_ai_model()
+
+            self.send_json(config_to_send)
+
+        elif path == '/api/ai/config/update':
+            # Update AI configuration
+            new_config = data
+
+            # Update config
+            for key in ["provider", "openai_api_key", "openai_model", "ollama_base_url",
+                       "ollama_model", "lmstudio_base_url", "lmstudio_model",
+                       "custom_base_url", "custom_api_key", "custom_model"]:
+                if key in new_config:
+                    ai_config[key] = new_config[key]
+
+            # Save config to file
+            try:
+                with open(AI_CONFIG_FILE, 'w') as f:
+                    json.dump(ai_config, f, indent=2)
+            except Exception as e:
+                self.send_json({"error": f"Failed to save config: {e}"}, 500)
+                return
+
+            # Reinitialize client
+            init_ai_client()
+
+            self.send_json({
+                "status": "ok",
+                "provider": ai_config["provider"],
+                "active": openai_client is not None,
+                "is_local": is_ai_local(),
+                "model": get_ai_model()
+            })
+
+        elif path == '/api/ai/test':
+            # Test AI connection
+            if not openai_client:
+                self.send_json({"error": "No AI provider configured"}, 400)
+                return
+
+            try:
+                response = openai_client.chat.completions.create(
+                    model=get_ai_model(),
+                    messages=[{"role": "user", "content": "Say 'test successful' and nothing else."}],
+                    max_tokens=10
+                )
+                result_text = response.choices[0].message.content
+                self.send_json({
+                    "status": "ok",
+                    "response": result_text,
+                    "provider": ai_config["provider"],
+                    "model": get_ai_model(),
+                    "is_local": is_ai_local()
+                })
+            except Exception as e:
+                self.send_json({"error": str(e)}, 500)
+
         else:
             self.send_response(404)
             self.end_headers()

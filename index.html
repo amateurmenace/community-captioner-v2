@@ -3,636 +3,3035 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Community Captioner</title>
-    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <title>Community Captioner - Free AI-Powered Live Captioning</title>
+    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700;800&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
     <style>
         :root {
-            --bg-cream: #F5F3EE; --bg-white: #FFFFFF; --green-primary: #3D5A47; --green-light: #4A6B52;
-            --green-bright: #00A676; --text-dark: #3D5A47; --text-medium: #5A6B5E; --text-light: #8A9A8E;
-            --border-light: #D4D2CD; --border-card: #E0DED9; --radius-sm: 8px; --radius-md: 12px; --radius-lg: 16px;
-            --purple-primary: #6366F1; --purple-light: #818CF8; --orange-primary: #EA580C; --orange-light: #FB923C;
-            --red-primary: #DC2626; --blue-primary: #2563EB;
+            /* Sage green & warm background palette */
+            --bg-warm: #F5F3EE;
+            --bg-sage-light: #E8EDE7;
+            --bg-white: #FFFFFF;
+            --sage-primary: #7D9B76;
+            --sage-dark: #5A7C55;
+            --sage-darker: #3D5A47;
+            --sage-muted: #A8BAA3;
+            --text-dark: #2D3A2E;
+            --text-medium: #5A6B5E;
+            --text-light: #8A9A8E;
+            --border-light: #D4D2CD;
+            --border-sage: #C4D3BE;
+
+            /* Accent colors - purple used sparingly */
+            --purple-accent: #8B7FC7;
+            --purple-light: #A69DD6;
+
+            /* Functional colors */
+            --red-primary: #DC2626;
+            --orange-primary: #EA580C;
+            --green-bright: #00A676;
+
+            /* Spacing */
+            --radius-sm: 10px;
+            --radius-md: 14px;
+            --radius-lg: 18px;
+            --radius-xl: 24px;
         }
+
         * { margin: 0; padding: 0; box-sizing: border-box; }
-        body { font-family: 'DM Sans', -apple-system, sans-serif; background: var(--bg-cream); color: var(--text-dark); line-height: 1.5; min-height: 100vh; }
-        body.overlay-mode { background: transparent; overflow: hidden; }
-        .app { max-width: 1100px; margin: 0 auto; padding: 16px; }
-        
-        /* Header */
-        .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; }
-        .logo { display: flex; align-items: center; gap: 12px; }
-        .logo-bars { display: flex; flex-direction: column; gap: 4px; }
-        .logo-bar { height: 7px; border-radius: 3px; width: 48px; }
-        .logo-bar-1 { background: #3D5A47; }
-        .logo-bar-2 { background: #6B9B76; }
-        .logo-text { font-weight: 700; font-size: 20px; line-height: 1.1; }
-        .cc-badge { display: inline-flex; border: 2px solid currentColor; border-radius: 4px; padding: 2px 6px; font-size: 12px; margin-left: 6px; }
-        .header-right { display: flex; align-items: center; gap: 12px; }
-        .big-logo { height: 48px; }
 
-        /* Recording Status */
-        .rec-status { display: flex; align-items: center; gap: 8px; padding: 8px 14px; background: var(--bg-white); border: 1px solid var(--border-card); border-radius: 20px; font-size: 12px; font-weight: 600; }
-        .rec-status.recording { background: #FEE2E2; border-color: #FECACA; color: var(--red-primary); }
-        .rec-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--border-light); }
-        .rec-status.recording .rec-dot { background: var(--red-primary); animation: pulse 1s infinite; }
-        @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
+        body {
+            font-family: 'DM Sans', 'Inter', -apple-system, sans-serif;
+            background: var(--bg-warm);
+            color: var(--text-dark);
+            line-height: 1.6;
+            min-height: 100vh;
+        }
 
-        /* Main Layout */
-        .main-grid { display: grid; grid-template-columns: 1fr 320px; gap: 16px; }
-        @media (max-width: 900px) { .main-grid { grid-template-columns: 1fr; } }
+        /* Landing Page Styles */
+        .landing-page {
+            min-height: 100vh;
+            padding: 0;
+            background: linear-gradient(135deg, #F5F3EE 0%, #E8EDE7 50%, #F5F3EE 100%);
+            background-size: 400% 400%;
+            animation: gradientShift 15s ease infinite;
+            position: relative;
+        }
 
-        /* Preview */
-        .preview { background: #2D3748; border-radius: var(--radius-lg); padding: 32px 20px; min-height: 140px; display: flex; align-items: center; justify-content: center; position: relative; margin-bottom: 16px; }
-        .preview-label { position: absolute; top: 8px; left: 12px; font-size: 9px; color: #A0AEC0; text-transform: uppercase; letter-spacing: 0.5px; }
-        .preview-badges { position: absolute; top: 8px; right: 12px; display: flex; gap: 6px; }
-        .preview-badge { font-size: 9px; padding: 3px 8px; border-radius: 8px; font-weight: 600; }
-        .preview-badge.mode { background: #3B82F6; color: white; }
-        .preview-badge.whisper { background: #F97316; }
-        .preview-badge.engine { background: #8B5CF6; color: white; }
-        .preview-badge.fixes { background: #10B981; color: white; }
-        .preview-text { font-size: 22px; font-weight: 500; text-align: center; line-height: 1.3; padding: 10px 20px; border-radius: 8px; max-width: 90%; color: white; }
-        .preview-text.empty { color: #718096; font-size: 16px; background: transparent !important; }
+        @keyframes gradientShift {
+            0% { background-position: 0% 50%; }
+            50% { background-position: 100% 50%; }
+            100% { background-position: 0% 50%; }
+        }
 
-        /* Cards */
-        .card { background: var(--bg-white); border: 1px solid var(--border-card); border-radius: var(--radius-lg); padding: 16px; margin-bottom: 12px; }
-        .card-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
-        .card-title { font-size: 13px; font-weight: 600; display: flex; align-items: center; gap: 6px; }
-        .badge { font-size: 9px; padding: 2px 6px; border-radius: 6px; font-weight: 600; }
-        .badge.purple { background: var(--purple-primary); color: white; }
-        .badge.orange { background: var(--orange-primary); color: white; }
-        .badge.green { background: var(--green-bright); color: white; }
+        .landing-header {
+            padding: 24px 32px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid var(--border-light);
+            background: var(--bg-white);
+        }
 
-        /* Mode Selector */
-        .mode-tabs { display: flex; gap: 4px; background: var(--bg-cream); padding: 3px; border-radius: var(--radius-sm); margin-bottom: 12px; }
-        .mode-tab { flex: 1; padding: 8px 12px; border: none; background: transparent; border-radius: 6px; font-family: inherit; font-size: 12px; font-weight: 600; color: var(--text-medium); cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px; }
-        .mode-tab:hover { background: var(--bg-white); }
-        .mode-tab.active { background: var(--green-primary); color: white; }
-        .mode-tab.active.whisper { background: var(--orange-primary); }
+        .logo-section {
+            display: flex;
+            align-items: center;
+            gap: 14px;
+        }
 
-        /* Controls */
-        .select { width: 100%; padding: 8px 10px; border: 1px solid var(--border-light); border-radius: var(--radius-sm); font-family: inherit; font-size: 11px; background: var(--bg-cream); margin-bottom: 8px; }
-        .btn { padding: 10px 16px; border: none; border-radius: var(--radius-sm); font-family: inherit; font-size: 12px; font-weight: 600; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px; width: 100%; }
-        .btn-primary { background: var(--green-primary); color: white; }
-        .btn-primary:hover { background: var(--green-light); }
-        .btn-danger { background: var(--red-primary); color: white; }
-        .btn-whisper { background: var(--orange-primary); color: white; }
-        .btn-outline { background: transparent; border: 1px solid var(--border-light); color: var(--text-medium); }
-        .btn-outline:hover { border-color: var(--text-medium); }
-        .btn-sm { padding: 6px 10px; font-size: 11px; }
-        .btn:disabled { opacity: 0.5; cursor: not-allowed; }
-        .btn-row { display: flex; gap: 6px; margin-top: 8px; }
-        .btn-row .btn { flex: 1; }
+        .logo-icon {
+            width: 50px;
+            height: 50px;
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+            justify-content: center;
+        }
 
-        /* Toggle */
-        .toggle-row { display: flex; align-items: center; justify-content: space-between; padding: 10px 12px; background: var(--bg-cream); border-radius: var(--radius-sm); margin-bottom: 8px; }
-        .toggle-label { font-size: 12px; font-weight: 500; }
-        .toggle-sub { font-size: 10px; color: var(--text-light); }
-        .toggle { width: 36px; height: 20px; background: var(--border-light); border-radius: 10px; position: relative; cursor: pointer; transition: background 0.2s; flex-shrink: 0; }
-        .toggle.on { background: var(--purple-primary); }
-        .toggle::after { content: ''; position: absolute; top: 2px; left: 2px; width: 16px; height: 16px; background: white; border-radius: 50%; transition: transform 0.2s; box-shadow: 0 1px 2px rgba(0,0,0,0.2); }
-        .toggle.on::after { transform: translateX(16px); }
+        .logo-bar {
+            height: 9px;
+            border-radius: 4px;
+            transition: all 0.3s;
+        }
 
-        /* Whisper Setup */
-        .whisper-setup { background: #FFF7ED; border: 1px solid #FDBA74; border-radius: var(--radius-sm); padding: 10px; margin-bottom: 10px; }
-        .whisper-row { display: flex; gap: 6px; align-items: center; margin-bottom: 6px; }
-        .whisper-row:last-child { margin-bottom: 0; }
-        .whisper-row .select { margin-bottom: 0; flex: 1; }
-        .whisper-row .btn { width: auto; padding: 8px 12px; }
-        .whisper-status { font-size: 10px; color: #C2410C; }
+        .logo-bar-1 { background: var(--sage-darker); width: 100%; }
+        .logo-bar-2 { background: var(--sage-primary); width: 75%; }
+        .logo-bar-3 { background: var(--sage-muted); width: 50%; }
 
-        /* Session Panel */
-        .session-panel { background: linear-gradient(135deg, #1E3A5F 0%, #2D5A87 100%); color: white; border-radius: var(--radius-lg); padding: 16px; margin-bottom: 12px; }
-        .session-panel.recording { background: linear-gradient(135deg, #991B1B 0%, #DC2626 100%); }
-        .session-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
-        .session-title { font-size: 13px; font-weight: 600; display: flex; align-items: center; gap: 6px; }
-        .session-stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-bottom: 12px; }
-        .session-stat { text-align: center; }
-        .session-stat-value { font-size: 20px; font-weight: 700; }
-        .session-stat-label { font-size: 9px; opacity: 0.8; }
-        .session-actions { display: flex; gap: 6px; }
-        .session-actions .btn { background: rgba(255,255,255,0.2); border: 1px solid rgba(255,255,255,0.3); }
-        .session-actions .btn:hover { background: rgba(255,255,255,0.3); }
-        .session-actions .btn-record { background: white; color: #1E3A5F; border: none; }
-        .session-panel.recording .session-actions .btn-record { background: white; color: var(--red-primary); }
+        .logo-text {
+            font-size: 28px;
+            font-weight: 800;
+            color: var(--text-dark);
+            letter-spacing: -0.5px;
+        }
 
-        /* Corrections Log */
-        .corrections-log { max-height: 200px; overflow-y: auto; background: var(--bg-cream); border-radius: var(--radius-sm); padding: 8px; }
-        .correction-item { display: flex; align-items: center; gap: 8px; padding: 6px 8px; background: white; border-radius: 6px; margin-bottom: 4px; font-size: 11px; }
-        .correction-item:last-child { margin-bottom: 0; }
-        .correction-time { color: var(--text-light); font-size: 10px; min-width: 50px; }
-        .correction-from { color: var(--red-primary); text-decoration: line-through; }
-        .correction-arrow { color: var(--text-light); }
-        .correction-to { color: var(--green-primary); font-weight: 600; }
-        .correction-cat { font-size: 9px; padding: 2px 6px; border-radius: 4px; margin-left: auto; }
-        .correction-cat.person { background: #DBEAFE; color: #1E40AF; }
-        .correction-cat.place { background: #D1FAE5; color: #065F46; }
-        .correction-cat.organization { background: #FEF3C7; color: #92400E; }
-        .empty-log { text-align: center; padding: 20px; color: var(--text-light); font-size: 11px; }
+        .badge-tag {
+            display: inline-block;
+            background: var(--bg-sage-light);
+            color: var(--sage-darker);
+            padding: 6px 14px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
 
-        /* Export Panel */
-        .export-panel { background: var(--bg-white); border: 1px solid var(--border-card); border-radius: var(--radius-lg); padding: 16px; }
-        .export-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; margin-bottom: 12px; }
-        .export-btn { padding: 12px; border: 1px solid var(--border-light); background: var(--bg-cream); border-radius: var(--radius-sm); cursor: pointer; text-align: center; transition: all 0.2s; }
-        .export-btn:hover { border-color: var(--green-primary); background: #F0F7F2; }
-        .export-btn-icon { font-size: 20px; margin-bottom: 4px; }
-        .export-btn-label { font-size: 11px; font-weight: 600; }
-        .export-btn-desc { font-size: 9px; color: var(--text-light); }
+        /* Demo Section */
+        .demo-section {
+            max-width: 1200px;
+            margin: 0 auto 80px;
+            padding: 0 32px;
+        }
 
-        /* Engine Panel */
-        .engine-section { margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--border-light); }
-        .engine-row { display: flex; gap: 6px; }
-        .engine-row .btn { font-size: 10px; padding: 8px; }
-        .engine-info { font-size: 10px; color: var(--text-light); margin-top: 6px; text-align: center; }
+        .demo-card {
+            background: var(--bg-white);
+            border: 2px solid var(--border-light);
+            border-radius: var(--radius-xl);
+            padding: 48px;
+            box-shadow: 0 10px 40px rgba(61, 90, 71, 0.08);
+        }
 
-        /* OBS Section */
-        .obs-card { margin-top: 12px; }
-        .obs-url { display: flex; gap: 6px; margin-bottom: 8px; }
-        .obs-input { flex: 1; padding: 8px 10px; border: 1px solid var(--border-light); border-radius: var(--radius-sm); font-family: monospace; font-size: 10px; background: var(--bg-cream); }
-        .obs-info { font-size: 10px; color: var(--text-light); }
+        .demo-title {
+            font-size: 24px;
+            font-weight: 700;
+            margin-bottom: 24px;
+            color: var(--text-dark);
+            text-align: center;
+        }
 
-        /* Tabs */
-        .tabs { display: flex; gap: 2px; margin-bottom: 12px; }
-        .tab { flex: 1; padding: 8px; background: var(--bg-cream); border: none; border-radius: var(--radius-sm) var(--radius-sm) 0 0; font-family: inherit; font-size: 11px; font-weight: 600; color: var(--text-medium); cursor: pointer; }
-        .tab.active { background: var(--bg-white); color: var(--text-dark); }
+        .demo-box {
+            background: #1a1a1a;
+            border-radius: var(--radius-lg);
+            padding: 32px;
+            margin-bottom: 24px;
+            min-height: 120px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
 
-        /* Footer */
-        .footer { text-align: center; padding: 16px; color: var(--text-light); font-size: 10px; }
-        .footer a { color: var(--green-primary); text-decoration: none; }
+        .demo-text {
+            font-size: 28px;
+            font-weight: 600;
+            color: white;
+            text-align: center;
+            line-height: 1.5;
+        }
 
-        /* Overlay */
-        .overlay-container { width: 1920px; height: 1080px; position: relative; }
-        .caption-display { position: absolute; width: 100%; padding: 20px 60px; display: flex; justify-content: center; z-index: 10000; }
-        .caption-text-overlay { word-wrap: break-word; line-height: 1.4; }
+        .demo-word {
+            display: inline-block;
+            transition: all 0.6s ease;
+        }
+
+        .demo-word.correcting {
+            color: #DC2626;
+            transform: scale(1.1);
+        }
+
+        .demo-word.corrected {
+            color: #00A676;
+            transform: scale(1);
+        }
+
+        .demo-controls {
+            display: flex;
+            gap: 16px;
+            justify-content: center;
+        }
+
+        .demo-btn {
+            padding: 12px 24px;
+            background: var(--sage-darker);
+            color: white;
+            border: none;
+            border-radius: var(--radius-md);
+            font-size: 15px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .demo-btn:hover {
+            background: var(--sage-primary);
+            transform: translateY(-2px);
+        }
+
+        .demo-btn.secondary {
+            background: transparent;
+            border: 2px solid var(--border-light);
+            color: var(--text-medium);
+        }
+
+        .demo-btn.secondary:hover {
+            border-color: var(--sage-primary);
+            color: var(--sage-darker);
+            transform: translateY(-2px);
+        }
+
+        .hero-section {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 80px 32px 60px;
+            text-align: center;
+        }
+
+        .hero-title {
+            font-size: 68px;
+            font-weight: 800;
+            color: var(--text-dark);
+            line-height: 1.1;
+            margin-bottom: 24px;
+            letter-spacing: -1.5px;
+        }
+
+        .hero-subtitle {
+            font-size: 24px;
+            color: var(--text-medium);
+            margin-bottom: 16px;
+            font-weight: 500;
+        }
+
+        .hero-subtitle strong {
+            color: var(--sage-darker);
+            font-weight: 700;
+        }
+
+        .hero-description {
+            font-size: 18px;
+            color: var(--text-medium);
+            max-width: 800px;
+            margin: 0 auto 40px;
+            line-height: 1.7;
+        }
+
+        .cta-buttons {
+            display: flex;
+            gap: 16px;
+            justify-content: center;
+            margin-bottom: 80px;
+        }
+
+        .cta-btn {
+            padding: 18px 36px;
+            font-size: 18px;
+            font-weight: 700;
+            border-radius: var(--radius-md);
+            border: none;
+            cursor: pointer;
+            transition: all 0.2s;
+            font-family: inherit;
+        }
+
+        .cta-btn-primary {
+            background: var(--sage-darker);
+            color: white;
+        }
+
+        .cta-btn-primary:hover {
+            background: var(--sage-primary);
+            transform: translateY(-2px);
+            box-shadow: 0 8px 20px rgba(61, 90, 71, 0.3);
+        }
+
+        .cta-btn-secondary {
+            background: transparent;
+            color: var(--sage-darker);
+            border: 2px solid var(--sage-darker);
+        }
+
+        .cta-btn-secondary:hover {
+            background: var(--bg-sage-light);
+        }
+
+        .feature-cards {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 40px 32px;
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 24px;
+        }
+
+        .feature-card {
+            background: var(--bg-white);
+            border: 2px solid var(--border-light);
+            border-radius: var(--radius-lg);
+            padding: 40px 32px;
+            text-align: center;
+            transition: all 0.3s;
+            cursor: pointer;
+        }
+
+        .feature-card:hover {
+            border-color: var(--sage-primary);
+            transform: translateY(-4px);
+            box-shadow: 0 12px 30px rgba(125, 155, 118, 0.15);
+        }
+
+        .feature-icon {
+            width: 80px;
+            height: 80px;
+            margin: 0 auto 24px;
+            background: var(--bg-sage-light);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 36px;
+        }
+
+        .feature-card.special .feature-icon {
+            background: linear-gradient(135deg, var(--purple-accent), var(--purple-light));
+            color: white;
+        }
+
+        .feature-title {
+            font-size: 22px;
+            font-weight: 700;
+            margin-bottom: 12px;
+            color: var(--text-dark);
+        }
+
+        .feature-desc {
+            font-size: 15px;
+            color: var(--text-medium);
+            line-height: 1.6;
+        }
+
+        .special-badge {
+            display: inline-block;
+            background: var(--purple-accent);
+            color: white;
+            padding: 4px 10px;
+            border-radius: 12px;
+            font-size: 11px;
+            font-weight: 700;
+            text-transform: uppercase;
+            margin-bottom: 8px;
+        }
+
+        /* Dashboard Styles */
+        .dashboard {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 32px;
+            display: none;
+        }
+
+        .dashboard.active {
+            display: block;
+        }
+
+        .dashboard-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 32px;
+            padding-bottom: 24px;
+            border-bottom: 2px solid var(--border-light);
+        }
+
+        .dashboard-title {
+            font-size: 36px;
+            font-weight: 800;
+            color: var(--text-dark);
+        }
+
+        .back-btn {
+            padding: 12px 24px;
+            background: transparent;
+            border: 2px solid var(--border-light);
+            border-radius: var(--radius-sm);
+            font-size: 15px;
+            font-weight: 600;
+            cursor: pointer;
+            color: var(--text-medium);
+            transition: all 0.2s;
+        }
+
+        .back-btn:hover {
+            border-color: var(--sage-primary);
+            color: var(--sage-darker);
+        }
+
+        .dashboard-grid {
+            display: grid;
+            grid-template-columns: 2fr 1fr;
+            gap: 28px;
+        }
+
+        .preview-section {
+            background: #1a1a1a;
+            border-radius: var(--radius-xl);
+            padding: 48px 32px;
+            min-height: 200px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+            margin-bottom: 28px;
+        }
+
+        .preview-label {
+            position: absolute;
+            top: 16px;
+            left: 20px;
+            font-size: 11px;
+            color: #666;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            font-weight: 600;
+        }
+
+        .preview-badges {
+            position: absolute;
+            top: 16px;
+            right: 20px;
+            display: flex;
+            gap: 8px;
+        }
+
+        .preview-badge {
+            padding: 6px 12px;
+            border-radius: 8px;
+            font-size: 11px;
+            font-weight: 700;
+            color: white;
+        }
+
+        .preview-badge.mode { background: var(--sage-primary); }
+        .preview-badge.whisper { background: var(--orange-primary); }
+        .preview-badge.engine { background: var(--purple-accent); }
+        .preview-badge.corrections { background: var(--green-bright); }
+        .preview-badge.listening {
+            background: var(--red-primary);
+            animation: pulse 1.5s infinite;
+        }
+
+        .preview-text {
+            font-size: 32px;
+            font-weight: 600;
+            color: white;
+            text-align: center;
+            max-width: 90%;
+            line-height: 1.4;
+        }
+
+        .preview-text.empty {
+            color: #555;
+            font-size: 18px;
+        }
+
+        .card {
+            background: var(--bg-white);
+            border: 2px solid var(--border-light);
+            border-radius: var(--radius-lg);
+            padding: 28px;
+            margin-bottom: 24px;
+        }
+
+        .card-title {
+            font-size: 20px;
+            font-weight: 700;
+            margin-bottom: 20px;
+            color: var(--text-dark);
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .card-badge {
+            padding: 4px 10px;
+            background: var(--purple-accent);
+            color: white;
+            border-radius: 8px;
+            font-size: 11px;
+            font-weight: 700;
+            text-transform: uppercase;
+        }
+
+        .mode-selector {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+            margin-bottom: 24px;
+        }
+
+        .mode-btn {
+            padding: 18px 24px;
+            background: var(--bg-sage-light);
+            border: 2px solid var(--border-sage);
+            border-radius: var(--radius-md);
+            font-size: 16px;
+            font-weight: 700;
+            cursor: pointer;
+            transition: all 0.2s;
+            color: var(--text-medium);
+        }
+
+        .mode-btn:hover {
+            border-color: var(--sage-primary);
+        }
+
+        .mode-btn.active {
+            background: var(--sage-darker);
+            border-color: var(--sage-darker);
+            color: white;
+        }
+
+        .mode-btn.active.whisper {
+            background: var(--orange-primary);
+            border-color: var(--orange-primary);
+        }
+
+        .btn-large {
+            width: 100%;
+            padding: 18px 24px;
+            font-size: 17px;
+            font-weight: 700;
+            border-radius: var(--radius-md);
+            border: none;
+            cursor: pointer;
+            transition: all 0.2s;
+            margin-bottom: 12px;
+        }
+
+        .btn-primary {
+            background: var(--sage-darker);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background: var(--sage-primary);
+        }
+
+        .btn-danger {
+            background: var(--red-primary);
+            color: white;
+        }
+
+        .btn-outline {
+            background: transparent;
+            border: 2px solid var(--border-light);
+            color: var(--text-medium);
+        }
+
+        .btn-outline:hover {
+            border-color: var(--sage-primary);
+            color: var(--sage-darker);
+        }
+
+        .btn:disabled {
+            opacity: 0.4;
+            cursor: not-allowed;
+        }
+
+        .setting-group {
+            margin-bottom: 24px;
+        }
+
+        .setting-label {
+            font-size: 14px;
+            font-weight: 700;
+            color: var(--text-dark);
+            margin-bottom: 8px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .setting-value {
+            font-weight: 600;
+            color: var(--sage-darker);
+        }
+
+        .setting-input {
+            width: 100%;
+            padding: 14px 16px;
+            border: 2px solid var(--border-light);
+            border-radius: var(--radius-sm);
+            font-size: 15px;
+            font-family: inherit;
+            transition: border-color 0.2s;
+        }
+
+        .setting-input:focus {
+            outline: none;
+            border-color: var(--sage-primary);
+        }
+
+        .setting-slider {
+            width: 100%;
+            height: 8px;
+            border-radius: 4px;
+            background: var(--border-light);
+            outline: none;
+            -webkit-appearance: none;
+        }
+
+        .setting-slider::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            background: var(--sage-darker);
+            cursor: pointer;
+        }
+
+        .setting-slider::-moz-range-thumb {
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            background: var(--sage-darker);
+            cursor: pointer;
+            border: none;
+        }
+
+        .color-input-group {
+            display: grid;
+            grid-template-columns: 1fr auto;
+            gap: 10px;
+            align-items: center;
+        }
+
+        .color-input {
+            width: 60px;
+            height: 40px;
+            border: 2px solid var(--border-light);
+            border-radius: var(--radius-sm);
+            cursor: pointer;
+        }
+
+        .toggle-setting {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 16px;
+            background: var(--bg-sage-light);
+            border-radius: var(--radius-sm);
+            margin-bottom: 12px;
+        }
+
+        .toggle-label {
+            font-size: 15px;
+            font-weight: 600;
+            color: var(--text-dark);
+        }
+
+        .toggle-switch {
+            width: 50px;
+            height: 28px;
+            background: var(--border-light);
+            border-radius: 14px;
+            position: relative;
+            cursor: pointer;
+            transition: background 0.3s;
+        }
+
+        .toggle-switch.on {
+            background: var(--sage-primary);
+        }
+
+        .toggle-switch::after {
+            content: '';
+            position: absolute;
+            width: 22px;
+            height: 22px;
+            background: white;
+            border-radius: 50%;
+            top: 3px;
+            left: 3px;
+            transition: transform 0.3s;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+        }
+
+        .toggle-switch.on::after {
+            transform: translateX(22px);
+        }
+
+        .rec-indicator {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 14px 20px;
+            background: var(--bg-white);
+            border: 2px solid var(--border-light);
+            border-radius: 16px;
+            font-size: 14px;
+            font-weight: 600;
+        }
+
+        .rec-indicator.recording {
+            background: #FEE2E2;
+            border-color: var(--red-primary);
+            color: var(--red-primary);
+        }
+
+        .rec-dot {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            background: var(--border-light);
+        }
+
+        .rec-indicator.recording .rec-dot {
+            background: var(--red-primary);
+            animation: pulse 1.5s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.4; }
+        }
+
+        .url-display {
+            background: var(--bg-sage-light);
+            padding: 16px;
+            border-radius: var(--radius-sm);
+            margin-top: 16px;
+        }
+
+        .url-label {
+            font-size: 12px;
+            font-weight: 700;
+            color: var(--text-medium);
+            margin-bottom: 8px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .url-text {
+            font-family: 'Monaco', monospace;
+            font-size: 14px;
+            color: var(--sage-darker);
+            word-break: break-all;
+            padding: 10px;
+            background: white;
+            border-radius: 6px;
+            border: 1px solid var(--border-sage);
+        }
+
+        .export-buttons {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+            margin-top: 16px;
+        }
+
+        .export-btn {
+            padding: 12px 16px;
+            background: var(--bg-sage-light);
+            border: 2px solid var(--border-sage);
+            border-radius: var(--radius-sm);
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            color: var(--text-dark);
+            transition: all 0.2s;
+            text-align: center;
+            text-decoration: none;
+            display: block;
+        }
+
+        .export-btn:hover {
+            background: var(--sage-darker);
+            color: white;
+            border-color: var(--sage-darker);
+        }
+
+        /* Wizard Styles */
+        .wizard-container {
+            max-width: 900px;
+            margin: 0 auto;
+        }
+
+        .wizard-progress {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 40px;
+            position: relative;
+        }
+
+        .wizard-progress::before {
+            content: '';
+            position: absolute;
+            top: 20px;
+            left: 0;
+            right: 0;
+            height: 2px;
+            background: var(--border-light);
+            z-index: 0;
+        }
+
+        .wizard-step {
+            flex: 1;
+            text-align: center;
+            position: relative;
+            z-index: 1;
+        }
+
+        .wizard-step-circle {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            background: var(--bg-white);
+            border: 3px solid var(--border-light);
+            margin: 0 auto 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 700;
+            color: var(--text-light);
+            transition: all 0.3s;
+        }
+
+        .wizard-step.active .wizard-step-circle {
+            background: var(--sage-darker);
+            border-color: var(--sage-darker);
+            color: white;
+        }
+
+        .wizard-step.completed .wizard-step-circle {
+            background: var(--sage-primary);
+            border-color: var(--sage-primary);
+            color: white;
+        }
+
+        .wizard-step-label {
+            font-size: 12px;
+            font-weight: 600;
+            color: var(--text-light);
+        }
+
+        .wizard-step.active .wizard-step-label {
+            color: var(--sage-darker);
+        }
+
+        .wizard-content {
+            background: var(--bg-white);
+            border: 2px solid var(--border-light);
+            border-radius: var(--radius-lg);
+            padding: 40px;
+            margin-bottom: 24px;
+        }
+
+        .wizard-nav {
+            display: flex;
+            justify-content: space-between;
+            gap: 16px;
+        }
+
+        .wizard-btn {
+            padding: 14px 28px;
+            font-size: 16px;
+            font-weight: 700;
+            border-radius: var(--radius-md);
+            border: none;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .wizard-btn-primary {
+            background: var(--sage-darker);
+            color: white;
+            flex: 1;
+        }
+
+        .wizard-btn-primary:hover {
+            background: var(--sage-primary);
+        }
+
+        .wizard-btn-secondary {
+            background: transparent;
+            border: 2px solid var(--border-light);
+            color: var(--text-medium);
+        }
+
+        .wizard-btn-secondary:hover {
+            border-color: var(--sage-primary);
+            color: var(--sage-darker);
+        }
+
+        .template-options {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 16px;
+            margin-top: 24px;
+        }
+
+        .template-card {
+            padding: 24px;
+            border: 2px solid var(--border-light);
+            border-radius: var(--radius-md);
+            cursor: pointer;
+            transition: all 0.2s;
+            text-align: center;
+        }
+
+        .template-card:hover {
+            border-color: var(--sage-primary);
+            transform: translateY(-2px);
+        }
+
+        .template-card.selected {
+            border-color: var(--sage-darker);
+            background: var(--bg-sage-light);
+        }
+
+        .template-icon {
+            font-size: 40px;
+            margin-bottom: 12px;
+        }
+
+        .template-title {
+            font-size: 16px;
+            font-weight: 700;
+            margin-bottom: 8px;
+            color: var(--text-dark);
+        }
+
+        .template-desc {
+            font-size: 13px;
+            color: var(--text-medium);
+        }
+
+        .term-form {
+            background: var(--bg-sage-light);
+            padding: 24px;
+            border-radius: var(--radius-md);
+            margin-bottom: 20px;
+        }
+
+        .term-list {
+            max-height: 300px;
+            overflow-y: auto;
+        }
+
+        .term-item {
+            padding: 12px 16px;
+            background: white;
+            border-radius: var(--radius-sm);
+            margin-bottom: 8px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .term-name {
+            font-weight: 600;
+            color: var(--text-dark);
+        }
+
+        .term-category {
+            font-size: 12px;
+            padding: 4px 8px;
+            background: var(--sage-primary);
+            color: white;
+            border-radius: 6px;
+            margin-left: 8px;
+        }
+
+        .term-remove {
+            padding: 6px 12px;
+            background: transparent;
+            border: none;
+            color: var(--red-primary);
+            cursor: pointer;
+            font-weight: 600;
+        }
+
+        .info-box {
+            background: var(--bg-sage-light);
+            padding: 20px;
+            border-radius: var(--radius-md);
+            margin: 20px 0;
+            border-left: 4px solid var(--sage-primary);
+        }
+
+        .info-box-title {
+            font-weight: 700;
+            margin-bottom: 8px;
+            color: var(--sage-darker);
+        }
+
+        .example-correction {
+            padding: 12px;
+            background: white;
+            border-radius: var(--radius-sm);
+            margin-top: 12px;
+            font-family: monospace;
+        }
+
+        .correction-before {
+            color: var(--red-primary);
+            text-decoration: line-through;
+        }
+
+        .correction-after {
+            color: var(--green-bright);
+            font-weight: 600;
+        }
+
+        .about-content h2 {
+            font-size: 28px;
+            margin-top: 32px;
+            margin-bottom: 16px;
+            color: var(--text-dark);
+        }
+
+        .about-content h3 {
+            font-size: 20px;
+            margin-top: 24px;
+            margin-bottom: 12px;
+            color: var(--sage-darker);
+        }
+
+        .about-content p {
+            font-size: 16px;
+            line-height: 1.7;
+            color: var(--text-medium);
+            margin-bottom: 16px;
+        }
+
+        .about-content ul {
+            margin: 16px 0;
+            padding-left: 24px;
+        }
+
+        .about-content li {
+            margin-bottom: 8px;
+            color: var(--text-medium);
+        }
+
+        .comparison-table {
+            width: 100%;
+            margin: 24px 0;
+            border-collapse: collapse;
+        }
+
+        .comparison-table th {
+            background: var(--sage-darker);
+            color: white;
+            padding: 12px;
+            text-align: left;
+            font-weight: 700;
+        }
+
+        .comparison-table td {
+            padding: 12px;
+            border-bottom: 1px solid var(--border-light);
+        }
+
+        .comparison-table tr:nth-child(even) {
+            background: var(--bg-sage-light);
+        }
+
+        .architecture-diagram {
+            background: var(--bg-white);
+            padding: 24px;
+            border-radius: var(--radius-md);
+            border: 2px solid var(--border-light);
+            margin: 24px 0;
+            font-family: monospace;
+            font-size: 13px;
+            line-height: 1.8;
+            overflow-x: auto;
+        }
+
+        @media (max-width: 1024px) {
+            .feature-cards {
+                grid-template-columns: 1fr;
+            }
+            .dashboard-grid {
+                grid-template-columns: 1fr;
+            }
+            .template-options {
+                grid-template-columns: 1fr;
+            }
+        }
     </style>
 </head>
 <body>
     <div id="root"></div>
+
     <script type="text/babel">
         const { useState, useEffect, useRef } = React;
 
-        const defaultSettings = { fontSize: 48, fontFamily: 'DM Sans', textColor: '#FFFFFF', backgroundColor: '#000000', backgroundOpacity: 80, textAlign: 'center', position: 'bottom', maxLines: 2, maxWidth: 85, showBackground: true, textShadow: true, paddingH: 28, paddingV: 14 };
-        const isOverlay = () => new URLSearchParams(window.location.search).get('overlay') === 'true';
+        function App() {
+            const [view, setView] = useState('landing');
 
-        function CaptionOverlay() {
-            const [caption, setCaption] = useState('');
-            const [settings, setSettings] = useState(defaultSettings);
-            useEffect(() => {
-                document.body.classList.add('overlay-mode');
-                const poll = setInterval(async () => {
-                    try { const r = await fetch('/api/caption'); const d = await r.json(); setCaption(d.caption || ''); if (d.settings) setSettings(p => ({...p, ...d.settings})); } catch {}
-                }, 100);
-                return () => clearInterval(poll);
-            }, []);
-            const bg = () => { if (!settings.showBackground) return 'transparent'; const h = settings.backgroundColor; return `rgba(${parseInt(h.slice(1,3),16)},${parseInt(h.slice(3,5),16)},${parseInt(h.slice(5,7),16)},${settings.backgroundOpacity/100})`; };
-            const pos = () => settings.position === 'top' ? { top: '40px' } : settings.position === 'middle' ? { top: '50%', transform: 'translateY(-50%)' } : { bottom: '40px' };
-            if (!caption) return null;
-            return <div className="overlay-container"><div className="caption-display" style={pos()}><div className="caption-text-overlay" style={{ fontSize: `${settings.fontSize}px`, fontFamily: settings.fontFamily, color: settings.textColor, backgroundColor: bg(), textAlign: settings.textAlign, padding: settings.showBackground ? `${settings.paddingV}px ${settings.paddingH}px` : '0', borderRadius: '10px', textShadow: settings.textShadow ? '2px 2px 4px rgba(0,0,0,0.8)' : 'none', maxWidth: `${settings.maxWidth}%` }}>{caption}</div></div></div>;
+            const startDashboard = () => setView('dashboard');
+            const startEngineWizard = () => setView('engine-wizard');
+            const showAbout = () => setView('about');
+            const showAISettings = () => setView('ai-settings');
+
+            if (view === 'landing') {
+                return <LandingPage
+                    onStartDashboard={startDashboard}
+                    onStartEngine={startEngineWizard}
+                    onShowAbout={showAbout}
+                    onShowAISettings={showAISettings}
+                />;
+            }
+
+            if (view === 'dashboard') {
+                return <Dashboard onBack={() => setView('landing')} />;
+            }
+
+            if (view === 'engine-wizard') {
+                return <EngineWizard onBack={() => setView('landing')} />;
+            }
+
+            if (view === 'about') {
+                return <AboutPage onBack={() => setView('landing')} />;
+            }
+
+            if (view === 'ai-settings') {
+                return <AISettings onBack={() => setView('landing')} />;
+            }
         }
 
-        function App() {
-            const [mode, setMode] = useState('browser');
-            const [settings, setSettings] = useState(defaultSettings);
-            const [listening, setListening] = useState(false);
-            const [caption, setCaption] = useState('');
-            const [interim, setInterim] = useState('');
-            const [devices, setDevices] = useState([]);
-            const [device, setDevice] = useState('');
-            const [copied, setCopied] = useState(false);
-            const [localIP, setLocalIP] = useState('');
-            const recogRef = useRef(null);
-            
-            // Whisper
-            const [whisperAvailable, setWhisperAvailable] = useState(false);
-            const [whisperModel, setWhisperModel] = useState('base');
-            const [whisperLoaded, setWhisperLoaded] = useState(false);
-            const [whisperDevices, setWhisperDevices] = useState([]);
-            const [whisperDevice, setWhisperDevice] = useState(null);
-            const [whisperRunning, setWhisperRunning] = useState(false);
-            const [whisperLoading, setWhisperLoading] = useState(false);
-            
-            // Engine
-            const [engineEnabled, setEngineEnabled] = useState(false);
-            const [engineStats, setEngineStats] = useState({ terms_count: 0, rules_count: 0 });
-            const [corrections, setCorrections] = useState([]);
-            const [recentCorrections, setRecentCorrections] = useState([]);
-            
-            // Session
-            const [recording, setRecording] = useState(false);
-            const [session, setSession] = useState(null);
-            const [sessionStats, setSessionStats] = useState({ duration: 0, caption_count: 0, correction_count: 0 });
-            
-            // UI
-            const [sideTab, setSideTab] = useState('session');
+        function CaptionDemo() {
+            const [demoIndex, setDemoIndex] = useState(0);
+            const [isAnimating, setIsAnimating] = useState(false);
 
-            const overlayUrl = `http://localhost:8080?overlay=true`;
-            const networkUrl = localIP ? `http://${localIP}:8080?overlay=true` : '';
-
-            // Initialize
-            useEffect(() => {
-                const saved = localStorage.getItem('cc-settings');
-                if (saved) try { setSettings(p => ({...p, ...JSON.parse(saved)})); } catch {}
-                
-                navigator.mediaDevices?.enumerateDevices().then(d => {
-                    const inputs = d.filter(x => x.kind === 'audioinput');
-                    setDevices(inputs);
-                    if (inputs.length) setDevice(inputs[0].deviceId);
-                }).catch(() => {});
-                
-                fetch('/api/info').then(r => r.json()).then(d => {
-                    setLocalIP(d.local_ip || '');
-                    setWhisperAvailable(d.whisper_available);
-                }).catch(() => {});
-                
-                fetch('/api/whisper/status').then(r => r.json()).then(d => {
-                    setWhisperAvailable(d.available);
-                    setWhisperLoaded(d.model_loaded);
-                    setWhisperRunning(d.is_running);
-                }).catch(() => {});
-                
-                fetch('/api/whisper/devices').then(r => r.json()).then(d => {
-                    setWhisperDevices(d.devices || []);
-                    const def = d.devices?.find(x => x.is_default);
-                    if (def) setWhisperDevice(def.id);
-                }).catch(() => {});
-                
-                loadEngine();
-            }, []);
-
-            // Poll for updates
-            useEffect(() => {
-                const poll = setInterval(async () => {
-                    try {
-                        const [capRes, engRes, sessRes] = await Promise.all([
-                            fetch('/api/caption'),
-                            fetch('/api/engine/status'),
-                            fetch('/api/session/status')
-                        ]);
-                        const cap = await capRes.json();
-                        const eng = await engRes.json();
-                        const sess = await sessRes.json();
-                        
-                        if (mode === 'whisper' && cap.caption) {
-                            setCaption(cap.caption);
-                            setCorrections(cap.corrections || []);
-                        }
-                        setWhisperRunning(cap.whisper_running);
-                        setEngineStats(eng);
-                        setRecentCorrections(eng.recent_corrections || []);
-                        
-                        if (sess.recording) {
-                            setRecording(true);
-                            setSession(sess.session);
-                            setSessionStats({
-                                duration: sess.duration || 0,
-                                caption_count: sess.caption_count || 0,
-                                correction_count: sess.correction_count || 0
-                            });
-                        } else {
-                            setRecording(false);
-                        }
-                    } catch {}
-                }, 500);
-                return () => clearInterval(poll);
-            }, [mode]);
-
-            const loadEngine = async () => {
-                const res = await fetch('/api/engine/status');
-                const data = await res.json();
-                setEngineEnabled(data.enabled);
-                setEngineStats(data);
-                setRecentCorrections(data.recent_corrections || []);
-            };
-
-            useEffect(() => {
-                localStorage.setItem('cc-settings', JSON.stringify(settings));
-                fetch('/api/caption', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ settings }) }).catch(() => {});
-            }, [settings]);
-
-            useEffect(() => {
-                if (mode === 'browser') {
-                    const text = interim || caption;
-                    fetch('/api/caption', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ caption: text }) })
-                        .then(r => r.json()).then(d => setCorrections(d.corrections || [])).catch(() => {});
+            const demos = [
+                {
+                    original: ["Welcome", "to", "the", "Brooklyn", "Select", "Board", "meeting"],
+                    corrected: ["Welcome", "to", "the", "Brookline", "Select", "Board", "meeting"],
+                    corrections: [3] // Index of words to correct
+                },
+                {
+                    original: ["Chair", "bernard", "green", "will", "lead", "the", "discussion"],
+                    corrected: ["Chair", "Bernard", "Greene", "will", "lead", "the", "discussion"],
+                    corrections: [1, 2]
+                },
+                {
+                    original: ["Meeting", "at", "coolidge", "corner", "town", "hall"],
+                    corrected: ["Meeting", "at", "Coolidge", "Corner", "Town", "Hall"],
+                    corrections: [2, 3, 4, 5]
                 }
-            }, [caption, interim, mode]);
+            ];
 
-            const limit = (text, lines, width) => {
-                const chars = Math.floor(55 * (width || 80) / 80) * lines;
-                if (text.length <= chars) return text;
-                const t = text.slice(-chars), sp = t.indexOf(' ');
-                return sp > 0 && sp < 20 ? t.slice(sp + 1) : t;
-            };
+            const currentDemo = demos[demoIndex];
+            const [displayWords, setDisplayWords] = useState(currentDemo.original);
 
-            // Browser speech
-            const startBrowser = async () => {
-                if (!('webkitSpeechRecognition' in window || 'SpeechRecognition' in window)) { alert('Use Chrome or Edge'); return; }
-                try { await navigator.mediaDevices.getUserMedia({ audio: device ? { deviceId: { exact: device } } : true }); } catch { alert('Allow mic'); return; }
-                const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
-                const r = new SR(); r.continuous = true; r.interimResults = true; r.lang = 'en-US';
-                r.onresult = e => {
-                    let i = '', f = '';
-                    for (let x = e.resultIndex; x < e.results.length; x++) {
-                        const t = e.results[x][0].transcript;
-                        if (e.results[x].isFinal) f += t; else i += t;
-                    }
-                    if (f) { setCaption(p => limit((p + ' ' + f).trim(), settings.maxLines, settings.maxWidth)); setInterim(''); }
-                    else setInterim(limit(i, settings.maxLines, settings.maxWidth));
-                };
-                r.onend = () => { if (listening && recogRef.current) try { r.start(); } catch {} };
-                recogRef.current = r; r.start(); setListening(true);
-            };
-            const stopBrowser = () => { recogRef.current?.stop(); recogRef.current = null; setListening(false); };
+            useEffect(() => {
+                if (isAnimating) {
+                    const timer = setTimeout(() => {
+                        setDisplayWords(currentDemo.corrected);
+                        setTimeout(() => {
+                            setIsAnimating(false);
+                        }, 1000);
+                    }, 800);
+                    return () => clearTimeout(timer);
+                }
+            }, [isAnimating, currentDemo]);
 
-            // Whisper
-            const loadWhisperModel = async () => {
-                setWhisperLoading(true);
-                const r = await fetch('/api/whisper/load', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ model: whisperModel }) });
-                const d = await r.json();
-                if (d.status === 'ok') setWhisperLoaded(true);
-                else alert(d.error);
-                setWhisperLoading(false);
-            };
-            const startWhisper = async () => {
-                const r = await fetch('/api/whisper/start', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ device_id: whisperDevice }) });
-                if ((await r.json()).status === 'started') setWhisperRunning(true);
-            };
-            const stopWhisper = async () => { await fetch('/api/whisper/stop', { method: 'POST' }); setWhisperRunning(false); };
-
-            // Engine
-            const toggleEngine = async () => {
-                await fetch('/api/engine/enable', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ enabled: !engineEnabled }) });
-                setEngineEnabled(!engineEnabled);
-            };
-            const loadDefaults = async () => { await fetch('/api/engine/defaults', { method: 'POST' }); loadEngine(); };
-
-            // Session
-            const startSession = async () => {
-                await fetch('/api/session/start', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: `Session ${new Date().toLocaleString()}` }) });
-                setRecording(true);
-            };
-            const stopSession = async () => {
-                await fetch('/api/session/stop', { method: 'POST' });
-                setRecording(false);
+            const playDemo = () => {
+                setIsAnimating(true);
+                setDisplayWords(currentDemo.original);
             };
 
-            // Exports
-            const exportFile = (format) => {
-                const url = `/api/session/export/${format}`;
-                window.open(url, '_blank');
+            const nextDemo = () => {
+                setDemoIndex((demoIndex + 1) % demos.length);
+                setDisplayWords(demos[(demoIndex + 1) % demos.length].original);
+                setIsAnimating(false);
             };
-            const downloadEngine = () => window.open('/api/engine/export', '_blank');
-            const uploadEngine = () => {
-                const input = document.createElement('input');
-                input.type = 'file';
-                input.accept = '.json';
-                input.onchange = async (e) => {
-                    const file = e.target.files[0];
-                    const text = await file.text();
-                    const data = JSON.parse(text);
-                    await fetch('/api/engine/import', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) });
-                    loadEngine();
-                };
-                input.click();
-            };
-
-            const clear = () => { setCaption(''); setInterim(''); setCorrections([]); fetch('/api/clear', { method: 'POST' }); };
-            const copy = () => { navigator.clipboard.writeText(overlayUrl); setCopied(true); setTimeout(() => setCopied(false), 2000); };
-            
-            const display = interim || caption;
-            const isActive = mode === 'browser' ? listening : whisperRunning;
-            const formatTime = (s) => `${Math.floor(s/60)}:${String(Math.floor(s%60)).padStart(2,'0')}`;
-            const bg = () => { if (!settings.showBackground) return 'transparent'; const h = settings.backgroundColor; return `rgba(${parseInt(h.slice(1,3),16)},${parseInt(h.slice(3,5),16)},${parseInt(h.slice(5,7),16)},${settings.backgroundOpacity/100})`; };
 
             return (
-                <div className="app">
-                    {/* Header */}
-                    <header className="header">
-                        <div className="logo">
-                            <div className="logo-bars"><div className="logo-bar logo-bar-1"></div><div className="logo-bar logo-bar-2"></div></div>
-                            <div className="logo-text">COMMUNITY<br/>CAPTIONER <span className="cc-badge">CC</span></div>
-                        </div>
-                        <div className="header-right">
-                            <div className={`rec-status ${recording ? 'recording' : ''}`}>
-                                <div className="rec-dot"></div>
-                                {recording ? `REC ${formatTime(sessionStats.duration)}` : 'Ready'}
-                            </div>
-                            <img src="big-logo.png" alt="BIG" className="big-logo" />
-                        </div>
-                    </header>
+                <div className="demo-section">
+                    <div className="demo-card">
+                        <h2 className="demo-title">See the AI Correction Engine in Action</h2>
+                        <div className="demo-box">
+                            <div className="demo-text">
+                                {displayWords.map((word, idx) => {
+                                    const isCorrecting = isAnimating && currentDemo.corrections.includes(idx);
+                                    const isCorrected = !isAnimating &&
+                                                       currentDemo.corrections.includes(idx) &&
+                                                       displayWords === currentDemo.corrected;
 
-                    {/* Preview */}
-                    <div className="preview">
-                        <span className="preview-label">Live Preview</span>
-                        <div className="preview-badges">
-                            <span className={`preview-badge mode ${mode === 'whisper' ? 'whisper' : ''}`}>{mode === 'browser' ? '⚡ Web Speech' : '🎯 Whisper'}</span>
-                            {engineEnabled && <span className="preview-badge engine">✨ Engine</span>}
-                            {corrections.length > 0 && <span className="preview-badge fixes">{corrections.length} fixes</span>}
-                        </div>
-                        <div className={`preview-text ${!display ? 'empty' : ''}`} style={display ? { backgroundColor: bg(), padding: settings.showBackground ? `${settings.paddingV*0.6}px ${settings.paddingH*0.6}px` : '0' } : {}}>
-                            {display || 'Captions will appear here...'}
-                        </div>
-                    </div>
-
-                    <div className="main-grid">
-                        {/* Left Column - Controls */}
-                        <div>
-                            {/* Mode & Controls */}
-                            <div className="card">
-                                <div className="mode-tabs">
-                                    <button className={`mode-tab ${mode === 'browser' ? 'active' : ''}`} onClick={() => { if (!listening) setMode('browser'); }}>⚡ Web Speech</button>
-                                    <button className={`mode-tab ${mode === 'whisper' ? 'active whisper' : ''}`} onClick={() => { if (!whisperRunning) setMode('whisper'); }}>🎯 Whisper</button>
-                                </div>
-
-                                {mode === 'browser' ? (
-                                    <>
-                                        <select className="select" value={device} onChange={e => setDevice(e.target.value)}>
-                                            {devices.map(d => <option key={d.deviceId} value={d.deviceId}>{d.label || `Mic ${d.deviceId.slice(0,8)}`}</option>)}
-                                        </select>
-                                        <button className={`btn ${listening ? 'btn-danger' : 'btn-primary'}`} onClick={listening ? stopBrowser : startBrowser}>
-                                            {listening ? '■ Stop' : '● Start Captioning'}
-                                        </button>
-                                    </>
-                                ) : (
-                                    <>
-                                        {!whisperAvailable ? (
-                                            <div className="whisper-setup">
-                                                <div className="whisper-status">⚠️ Install: pip3 install faster-whisper sounddevice numpy</div>
-                                            </div>
-                                        ) : (
-                                            <div className="whisper-setup">
-                                                <div className="whisper-row">
-                                                    <select className="select" value={whisperModel} onChange={e => setWhisperModel(e.target.value)} disabled={whisperLoaded}>
-                                                        <option value="tiny">tiny (75MB, fast)</option>
-                                                        <option value="base">base (150MB, balanced)</option>
-                                                        <option value="small">small (500MB, better)</option>
-                                                    </select>
-                                                    <button className="btn btn-whisper btn-sm" onClick={loadWhisperModel} disabled={whisperLoaded || whisperLoading}>
-                                                        {whisperLoading ? '...' : whisperLoaded ? '✓' : 'Load'}
-                                                    </button>
-                                                </div>
-                                                <div className="whisper-row">
-                                                    <select className="select" value={whisperDevice || ''} onChange={e => setWhisperDevice(parseInt(e.target.value))} disabled={whisperRunning}>
-                                                        {whisperDevices.map(d => <option key={d.id} value={d.id}>{d.name}{d.is_default ? ' ★' : ''}</option>)}
-                                                    </select>
-                                                </div>
-                                            </div>
-                                        )}
-                                        <button className={`btn ${whisperRunning ? 'btn-danger' : 'btn-whisper'}`} onClick={whisperRunning ? stopWhisper : startWhisper} disabled={!whisperLoaded}>
-                                            {whisperRunning ? '■ Stop Whisper' : '● Start Whisper'}
-                                        </button>
-                                    </>
-                                )}
-
-                                <div className="btn-row">
-                                    <button className="btn btn-outline btn-sm" onClick={clear}>Clear</button>
-                                </div>
-                            </div>
-
-                            {/* Caption Engine Toggle */}
-                            <div className="card">
-                                <div className="toggle-row">
-                                    <div>
-                                        <div className="toggle-label">✨ Caption Engine</div>
-                                        <div className="toggle-sub">{engineStats.terms_count} terms • {engineStats.rules_count} rules</div>
-                                    </div>
-                                    <div className={`toggle ${engineEnabled ? 'on' : ''}`} onClick={toggleEngine}></div>
-                                </div>
-                                {engineStats.terms_count === 0 && (
-                                    <button className="btn btn-outline btn-sm" onClick={loadDefaults}>Load Brookline Defaults</button>
-                                )}
-                            </div>
-
-                            {/* Session Recording */}
-                            <div className={`session-panel ${recording ? 'recording' : ''}`}>
-                                <div className="session-header">
-                                    <div className="session-title">📝 Session Recording</div>
-                                </div>
-                                <div className="session-stats">
-                                    <div className="session-stat">
-                                        <div className="session-stat-value">{formatTime(sessionStats.duration)}</div>
-                                        <div className="session-stat-label">Duration</div>
-                                    </div>
-                                    <div className="session-stat">
-                                        <div className="session-stat-value">{sessionStats.caption_count}</div>
-                                        <div className="session-stat-label">Captions</div>
-                                    </div>
-                                    <div className="session-stat">
-                                        <div className="session-stat-value">{sessionStats.correction_count}</div>
-                                        <div className="session-stat-label">Corrections</div>
-                                    </div>
-                                </div>
-                                <div className="session-actions">
-                                    <button className="btn btn-record" onClick={recording ? stopSession : startSession}>
-                                        {recording ? '■ Stop Recording' : '● Start Recording'}
-                                    </button>
-                                </div>
-                            </div>
-
-                            {/* OBS */}
-                            <div className="card obs-card">
-                                <div className="card-title">📺 OBS Browser Source</div>
-                                <div className="obs-url">
-                                    <input className="obs-input" value={overlayUrl} readOnly />
-                                    <button className="btn btn-primary btn-sm" onClick={copy} style={{width:'60px'}}>{copied ? '✓' : 'Copy'}</button>
-                                </div>
-                                <div className="obs-info">Add as Browser Source • 1920×1080</div>
+                                    return (
+                                        <span
+                                            key={idx}
+                                            className={`demo-word ${isCorrecting ? 'correcting' : ''} ${isCorrected ? 'corrected' : ''}`}
+                                        >
+                                            {word}{' '}
+                                        </span>
+                                    );
+                                })}
                             </div>
                         </div>
-
-                        {/* Right Column - Dashboard */}
-                        <div>
-                            <div className="tabs">
-                                <button className={`tab ${sideTab === 'session' ? 'active' : ''}`} onClick={() => setSideTab('session')}>Session</button>
-                                <button className={`tab ${sideTab === 'corrections' ? 'active' : ''}`} onClick={() => setSideTab('corrections')}>Corrections</button>
-                                <button className={`tab ${sideTab === 'engine' ? 'active' : ''}`} onClick={() => setSideTab('engine')}>Engine</button>
-                            </div>
-
-                            {sideTab === 'session' && (
-                                <div className="export-panel">
-                                    <div className="card-title" style={{marginBottom:'12px'}}>📤 Export Session</div>
-                                    <div className="export-grid">
-                                        <div className="export-btn" onClick={() => exportFile('srt')}>
-                                            <div className="export-btn-icon">📄</div>
-                                            <div className="export-btn-label">SRT</div>
-                                            <div className="export-btn-desc">Subtitle file</div>
-                                        </div>
-                                        <div className="export-btn" onClick={() => exportFile('vtt')}>
-                                            <div className="export-btn-icon">🎬</div>
-                                            <div className="export-btn-label">VTT</div>
-                                            <div className="export-btn-desc">Web captions</div>
-                                        </div>
-                                        <div className="export-btn" onClick={() => exportFile('txt')}>
-                                            <div className="export-btn-icon">📝</div>
-                                            <div className="export-btn-label">Transcript</div>
-                                            <div className="export-btn-desc">Plain text</div>
-                                        </div>
-                                        <div className="export-btn" onClick={() => exportFile('json')}>
-                                            <div className="export-btn-icon">📊</div>
-                                            <div className="export-btn-label">JSON</div>
-                                            <div className="export-btn-desc">Full data</div>
-                                        </div>
-                                    </div>
-                                    <button className="btn btn-outline" onClick={async () => {
-                                        const r = await fetch('/api/session/summary');
-                                        const d = await r.json();
-                                        alert(d.summary);
-                                    }}>📋 Generate Summary</button>
-                                </div>
-                            )}
-
-                            {sideTab === 'corrections' && (
-                                <div className="card">
-                                    <div className="card-title">Live Corrections</div>
-                                    <div className="corrections-log">
-                                        {recentCorrections.length === 0 ? (
-                                            <div className="empty-log">Corrections will appear here as they're made</div>
-                                        ) : (
-                                            recentCorrections.slice().reverse().map((c, i) => (
-                                                <div key={i} className="correction-item">
-                                                    <span className="correction-time">{c.timestamp?.slice(11,19) || ''}</span>
-                                                    <span className="correction-from">{c.from}</span>
-                                                    <span className="correction-arrow">→</span>
-                                                    <span className="correction-to">{c.to}</span>
-                                                    <span className={`correction-cat ${c.category}`}>{c.category}</span>
-                                                </div>
-                                            ))
-                                        )}
-                                    </div>
-                                </div>
-                            )}
-
-                            {sideTab === 'engine' && (
-                                <div className="card">
-                                    <div className="card-title">Caption Engine <span className="badge purple">Portable</span></div>
-                                    <p style={{fontSize:'11px',color:'var(--text-light)',marginBottom:'12px'}}>
-                                        Download your engine to share or backup. Upload an engine to use its correction rules.
-                                    </p>
-                                    <div className="engine-row">
-                                        <button className="btn btn-primary" onClick={downloadEngine}>⬇️ Download</button>
-                                        <button className="btn btn-outline" onClick={uploadEngine}>⬆️ Upload</button>
-                                    </div>
-                                    <div className="engine-info">
-                                        {engineStats.terms_count} terms • {engineStats.rules_count} rules • {engineStats.stats?.corrections_applied || 0} total corrections
-                                    </div>
-                                    <div className="engine-section">
-                                        <button className="btn btn-outline btn-sm" onClick={loadDefaults}>Reset to Brookline Defaults</button>
-                                    </div>
-                                </div>
-                            )}
+                        <div className="demo-controls">
+                            <button className="demo-btn" onClick={playDemo} disabled={isAnimating}>
+                                {isAnimating ? 'Correcting...' : 'Watch Correction'}
+                            </button>
+                            <button className="demo-btn secondary" onClick={nextDemo}>
+                                Next Example
+                            </button>
                         </div>
                     </div>
-
-                    <footer className="footer">
-                        Community Captioner v2 • <a href="https://brooklineinteractive.org">Brookline Interactive Group</a> • <a href="https://weirdmachine.org">Stephen Walter</a>
-                    </footer>
                 </div>
             );
         }
 
-        ReactDOM.createRoot(document.getElementById('root')).render(isOverlay() ? <CaptionOverlay /> : <App />);
+        function LandingPage({ onStartDashboard, onStartEngine, onShowAbout, onShowAISettings }) {
+            return (
+                <div className="landing-page">
+                    <header className="landing-header">
+                        <div className="logo-section">
+                            <div className="logo-icon">
+                                <div className="logo-bar logo-bar-1"></div>
+                                <div className="logo-bar logo-bar-2"></div>
+                                <div className="logo-bar logo-bar-3"></div>
+                            </div>
+                            <div>
+                                <div className="logo-text">Community Captioner</div>
+                                <span className="badge-tag">Open Source Captioning for Community Media</span>
+                            </div>
+                        </div>
+                        <div style={{display: 'flex', gap: '12px', alignItems: 'center'}}>
+                            <button
+                                onClick={onShowAISettings}
+                                style={{
+                                    padding: '8px 16px',
+                                    background: 'var(--sage-primary)',
+                                    color: 'white',
+                                    border: 'none',
+                                    borderRadius: '8px',
+                                    cursor: 'pointer',
+                                    fontSize: '14px',
+                                    fontWeight: '500'
+                                }}
+                            >
+                                AI Settings
+                            </button>
+                            <img src="/big-logo.png" alt="BIG" className="big-logo" style={{height: '60px'}} />
+                        </div>
+                    </header>
+
+                    <section className="hero-section">
+                        <h1 className="hero-title">AI for Accessibility</h1>
+                        <p className="hero-subtitle">
+                            Making civic information <strong>accessible</strong>, <strong>searchable</strong>, and <strong>understandable</strong> for everyone.
+                        </p>
+                        <p className="hero-description">
+                            Professional-grade live captioning for community media organizations.
+                            No subscription fees, using tech you already have. First ever free corrections engine that lets you make sure captions are correct and locally-accurate.
+                            No more having to manually build custom dictionaries - just upload documents or share websites relevant to your local context and AI will craft an engine to correct things like proper names, places, and organizations.
+                            An accessibility platform powered by AI + Humans working together.
+                        </p>
+
+                        <div className="cta-buttons">
+                            <button className="cta-btn cta-btn-primary" onClick={onStartDashboard}>
+                                Open Control Dashboard
+                            </button>
+                            <button className="cta-btn cta-btn-secondary" onClick={onShowAbout}>
+                                Learn More
+                            </button>
+                        </div>
+                    </section>
+
+                    <CaptionDemo />
+
+                    <div className="feature-cards">
+                        <div className="feature-card" onClick={onStartDashboard}>
+                            <div className="feature-icon">▶</div>
+                            <h3 className="feature-title">Live Overlay</h3>
+                            <p className="feature-desc">
+                                Real-time captions for OBS, vMix, and streaming platforms.
+                                Fully customizable appearance and positioning.
+                            </p>
+                        </div>
+
+                        <div className="feature-card special" onClick={onStartEngine}>
+                            <span className="special-badge">Unique Feature</span>
+                            <div className="feature-icon">⚡</div>
+                            <h3 className="feature-title">AI Caption Engine</h3>
+                            <p className="feature-desc">
+                                Automatically corrects local names, places, and organizations.
+                                Build custom correction rules from documents and web sources.
+                            </p>
+                        </div>
+
+                        <div className="feature-card" onClick={onStartDashboard}>
+                            <div className="feature-icon">📝</div>
+                            <h3 className="feature-title">Session Recording</h3>
+                            <p className="feature-desc">
+                                Record and export captions in SRT, VTT, TXT, or JSON formats.
+                                Perfect for post-production and archival.
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            );
+        }
+
+        function Dashboard({ onBack }) {
+            const [mode, setMode] = useState('browser');
+            const [caption, setCaption] = useState('');
+            const [rawCaption, setRawCaption] = useState('');
+            const [corrections, setCorrections] = useState([]);
+            const [recording, setRecording] = useState(false);
+            const [sessionName, setSessionName] = useState('');
+            const [engineEnabled, setEngineEnabled] = useState(false);
+            const [whisperRunning, setWhisperRunning] = useState(false);
+            const [browserListening, setBrowserListening] = useState(false);
+            const [localIP, setLocalIP] = useState(window.location.hostname);
+            const port = window.location.port || '8080';
+
+            // Caption styling state
+            const [fontSize, setFontSize] = useState(32);
+            const [lineHeight, setLineHeight] = useState(1.4);
+            const [maxWidth, setMaxWidth] = useState(90);
+            const [fontFamily, setFontFamily] = useState('sans-serif');
+            const [textColor, setTextColor] = useState('#FFFFFF');
+            const [bgColor, setBgColor] = useState('#000000');
+            const [bgOpacity, setBgOpacity] = useState(0.8);
+
+            // Whisper state
+            const [whisperDevices, setWhisperDevices] = useState([]);
+            const [selectedDevice, setSelectedDevice] = useState('');
+            const [selectedModel, setSelectedModel] = useState('base');
+            const [modelLoading, setModelLoading] = useState(false);
+            const [modelLoaded, setModelLoaded] = useState(false);
+
+            // Session export state
+            const [showExports, setShowExports] = useState(false);
+            const [sessionStats, setSessionStats] = useState(null);
+
+            // Speech recognition ref
+            const recognitionRef = useRef(null);
+
+            useEffect(() => {
+                // Poll for caption and status updates
+                const interval = setInterval(() => {
+                    fetch('/api/caption')
+                        .then(r => r.json())
+                        .then(data => {
+                            setCaption(data.caption || '');
+                            setRawCaption(data.raw_caption || '');
+                            setCorrections(data.corrections || []);
+                            setRecording(data.session?.recording || false);
+                            setWhisperRunning(data.whisper_running || false);
+                        })
+                        .catch(err => console.error('Error fetching caption:', err));
+
+                    fetch('/api/engine/status')
+                        .then(r => r.json())
+                        .then(data => setEngineEnabled(data.enabled))
+                        .catch(err => console.error('Error fetching engine status:', err));
+                }, 500);
+
+                // Fetch Whisper devices on mount
+                fetch('/api/whisper/devices')
+                    .then(r => r.json())
+                    .then(data => {
+                        if (data.devices) {
+                            setWhisperDevices(data.devices);
+                            if (data.devices.length > 0) {
+                                setSelectedDevice(data.devices[0].id);
+                            }
+                        }
+                    })
+                    .catch(err => console.error('Error fetching devices:', err));
+
+                return () => clearInterval(interval);
+            }, []);
+
+            const updateCaptionSettings = () => {
+                const settings = {
+                    fontSize,
+                    lineHeight,
+                    maxWidth,
+                    fontFamily,
+                    textColor,
+                    backgroundColor: bgColor,
+                    backgroundOpacity: bgOpacity
+                };
+
+                fetch('/api/caption', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ settings })
+                })
+                .catch(err => console.error('Error updating settings:', err));
+            };
+
+            useEffect(() => {
+                updateCaptionSettings();
+            }, [fontSize, lineHeight, maxWidth, fontFamily, textColor, bgColor, bgOpacity]);
+
+            const startBrowserCaptions = () => {
+                if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) {
+                    alert('Speech recognition not supported in this browser. Please use Chrome or Edge.');
+                    return;
+                }
+
+                const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+                const recognition = new SpeechRecognition();
+                recognition.continuous = true;
+                recognition.interimResults = true;
+                recognition.lang = 'en-US';
+
+                recognition.onresult = (event) => {
+                    let interimTranscript = '';
+                    let finalTranscript = '';
+
+                    for (let i = event.resultIndex; i < event.results.length; i++) {
+                        const transcript = event.results[i][0].transcript;
+                        if (event.results[i].isFinal) {
+                            finalTranscript += transcript + ' ';
+                        } else {
+                            interimTranscript += transcript;
+                        }
+                    }
+
+                    const textToSend = finalTranscript || interimTranscript;
+                    if (textToSend) {
+                        fetch('/api/caption', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                text: textToSend,
+                                settings: {
+                                    fontSize,
+                                    lineHeight,
+                                    maxWidth,
+                                    fontFamily,
+                                    textColor,
+                                    backgroundColor: bgColor,
+                                    backgroundOpacity: bgOpacity
+                                }
+                            })
+                        });
+                    }
+                };
+
+                recognition.onerror = (event) => {
+                    console.error('Speech recognition error:', event.error);
+                    setBrowserListening(false);
+                };
+
+                recognition.onend = () => {
+                    if (browserListening) {
+                        recognition.start(); // Auto-restart
+                    }
+                };
+
+                recognition.start();
+                recognitionRef.current = recognition;
+                setBrowserListening(true);
+            };
+
+            const stopBrowserCaptions = () => {
+                if (recognitionRef.current) {
+                    recognitionRef.current.stop();
+                    recognitionRef.current = null;
+                }
+                setBrowserListening(false);
+            };
+
+            const loadWhisperModel = () => {
+                setModelLoading(true);
+                fetch('/api/whisper/load', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ model: selectedModel })
+                })
+                .then(r => r.json())
+                .then(data => {
+                    setModelLoading(false);
+                    if (data.status === 'loaded') {
+                        setModelLoaded(true);
+                    }
+                })
+                .catch(err => {
+                    console.error('Error loading model:', err);
+                    setModelLoading(false);
+                });
+            };
+
+            const startWhisper = () => {
+                fetch('/api/whisper/start', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ device_id: selectedDevice })
+                })
+                .catch(err => console.error('Error starting Whisper:', err));
+            };
+
+            const stopWhisper = () => {
+                fetch('/api/whisper/stop', { method: 'POST' })
+                .catch(err => console.error('Error stopping Whisper:', err));
+            };
+
+            const toggleRecording = () => {
+                if (recording) {
+                    fetch('/api/session/stop', { method: 'POST' })
+                        .then(() => {
+                            // Fetch session stats for export
+                            fetch('/api/session/status')
+                                .then(r => r.json())
+                                .then(data => {
+                                    setSessionStats(data);
+                                    setShowExports(true);
+                                });
+                        });
+                } else {
+                    const name = sessionName || `Session ${new Date().toLocaleString()}`;
+                    fetch('/api/session/start', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ name })
+                    });
+                    setShowExports(false);
+                }
+            };
+
+            const openOverlay = () => {
+                window.open('/overlay.html', '_blank', 'width=1200,height=200');
+            };
+
+            const toggleEngine = () => {
+                fetch('/api/engine/enable', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ enabled: !engineEnabled })
+                })
+                .then(r => r.json())
+                .then(data => setEngineEnabled(data.enabled));
+            };
+
+            return (
+                <div className="dashboard active">
+                    <div className="dashboard-header">
+                        <h1 className="dashboard-title">Control Dashboard</h1>
+                        <button className="back-btn" onClick={onBack}>← Back to Home</button>
+                    </div>
+
+                    <div className="dashboard-grid">
+                        <div className="main-column">
+                            <div className="preview-section" style={{
+                                fontSize: `${fontSize}px`,
+                                lineHeight: lineHeight
+                            }}>
+                                <div className="preview-label">Live Preview</div>
+                                <div className="preview-badges">
+                                    <div className="preview-badge mode">{mode.toUpperCase()}</div>
+                                    {browserListening && <div className="preview-badge listening">LISTENING</div>}
+                                    {whisperRunning && <div className="preview-badge whisper">WHISPER</div>}
+                                    {engineEnabled && <div className="preview-badge engine">ENGINE ON</div>}
+                                    {corrections.length > 0 && (
+                                        <div className="preview-badge corrections">{corrections.length} FIXES</div>
+                                    )}
+                                </div>
+                                <div
+                                    className={`preview-text ${!caption ? 'empty' : ''}`}
+                                    style={{
+                                        fontSize: `${fontSize}px`,
+                                        lineHeight: lineHeight,
+                                        maxWidth: `${maxWidth}%`,
+                                        fontFamily: fontFamily,
+                                        color: textColor
+                                    }}
+                                >
+                                    {caption || 'Captions will appear here...'}
+                                </div>
+                            </div>
+
+                            <div className="card">
+                                <h2 className="card-title">Captioning Mode</h2>
+                                <div className="mode-selector">
+                                    <button
+                                        className={`mode-btn ${mode === 'browser' ? 'active' : ''}`}
+                                        onClick={() => setMode('browser')}
+                                    >
+                                        Browser Speech
+                                    </button>
+                                    <button
+                                        className={`mode-btn whisper ${mode === 'whisper' ? 'active whisper' : ''}`}
+                                        onClick={() => setMode('whisper')}
+                                    >
+                                        Whisper AI
+                                    </button>
+                                </div>
+
+                                {mode === 'browser' && (
+                                    <div>
+                                        <button
+                                            className="btn-large btn-primary"
+                                            onClick={browserListening ? stopBrowserCaptions : startBrowserCaptions}
+                                        >
+                                            {browserListening ? 'Stop Browser Captions' : 'Start Browser Captions'}
+                                        </button>
+                                        <p style={{fontSize: '14px', color: 'var(--text-medium)', marginTop: '12px'}}>
+                                            Uses Chrome/Edge speech recognition. Requires internet connection.
+                                        </p>
+                                    </div>
+                                )}
+
+                                {mode === 'whisper' && (
+                                    <div>
+                                        <div className="setting-group">
+                                            <label className="setting-label">Audio Device</label>
+                                            <select
+                                                className="setting-input"
+                                                value={selectedDevice}
+                                                onChange={(e) => setSelectedDevice(e.target.value)}
+                                            >
+                                                {whisperDevices.map(device => (
+                                                    <option key={device.id} value={device.id}>
+                                                        {device.name}
+                                                    </option>
+                                                ))}
+                                            </select>
+                                        </div>
+
+                                        <div className="setting-group">
+                                            <label className="setting-label">Model Size</label>
+                                            <select
+                                                className="setting-input"
+                                                value={selectedModel}
+                                                onChange={(e) => setSelectedModel(e.target.value)}
+                                            >
+                                                <option value="tiny">Tiny (fastest, least accurate)</option>
+                                                <option value="base">Base (recommended)</option>
+                                                <option value="small">Small (slower, more accurate)</option>
+                                                <option value="medium">Medium (slowest, most accurate)</option>
+                                            </select>
+                                        </div>
+
+                                        {!modelLoaded && (
+                                            <button
+                                                className="btn-large btn-primary"
+                                                onClick={loadWhisperModel}
+                                                disabled={modelLoading}
+                                            >
+                                                {modelLoading ? 'Loading Model...' : 'Load Whisper Model'}
+                                            </button>
+                                        )}
+
+                                        {modelLoaded && (
+                                            <button
+                                                className="btn-large btn-primary"
+                                                onClick={whisperRunning ? stopWhisper : startWhisper}
+                                            >
+                                                {whisperRunning ? 'Stop Whisper' : 'Start Whisper'}
+                                            </button>
+                                        )}
+
+                                        <p style={{fontSize: '14px', color: 'var(--text-medium)', marginTop: '12px'}}>
+                                            Local AI transcription. Requires faster-whisper package.
+                                        </p>
+                                    </div>
+                                )}
+                            </div>
+
+                            <div className="card">
+                                <h2 className="card-title">
+                                    AI Caption Engine
+                                    <span className="card-badge">Unique</span>
+                                </h2>
+                                <div className="toggle-setting">
+                                    <span className="toggle-label">
+                                        {engineEnabled ? 'Engine Active' : 'Engine Disabled'}
+                                    </span>
+                                    <div
+                                        className={`toggle-switch ${engineEnabled ? 'on' : ''}`}
+                                        onClick={toggleEngine}
+                                    ></div>
+                                </div>
+
+                                {corrections.length > 0 && (
+                                    <div style={{marginTop: '16px', padding: '14px', background: 'var(--bg-sage-light)', borderRadius: 'var(--radius-sm)'}}>
+                                        <div style={{fontSize: '12px', fontWeight: '700', marginBottom: '8px', color: 'var(--text-medium)'}}>
+                                            RECENT CORRECTIONS
+                                        </div>
+                                        {corrections.map((c, i) => (
+                                            <div key={i} style={{fontSize: '14px', marginBottom: '4px'}}>
+                                                <span style={{color: '#DC2626', textDecoration: 'line-through'}}>{c.from}</span>
+                                                {' → '}
+                                                <span style={{color: '#00A676', fontWeight: '600'}}>{c.to}</span>
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
+
+                                <button className="btn-large btn-outline" style={{marginTop: '16px'}}>
+                                    Configure Engine
+                                </button>
+                            </div>
+                        </div>
+
+                        <div className="sidebar-column">
+                            <div className="card">
+                                <h2 className="card-title">Live Overlay</h2>
+                                <button className="btn-large btn-primary" onClick={openOverlay}>
+                                    Open Overlay Window
+                                </button>
+
+                                <div className="url-display">
+                                    <div className="url-label">Local Network URL</div>
+                                    <div className="url-text">
+                                        http://{localIP}:{port}/overlay.html
+                                    </div>
+                                </div>
+
+                                <p style={{fontSize: '13px', color: 'var(--text-medium)', marginTop: '12px', lineHeight: '1.5'}}>
+                                    Use this URL in OBS Browser Source, vMix, or any streaming software.
+                                    Access from any device on your local network.
+                                </p>
+                            </div>
+
+                            <div className="card">
+                                <h2 className="card-title">Session Recording</h2>
+                                <div className="rec-indicator" style={{marginBottom: '16px'}}>
+                                    <div className={`rec-indicator ${recording ? 'recording' : ''}`}>
+                                        <div className="rec-dot"></div>
+                                        {recording ? 'Recording' : 'Not Recording'}
+                                    </div>
+                                </div>
+
+                                {!recording && !showExports && (
+                                    <div className="setting-group">
+                                        <label className="setting-label">Session Name</label>
+                                        <input
+                                            type="text"
+                                            className="setting-input"
+                                            placeholder="e.g., Select Board Meeting"
+                                            value={sessionName}
+                                            onChange={(e) => setSessionName(e.target.value)}
+                                        />
+                                    </div>
+                                )}
+
+                                <button
+                                    className={`btn-large ${recording ? 'btn-danger' : 'btn-primary'}`}
+                                    onClick={toggleRecording}
+                                >
+                                    {recording ? 'Stop Recording' : 'Start Recording'}
+                                </button>
+
+                                {recording && (
+                                    <div style={{marginTop: '16px', padding: '14px', background: '#FEE2E2', borderRadius: 'var(--radius-sm)', fontSize: '13px', color: '#991B1B'}}>
+                                        All captions and corrections are being saved.
+                                        Export available after stopping.
+                                    </div>
+                                )}
+
+                                {showExports && sessionStats && (
+                                    <div style={{marginTop: '16px'}}>
+                                        <div style={{padding: '14px', background: 'var(--bg-sage-light)', borderRadius: 'var(--radius-sm)', marginBottom: '12px'}}>
+                                            <div style={{fontSize: '12px', fontWeight: '700', color: 'var(--text-medium)', marginBottom: '8px'}}>
+                                                SESSION STATS
+                                            </div>
+                                            <div style={{fontSize: '14px', marginBottom: '4px'}}>
+                                                Captions: {sessionStats.caption_count || 0}
+                                            </div>
+                                            <div style={{fontSize: '14px', marginBottom: '4px'}}>
+                                                Corrections: {sessionStats.correction_count || 0}
+                                            </div>
+                                        </div>
+
+                                        <div className="export-buttons">
+                                            <a href="/api/session/export/srt" className="export-btn" download>
+                                                Export SRT
+                                            </a>
+                                            <a href="/api/session/export/vtt" className="export-btn" download>
+                                                Export VTT
+                                            </a>
+                                            <a href="/api/session/export/txt" className="export-btn" download>
+                                                Export TXT
+                                            </a>
+                                            <a href="/api/session/export/json" className="export-btn" download>
+                                                Export JSON
+                                            </a>
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+
+                            <div className="card">
+                                <h2 className="card-title">Caption Styling</h2>
+
+                                <div className="setting-group">
+                                    <label className="setting-label">
+                                        Font Size
+                                        <span className="setting-value">{fontSize}px</span>
+                                    </label>
+                                    <input
+                                        type="range"
+                                        className="setting-slider"
+                                        min="24"
+                                        max="72"
+                                        value={fontSize}
+                                        onChange={(e) => setFontSize(parseInt(e.target.value))}
+                                    />
+                                </div>
+
+                                <div className="setting-group">
+                                    <label className="setting-label">
+                                        Line Height
+                                        <span className="setting-value">{lineHeight}</span>
+                                    </label>
+                                    <input
+                                        type="range"
+                                        className="setting-slider"
+                                        min="1.0"
+                                        max="2.0"
+                                        step="0.1"
+                                        value={lineHeight}
+                                        onChange={(e) => setLineHeight(parseFloat(e.target.value))}
+                                    />
+                                </div>
+
+                                <div className="setting-group">
+                                    <label className="setting-label">
+                                        Max Width
+                                        <span className="setting-value">{maxWidth}%</span>
+                                    </label>
+                                    <input
+                                        type="range"
+                                        className="setting-slider"
+                                        min="50"
+                                        max="100"
+                                        value={maxWidth}
+                                        onChange={(e) => setMaxWidth(parseInt(e.target.value))}
+                                    />
+                                </div>
+
+                                <div className="setting-group">
+                                    <label className="setting-label">Font Family</label>
+                                    <select
+                                        className="setting-input"
+                                        value={fontFamily}
+                                        onChange={(e) => setFontFamily(e.target.value)}
+                                    >
+                                        <option value="sans-serif">Sans Serif</option>
+                                        <option value="serif">Serif</option>
+                                        <option value="monospace">Monospace</option>
+                                        <option value="'Arial', sans-serif">Arial</option>
+                                        <option value="'Helvetica', sans-serif">Helvetica</option>
+                                        <option value="'Verdana', sans-serif">Verdana</option>
+                                    </select>
+                                </div>
+
+                                <div className="setting-group">
+                                    <label className="setting-label">Text Color</label>
+                                    <div className="color-input-group">
+                                        <input
+                                            type="text"
+                                            className="setting-input"
+                                            value={textColor}
+                                            onChange={(e) => setTextColor(e.target.value)}
+                                        />
+                                        <input
+                                            type="color"
+                                            className="color-input"
+                                            value={textColor}
+                                            onChange={(e) => setTextColor(e.target.value)}
+                                        />
+                                    </div>
+                                </div>
+
+                                <div className="setting-group">
+                                    <label className="setting-label">Background Color</label>
+                                    <div className="color-input-group">
+                                        <input
+                                            type="text"
+                                            className="setting-input"
+                                            value={bgColor}
+                                            onChange={(e) => setBgColor(e.target.value)}
+                                        />
+                                        <input
+                                            type="color"
+                                            className="color-input"
+                                            value={bgColor}
+                                            onChange={(e) => setBgColor(e.target.value)}
+                                        />
+                                    </div>
+                                </div>
+
+                                <div className="setting-group">
+                                    <label className="setting-label">
+                                        Background Opacity
+                                        <span className="setting-value">{Math.round(bgOpacity * 100)}%</span>
+                                    </label>
+                                    <input
+                                        type="range"
+                                        className="setting-slider"
+                                        min="0"
+                                        max="1"
+                                        step="0.1"
+                                        value={bgOpacity}
+                                        onChange={(e) => setBgOpacity(parseFloat(e.target.value))}
+                                    />
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            );
+        }
+
+        function EngineWizard({ onBack }) {
+            const [currentStep, setCurrentStep] = useState(0);
+            const [selectedTemplate, setSelectedTemplate] = useState('');
+            const [terms, setTerms] = useState([]);
+            const [newTerm, setNewTerm] = useState({ term: '', category: 'person', aliases: '' });
+            const [testText, setTestText] = useState('');
+            const [testResult, setTestResult] = useState('');
+            const [aiConfig, setAiConfig] = useState(null);
+
+            // Load AI config to show privacy status
+            useEffect(() => {
+                fetch('/api/ai/config')
+                    .then(r => r.json())
+                    .then(data => setAiConfig(data));
+            }, []);
+
+            const isAILocal = aiConfig && (
+                aiConfig.provider === 'ollama' ||
+                aiConfig.provider === 'lmstudio' ||
+                (aiConfig.provider === 'custom' && (aiConfig.custom_base_url.includes('localhost') || aiConfig.custom_base_url.includes('127.0.0.1')))
+            );
+
+            const steps = [
+                { label: 'Welcome', num: 1 },
+                { label: 'Start', num: 2 },
+                { label: 'Add Terms', num: 3 },
+                { label: 'Upload', num: 4 },
+                { label: 'Web Source', num: 5 },
+                { label: 'Test', num: 6 },
+                { label: 'Save', num: 7 }
+            ];
+
+            const addTerm = () => {
+                if (!newTerm.term) return;
+
+                const aliasArray = newTerm.aliases.split(',').map(a => a.trim()).filter(a => a);
+
+                fetch('/api/engine/term', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        term: newTerm.term,
+                        category: newTerm.category,
+                        aliases: aliasArray
+                    })
+                })
+                .then(r => r.json())
+                .then(data => {
+                    setTerms([...terms, { ...newTerm, aliases: aliasArray }]);
+                    setNewTerm({ term: '', category: 'person', aliases: '' });
+                });
+            };
+
+            const loadBrooklineDefaults = () => {
+                fetch('/api/engine/defaults', { method: 'POST' })
+                    .then(r => r.json())
+                    .then(data => {
+                        alert('Brookline defaults loaded!');
+                        setSelectedTemplate('brookline');
+                    });
+            };
+
+            const testCorrection = () => {
+                fetch(`/api/engine/test?text=${encodeURIComponent(testText)}`)
+                    .then(r => r.json())
+                    .then(data => {
+                        setTestResult(data.corrected_text || testText);
+                    });
+            };
+
+            const exportEngine = () => {
+                window.open('/api/engine/export', '_blank');
+            };
+
+            return (
+                <div className="dashboard active">
+                    <div className="dashboard-header">
+                        <h1 className="dashboard-title">AI Caption Engine Wizard</h1>
+                        <button className="back-btn" onClick={onBack}>← Back</button>
+                    </div>
+
+                    <div className="wizard-container">
+                        <div className="wizard-progress">
+                            {steps.map((step, idx) => (
+                                <div
+                                    key={idx}
+                                    className={`wizard-step ${idx === currentStep ? 'active' : ''} ${idx < currentStep ? 'completed' : ''}`}
+                                >
+                                    <div className="wizard-step-circle">{step.num}</div>
+                                    <div className="wizard-step-label">{step.label}</div>
+                                </div>
+                            ))}
+                        </div>
+
+                        <div className="wizard-content">
+                            {currentStep === 0 && (
+                                <div>
+                                    <h2 style={{fontSize: '32px', marginBottom: '20px', color: 'var(--text-dark)'}}>
+                                        Welcome to the Caption Engine
+                                    </h2>
+                                    <p style={{fontSize: '18px', lineHeight: '1.7', color: 'var(--text-medium)', marginBottom: '20px'}}>
+                                        The Caption Engine is what makes Community Captioner unique. It automatically corrects
+                                        speech recognition errors for local proper nouns - names, places, and organizations
+                                        that generic AI systems get wrong.
+                                    </p>
+
+                                    <div className="info-box">
+                                        <div className="info-box-title">How It Works</div>
+                                        <p style={{color: 'var(--text-medium)', marginBottom: '12px'}}>
+                                            The engine maintains a database of terms specific to your community. When captions
+                                            come through, it checks for common misspellings and corrects them in real-time.
+                                        </p>
+                                        <div className="example-correction">
+                                            <div style={{marginBottom: '8px'}}>
+                                                <span className="correction-before">"Brooklyn Select Board"</span>
+                                                {' → '}
+                                                <span className="correction-after">"Brookline Select Board"</span>
+                                            </div>
+                                            <div>
+                                                <span className="correction-before">"bernard green"</span>
+                                                {' → '}
+                                                <span className="correction-after">"Bernard Greene"</span>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <div style={{marginTop: '24px', padding: '20px', background: 'var(--bg-sage-light)', borderRadius: 'var(--radius-md)'}}>
+                                        <h3 style={{fontSize: '18px', marginBottom: '12px', color: 'var(--sage-darker)'}}>
+                                            Why This Matters for Community Media
+                                        </h3>
+                                        <ul style={{paddingLeft: '20px', color: 'var(--text-medium)'}}>
+                                            <li>Generic AI doesn't know your town's Select Board chair</li>
+                                            <li>Place names get mangled (Brookline becomes Brooklyn)</li>
+                                            <li>Local organizations are unrecognizable</li>
+                                            <li>Manual correction during live broadcasts is impossible</li>
+                                        </ul>
+                                    </div>
+                                </div>
+                            )}
+
+                            {currentStep === 1 && (
+                                <div>
+                                    <h2 style={{fontSize: '28px', marginBottom: '20px', color: 'var(--text-dark)'}}>
+                                        Choose Your Starting Point
+                                    </h2>
+                                    <p style={{fontSize: '16px', color: 'var(--text-medium)', marginBottom: '24px'}}>
+                                        You can start with an empty engine, use the Brookline template, or import
+                                        an existing engine file.
+                                    </p>
+
+                                    <div className="template-options">
+                                        <div
+                                            className={`template-card ${selectedTemplate === 'empty' ? 'selected' : ''}`}
+                                            onClick={() => setSelectedTemplate('empty')}
+                                        >
+                                            <div className="template-icon">📄</div>
+                                            <div className="template-title">Start Empty</div>
+                                            <div className="template-desc">
+                                                Build your own engine from scratch
+                                            </div>
+                                        </div>
+
+                                        <div
+                                            className={`template-card ${selectedTemplate === 'brookline' ? 'selected' : ''}`}
+                                            onClick={() => {
+                                                setSelectedTemplate('brookline');
+                                                loadBrooklineDefaults();
+                                            }}
+                                        >
+                                            <div className="template-icon">🏛️</div>
+                                            <div className="template-title">Brookline Template</div>
+                                            <div className="template-desc">
+                                                Pre-loaded with Brookline, MA terms
+                                            </div>
+                                        </div>
+
+                                        <div
+                                            className={`template-card ${selectedTemplate === 'import' ? 'selected' : ''}`}
+                                            onClick={() => setSelectedTemplate('import')}
+                                        >
+                                            <div className="template-icon">📥</div>
+                                            <div className="template-title">Import Engine</div>
+                                            <div className="template-desc">
+                                                Load a saved engine JSON file
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    {selectedTemplate === 'brookline' && (
+                                        <div className="info-box" style={{marginTop: '24px'}}>
+                                            <div className="info-box-title">Brookline, MA Template Includes:</div>
+                                            <ul style={{paddingLeft: '20px', color: 'var(--text-medium)', marginTop: '8px'}}>
+                                                <li>Select Board members (Bernard Greene, Heather Hamilton, etc.)</li>
+                                                <li>Town officials (Town Administrator, DPW Commissioner, etc.)</li>
+                                                <li>Locations (Coolidge Corner, Brookline Village, etc.)</li>
+                                                <li>Organizations (BIG, Advisory Committee, Town Meeting, etc.)</li>
+                                            </ul>
+                                        </div>
+                                    )}
+                                </div>
+                            )}
+
+                            {currentStep === 2 && (
+                                <div>
+                                    <h2 style={{fontSize: '28px', marginBottom: '20px', color: 'var(--text-dark)'}}>
+                                        Add Terms Manually
+                                    </h2>
+                                    <p style={{fontSize: '16px', color: 'var(--text-medium)', marginBottom: '24px'}}>
+                                        Add people, places, and organizations one at a time. Include common misspellings
+                                        as aliases.
+                                    </p>
+
+                                    <div className="term-form">
+                                        <div className="setting-group">
+                                            <label className="setting-label">Term (Correct Spelling)</label>
+                                            <input
+                                                type="text"
+                                                className="setting-input"
+                                                placeholder="e.g., Bernard Greene"
+                                                value={newTerm.term}
+                                                onChange={(e) => setNewTerm({...newTerm, term: e.target.value})}
+                                            />
+                                        </div>
+
+                                        <div className="setting-group">
+                                            <label className="setting-label">Category</label>
+                                            <select
+                                                className="setting-input"
+                                                value={newTerm.category}
+                                                onChange={(e) => setNewTerm({...newTerm, category: e.target.value})}
+                                            >
+                                                <option value="person">Person</option>
+                                                <option value="place">Place</option>
+                                                <option value="organization">Organization</option>
+                                            </select>
+                                        </div>
+
+                                        <div className="setting-group">
+                                            <label className="setting-label">Aliases (comma-separated)</label>
+                                            <input
+                                                type="text"
+                                                className="setting-input"
+                                                placeholder="e.g., bernard green, bernie greene"
+                                                value={newTerm.aliases}
+                                                onChange={(e) => setNewTerm({...newTerm, aliases: e.target.value})}
+                                            />
+                                        </div>
+
+                                        <button className="btn-large btn-primary" onClick={addTerm}>
+                                            Add Term
+                                        </button>
+                                    </div>
+
+                                    {terms.length > 0 && (
+                                        <div style={{marginTop: '24px'}}>
+                                            <h3 style={{fontSize: '18px', marginBottom: '12px', color: 'var(--text-dark)'}}>
+                                                Added Terms ({terms.length})
+                                            </h3>
+                                            <div className="term-list">
+                                                {terms.map((term, idx) => (
+                                                    <div key={idx} className="term-item">
+                                                        <div>
+                                                            <span className="term-name">{term.term}</span>
+                                                            <span className="term-category">{term.category}</span>
+                                                        </div>
+                                                        <button
+                                                            className="term-remove"
+                                                            onClick={() => setTerms(terms.filter((_, i) => i !== idx))}
+                                                        >
+                                                            Remove
+                                                        </button>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
+                            )}
+
+                            {currentStep === 3 && (
+                                <div>
+                                    <h2 style={{fontSize: '28px', marginBottom: '20px', color: 'var(--text-dark)'}}>
+                                        Extract from Documents
+                                    </h2>
+                                    <p style={{fontSize: '16px', color: 'var(--text-medium)', marginBottom: '24px'}}>
+                                        Paste text from meeting agendas, rosters, or other documents. AI will extract
+                                        names and terms automatically.
+                                    </p>
+
+                                    <div className="info-box">
+                                        <div className="info-box-title">How It Works</div>
+                                        <p style={{color: 'var(--text-medium)'}}>
+                                            Using GPT-4, the system identifies person names, place names, and organizations.
+                                            It also generates common misspellings and aliases.
+                                        </p>
+                                    </div>
+
+                                    <div className="setting-group" style={{marginTop: '24px'}}>
+                                        <label className="setting-label">Paste Document Text</label>
+                                        <textarea
+                                            className="setting-input"
+                                            rows="8"
+                                            placeholder="Paste text from meeting agendas, staff directories, etc..."
+                                            id="documentText"
+                                        />
+                                    </div>
+
+                                    <button
+                                        className="btn-large btn-primary"
+                                        onClick={() => {
+                                            const text = document.getElementById('documentText').value;
+                                            if (!text) {
+                                                alert('Please paste some text first');
+                                                return;
+                                            }
+
+                                            fetch('/api/engine/document/extract', {
+                                                method: 'POST',
+                                                headers: { 'Content-Type': 'application/json' },
+                                                body: JSON.stringify({ text })
+                                            })
+                                            .then(r => r.json())
+                                            .then(data => {
+                                                if (data.error) {
+                                                    alert('Error: ' + data.error);
+                                                } else {
+                                                    alert(`AI extracted ${data.terms_added || 0} terms from your document!`);
+                                                    document.getElementById('documentText').value = '';
+                                                }
+                                            })
+                                            .catch(err => {
+                                                alert('Failed to extract terms: ' + err.message);
+                                            });
+                                        }}
+                                    >
+                                        Extract Terms with AI
+                                    </button>
+
+                                    {aiConfig && aiConfig.active && (
+                                        <div style={{marginTop: '16px', padding: '12px', background: isAILocal ? 'var(--bg-sage-light)' : '#FEF3C7', borderRadius: '8px', border: isAILocal ? '2px solid var(--sage-primary)' : '2px solid #FCD34D'}}>
+                                            <strong>{isAILocal ? '🔒 Local Processing' : '☁️ Cloud Processing'}</strong>
+                                            <p style={{fontSize: '14px', marginTop: '4px', color: 'var(--text-dark)'}}>
+                                                {isAILocal
+                                                    ? `Using ${aiConfig.provider.toUpperCase()} - your document text stays on your machine.`
+                                                    : `Using ${aiConfig.provider.toUpperCase()} - document text will be sent to ${aiConfig.provider.toUpperCase()} for processing.`}
+                                            </p>
+                                        </div>
+                                    )}
+
+                                    {(!aiConfig || !aiConfig.active) && (
+                                        <p style={{fontSize: '14px', color: 'var(--text-medium)', marginTop: '16px', fontStyle: 'italic'}}>
+                                            Note: Configure AI provider in AI Settings to enable this feature.
+                                        </p>
+                                    )}
+                                </div>
+                            )}
+
+                            {currentStep === 4 && (
+                                <div>
+                                    <h2 style={{fontSize: '28px', marginBottom: '20px', color: 'var(--text-dark)'}}>
+                                        Extract from Websites
+                                    </h2>
+                                    <p style={{fontSize: '16px', color: 'var(--text-medium)', marginBottom: '24px'}}>
+                                        Enter URLs to web pages containing relevant terms. AI will scrape and
+                                        extract names automatically.
+                                    </p>
+
+                                    <div className="info-box">
+                                        <div className="info-box-title">Example Sources</div>
+                                        <ul style={{paddingLeft: '20px', color: 'var(--text-medium)', marginTop: '8px'}}>
+                                            <li>Town government staff directory</li>
+                                            <li>Select Board / City Council member list</li>
+                                            <li>Local landmarks and attractions pages</li>
+                                            <li>Community organization websites</li>
+                                        </ul>
+                                    </div>
+
+                                    <div className="setting-group" style={{marginTop: '24px'}}>
+                                        <label className="setting-label">Website URL</label>
+                                        <input
+                                            type="url"
+                                            className="setting-input"
+                                            placeholder="https://example.com/staff-directory"
+                                            id="webUrl"
+                                        />
+                                    </div>
+
+                                    <button
+                                        className="btn-large btn-primary"
+                                        onClick={() => {
+                                            const url = document.getElementById('webUrl').value;
+                                            if (!url) {
+                                                alert('Please enter a URL first');
+                                                return;
+                                            }
+
+                                            fetch('/api/engine/web/extract', {
+                                                method: 'POST',
+                                                headers: { 'Content-Type': 'application/json' },
+                                                body: JSON.stringify({ url })
+                                            })
+                                            .then(r => r.json())
+                                            .then(data => {
+                                                if (data.error) {
+                                                    alert('Error: ' + data.error);
+                                                } else {
+                                                    alert(`AI extracted ${data.terms_added || 0} terms from ${url}!`);
+                                                    document.getElementById('webUrl').value = '';
+                                                }
+                                            })
+                                            .catch(err => {
+                                                alert('Failed to scrape website: ' + err.message);
+                                            });
+                                        }}
+                                    >
+                                        Scrape Website with AI
+                                    </button>
+
+                                    {aiConfig && aiConfig.active && (
+                                        <div style={{marginTop: '16px', padding: '12px', background: isAILocal ? 'var(--bg-sage-light)' : '#FEF3C7', borderRadius: '8px', border: isAILocal ? '2px solid var(--sage-primary)' : '2px solid #FCD34D'}}>
+                                            <strong>{isAILocal ? '🔒 Local Processing' : '☁️ Cloud Processing'}</strong>
+                                            <p style={{fontSize: '14px', marginTop: '4px', color: 'var(--text-dark)'}}>
+                                                {isAILocal
+                                                    ? `Using ${aiConfig.provider.toUpperCase()} - web content is processed locally on your machine.`
+                                                    : `Using ${aiConfig.provider.toUpperCase()} - web content will be sent to ${aiConfig.provider.toUpperCase()} for processing.`}
+                                            </p>
+                                        </div>
+                                    )}
+
+                                    {(!aiConfig || !aiConfig.active) && (
+                                        <p style={{fontSize: '14px', color: 'var(--text-medium)', marginTop: '16px', fontStyle: 'italic'}}>
+                                            Note: Configure AI provider in AI Settings to enable this feature.
+                                        </p>
+                                    )}
+                                </div>
+                            )}
+
+                            {currentStep === 5 && (
+                                <div>
+                                    <h2 style={{fontSize: '28px', marginBottom: '20px', color: 'var(--text-dark)'}}>
+                                        Test Your Engine
+                                    </h2>
+                                    <p style={{fontSize: '16px', color: 'var(--text-medium)', marginBottom: '24px'}}>
+                                        Type some text with misspellings to see how the engine corrects it.
+                                    </p>
+
+                                    <div className="setting-group">
+                                        <label className="setting-label">Test Input</label>
+                                        <textarea
+                                            className="setting-input"
+                                            rows="4"
+                                            placeholder="e.g., Welcome to the Brooklyn Select Board meeting with Chair Bernard Green"
+                                            value={testText}
+                                            onChange={(e) => setTestText(e.target.value)}
+                                        />
+                                    </div>
+
+                                    <button className="btn-large btn-primary" onClick={testCorrection}>
+                                        Test Correction
+                                    </button>
+
+                                    {testResult && (
+                                        <div style={{marginTop: '24px'}}>
+                                            <h3 style={{fontSize: '18px', marginBottom: '12px', color: 'var(--text-dark)'}}>
+                                                Result:
+                                            </h3>
+                                            <div style={{padding: '20px', background: 'var(--bg-sage-light)', borderRadius: 'var(--radius-md)', fontSize: '16px', lineHeight: '1.7'}}>
+                                                {testResult}
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    <div className="info-box" style={{marginTop: '24px'}}>
+                                        <div className="info-box-title">Example Test Cases</div>
+                                        <ul style={{paddingLeft: '20px', color: 'var(--text-medium)', marginTop: '8px'}}>
+                                            <li>"Brooklyn Select Board" → "Brookline Select Board"</li>
+                                            <li>"bernard green" → "Bernard Greene"</li>
+                                            <li>"coolidge corner theater" → "Coolidge Corner Theatre"</li>
+                                        </ul>
+                                    </div>
+                                </div>
+                            )}
+
+                            {currentStep === 6 && (
+                                <div>
+                                    <h2 style={{fontSize: '28px', marginBottom: '20px', color: 'var(--text-dark)'}}>
+                                        Save & Export Your Engine
+                                    </h2>
+                                    <p style={{fontSize: '16px', color: 'var(--text-medium)', marginBottom: '24px'}}>
+                                        Your engine is ready! You can download it as a JSON file to share with other
+                                        community media organizations or use as a backup.
+                                    </p>
+
+                                    <div className="info-box">
+                                        <div className="info-box-title">Your Engine Is Active</div>
+                                        <p style={{color: 'var(--text-medium)'}}>
+                                            All corrections are now being applied in real-time. The engine will continue
+                                            learning as you add more terms through the dashboard.
+                                        </p>
+                                    </div>
+
+                                    <button className="btn-large btn-primary" onClick={exportEngine} style={{marginTop: '24px'}}>
+                                        Download Engine JSON
+                                    </button>
+
+                                    <div style={{marginTop: '32px', padding: '24px', background: 'var(--bg-sage-light)', borderRadius: 'var(--radius-md)'}}>
+                                        <h3 style={{fontSize: '20px', marginBottom: '12px', color: 'var(--sage-darker)'}}>
+                                            Next Steps
+                                        </h3>
+                                        <ul style={{paddingLeft: '20px', color: 'var(--text-medium)', lineHeight: '1.8'}}>
+                                            <li>Return to the dashboard to start captioning</li>
+                                            <li>Monitor corrections in real-time</li>
+                                            <li>Add more terms as you discover errors</li>
+                                            <li>Share your engine file with other organizations</li>
+                                        </ul>
+                                    </div>
+
+                                    <button className="btn-large btn-outline" onClick={onBack} style={{marginTop: '24px'}}>
+                                        Return to Dashboard
+                                    </button>
+                                </div>
+                            )}
+                        </div>
+
+                        <div className="wizard-nav">
+                            {currentStep > 0 && (
+                                <button
+                                    className="wizard-btn wizard-btn-secondary"
+                                    onClick={() => setCurrentStep(currentStep - 1)}
+                                >
+                                    ← Previous
+                                </button>
+                            )}
+                            {currentStep < steps.length - 1 && (
+                                <button
+                                    className="wizard-btn wizard-btn-primary"
+                                    onClick={() => setCurrentStep(currentStep + 1)}
+                                >
+                                    Next →
+                                </button>
+                            )}
+                        </div>
+                    </div>
+                </div>
+            );
+        }
+
+        function AISettings({ onBack }) {
+            const [config, setConfig] = useState(null);
+            const [provider, setProvider] = useState('none');
+            const [openaiKey, setOpenaiKey] = useState('');
+            const [openaiModel, setOpenaiModel] = useState('gpt-4o-mini');
+            const [ollamaUrl, setOllamaUrl] = useState('http://localhost:11434');
+            const [ollamaModel, setOllamaModel] = useState('llama3.2');
+            const [lmstudioUrl, setLmstudioUrl] = useState('http://localhost:1234/v1');
+            const [lmstudioModel, setLmstudioModel] = useState('local-model');
+            const [customUrl, setCustomUrl] = useState('');
+            const [customKey, setCustomKey] = useState('');
+            const [customModel, setCustomModel] = useState('');
+            const [testResult, setTestResult] = useState('');
+            const [saving, setSaving] = useState(false);
+
+            useEffect(() => {
+                // Load current config
+                fetch('/api/ai/config')
+                    .then(r => r.json())
+                    .then(data => {
+                        setConfig(data);
+                        setProvider(data.provider || 'none');
+                        if (data.openai_api_key && data.openai_api_key !== '***') setOpenaiKey(data.openai_api_key);
+                        setOpenaiModel(data.openai_model || 'gpt-4o-mini');
+                        setOllamaUrl(data.ollama_base_url || 'http://localhost:11434');
+                        setOllamaModel(data.ollama_model || 'llama3.2');
+                        setLmstudioUrl(data.lmstudio_base_url || 'http://localhost:1234/v1');
+                        setLmstudioModel(data.lmstudio_model || 'local-model');
+                        setCustomUrl(data.custom_base_url || '');
+                        setCustomKey(data.custom_api_key || '');
+                        setCustomModel(data.custom_model || '');
+                    });
+            }, []);
+
+            const saveConfig = () => {
+                setSaving(true);
+                setTestResult('');
+
+                const newConfig = {
+                    provider,
+                    openai_api_key: openaiKey,
+                    openai_model: openaiModel,
+                    ollama_base_url: ollamaUrl,
+                    ollama_model: ollamaModel,
+                    lmstudio_base_url: lmstudioUrl,
+                    lmstudio_model: lmstudioModel,
+                    custom_base_url: customUrl,
+                    custom_api_key: customKey,
+                    custom_model: customModel
+                };
+
+                fetch('/api/ai/config/update', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(newConfig)
+                })
+                .then(r => r.json())
+                .then(data => {
+                    setSaving(false);
+                    if (data.error) {
+                        alert('Error: ' + data.error);
+                    } else {
+                        setConfig(data);
+                        alert('AI configuration saved!');
+                    }
+                });
+            };
+
+            const testConnection = () => {
+                setTestResult('Testing...');
+                fetch('/api/ai/test', { method: 'POST' })
+                    .then(r => r.json())
+                    .then(data => {
+                        if (data.error) {
+                            setTestResult('❌ Test failed: ' + data.error);
+                        } else {
+                            setTestResult(`✓ Test successful! Response: "${data.response}" (${data.is_local ? 'LOCAL' : 'CLOUD'})`);
+                        }
+                    });
+            };
+
+            const isLocal = config && (
+                provider === 'ollama' ||
+                provider === 'lmstudio' ||
+                (provider === 'custom' && (customUrl.includes('localhost') || customUrl.includes('127.0.0.1')))
+            );
+
+            return (
+                <div className="dashboard active">
+                    <div className="dashboard-header">
+                        <h1 className="dashboard-title">AI Settings</h1>
+                        <button className="back-btn" onClick={onBack}>← Back</button>
+                    </div>
+
+                    <div className="dashboard-content">
+                        <div className="info-box" style={{marginBottom: '24px'}}>
+                            <div className="info-box-title">AI Provider Configuration</div>
+                            <p style={{color: 'var(--text-medium)', marginBottom: '12px'}}>
+                                Choose an AI provider for features like session summaries and document term extraction.
+                                Local providers keep your data private.
+                            </p>
+                            {config && config.active && (
+                                <div style={{padding: '12px', background: isLocal ? 'var(--bg-sage-light)' : '#FEF3C7', borderRadius: '8px', marginTop: '12px'}}>
+                                    <strong>{isLocal ? '🔒 Local Processing' : '☁️ Cloud Processing'}</strong>
+                                    <div style={{fontSize: '14px', marginTop: '4px', color: 'var(--text-medium)'}}>
+                                        {isLocal
+                                            ? 'Your data stays on your machine. No external API calls.'
+                                            : 'Your data is sent to ' + provider.toUpperCase() + ' for processing.'}
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+
+                        <div className="setting-group">
+                            <label className="setting-label">AI Provider</label>
+                            <select
+                                className="setting-input"
+                                value={provider}
+                                onChange={(e) => setProvider(e.target.value)}
+                            >
+                                <option value="none">None (Disable AI Features)</option>
+                                <option value="openai">OpenAI (Cloud - GPT-4)</option>
+                                <option value="ollama">Ollama (Local - Free)</option>
+                                <option value="lmstudio">LM Studio (Local - Free)</option>
+                                <option value="custom">Custom API Endpoint</option>
+                            </select>
+                        </div>
+
+                        {provider === 'openai' && (
+                            <div>
+                                <div className="privacy-warning" style={{padding: '16px', background: '#FEF3C7', border: '2px solid #FCD34D', borderRadius: '8px', marginBottom: '16px'}}>
+                                    <strong>☁️ Cloud Processing Notice</strong>
+                                    <p style={{fontSize: '14px', marginTop: '8px', color: 'var(--text-dark)'}}>
+                                        When using OpenAI, your caption text and documents will be sent to OpenAI's servers for processing.
+                                        Make sure this complies with your privacy requirements.
+                                    </p>
+                                </div>
+
+                                <div className="setting-group">
+                                    <label className="setting-label">OpenAI API Key</label>
+                                    <input
+                                        type="password"
+                                        className="setting-input"
+                                        placeholder="sk-..."
+                                        value={openaiKey}
+                                        onChange={(e) => setOpenaiKey(e.target.value)}
+                                    />
+                                    <p style={{fontSize: '14px', color: 'var(--text-medium)', marginTop: '4px'}}>
+                                        Get your API key from <a href="https://platform.openai.com/api-keys" target="_blank" style={{color: 'var(--sage-primary)'}}>platform.openai.com/api-keys</a>
+                                    </p>
+                                </div>
+
+                                <div className="setting-group">
+                                    <label className="setting-label">Model</label>
+                                    <select
+                                        className="setting-input"
+                                        value={openaiModel}
+                                        onChange={(e) => setOpenaiModel(e.target.value)}
+                                    >
+                                        <option value="gpt-4o-mini">GPT-4o Mini (Fast & Cheap)</option>
+                                        <option value="gpt-4o">GPT-4o (Best Quality)</option>
+                                        <option value="gpt-4-turbo">GPT-4 Turbo</option>
+                                    </select>
+                                </div>
+                            </div>
+                        )}
+
+                        {provider === 'ollama' && (
+                            <div>
+                                <div className="privacy-ok" style={{padding: '16px', background: 'var(--bg-sage-light)', border: '2px solid var(--sage-primary)', borderRadius: '8px', marginBottom: '16px'}}>
+                                    <strong>🔒 Local Processing</strong>
+                                    <p style={{fontSize: '14px', marginTop: '8px', color: 'var(--text-dark)'}}>
+                                        Ollama runs entirely on your computer. Your data never leaves your machine.
+                                    </p>
+                                </div>
+
+                                <div className="info-box" style={{marginBottom: '16px'}}>
+                                    <div className="info-box-title">Setup Instructions</div>
+                                    <ol style={{paddingLeft: '20px', color: 'var(--text-medium)', fontSize: '14px'}}>
+                                        <li>Download Ollama from <a href="https://ollama.ai" target="_blank" style={{color: 'var(--sage-primary)'}}>ollama.ai</a></li>
+                                        <li>Run: <code style={{background: '#f5f5f5', padding: '2px 6px', borderRadius: '4px'}}>ollama pull llama3.2</code></li>
+                                        <li>Verify it's running on port 11434</li>
+                                    </ol>
+                                </div>
+
+                                <div className="setting-group">
+                                    <label className="setting-label">Ollama Base URL</label>
+                                    <input
+                                        type="text"
+                                        className="setting-input"
+                                        value={ollamaUrl}
+                                        onChange={(e) => setOllamaUrl(e.target.value)}
+                                    />
+                                </div>
+
+                                <div className="setting-group">
+                                    <label className="setting-label">Model Name</label>
+                                    <input
+                                        type="text"
+                                        className="setting-input"
+                                        value={ollamaModel}
+                                        onChange={(e) => setOllamaModel(e.target.value)}
+                                    />
+                                    <p style={{fontSize: '14px', color: 'var(--text-medium)', marginTop: '4px'}}>
+                                        Popular: llama3.2, mistral, phi3
+                                    </p>
+                                </div>
+                            </div>
+                        )}
+
+                        {provider === 'lmstudio' && (
+                            <div>
+                                <div className="privacy-ok" style={{padding: '16px', background: 'var(--bg-sage-light)', border: '2px solid var(--sage-primary)', borderRadius: '8px', marginBottom: '16px'}}>
+                                    <strong>🔒 Local Processing</strong>
+                                    <p style={{fontSize: '14px', marginTop: '8px', color: 'var(--text-dark)'}}>
+                                        LM Studio runs entirely on your computer. Your data never leaves your machine.
+                                    </p>
+                                </div>
+
+                                <div className="info-box" style={{marginBottom: '16px'}}>
+                                    <div className="info-box-title">Setup Instructions</div>
+                                    <ol style={{paddingLeft: '20px', color: 'var(--text-medium)', fontSize: '14px'}}>
+                                        <li>Download LM Studio from <a href="https://lmstudio.ai" target="_blank" style={{color: 'var(--sage-primary)'}}>lmstudio.ai</a></li>
+                                        <li>Download a model (e.g., Llama 3.2, Mistral)</li>
+                                        <li>Start the local server (default port 1234)</li>
+                                    </ol>
+                                </div>
+
+                                <div className="setting-group">
+                                    <label className="setting-label">LM Studio Base URL</label>
+                                    <input
+                                        type="text"
+                                        className="setting-input"
+                                        value={lmstudioUrl}
+                                        onChange={(e) => setLmstudioUrl(e.target.value)}
+                                    />
+                                </div>
+
+                                <div className="setting-group">
+                                    <label className="setting-label">Model Name</label>
+                                    <input
+                                        type="text"
+                                        className="setting-input"
+                                        value={lmstudioModel}
+                                        onChange={(e) => setLmstudioModel(e.target.value)}
+                                    />
+                                </div>
+                            </div>
+                        )}
+
+                        {provider === 'custom' && (
+                            <div>
+                                <div className="setting-group">
+                                    <label className="setting-label">API Base URL</label>
+                                    <input
+                                        type="text"
+                                        className="setting-input"
+                                        placeholder="http://localhost:8000/v1 or https://api.example.com/v1"
+                                        value={customUrl}
+                                        onChange={(e) => setCustomUrl(e.target.value)}
+                                    />
+                                    <p style={{fontSize: '14px', color: 'var(--text-medium)', marginTop: '4px'}}>
+                                        {customUrl && (customUrl.includes('localhost') || customUrl.includes('127.0.0.1'))
+                                            ? '🔒 Local endpoint detected'
+                                            : '☁️ External endpoint - data will be sent over the network'}
+                                    </p>
+                                </div>
+
+                                <div className="setting-group">
+                                    <label className="setting-label">API Key (if required)</label>
+                                    <input
+                                        type="password"
+                                        className="setting-input"
+                                        placeholder="Optional"
+                                        value={customKey}
+                                        onChange={(e) => setCustomKey(e.target.value)}
+                                    />
+                                </div>
+
+                                <div className="setting-group">
+                                    <label className="setting-label">Model Name</label>
+                                    <input
+                                        type="text"
+                                        className="setting-input"
+                                        placeholder="model-name"
+                                        value={customModel}
+                                        onChange={(e) => setCustomModel(e.target.value)}
+                                    />
+                                </div>
+                            </div>
+                        )}
+
+                        {provider !== 'none' && (
+                            <div style={{display: 'flex', gap: '12px', marginTop: '24px'}}>
+                                <button
+                                    className="btn-large btn-primary"
+                                    onClick={saveConfig}
+                                    disabled={saving}
+                                >
+                                    {saving ? 'Saving...' : 'Save Configuration'}
+                                </button>
+
+                                {config && config.active && (
+                                    <button
+                                        className="btn-large"
+                                        style={{background: 'var(--sage-light)', color: 'var(--sage-darker)'}}
+                                        onClick={testConnection}
+                                    >
+                                        Test Connection
+                                    </button>
+                                )}
+                            </div>
+                        )}
+
+                        {testResult && (
+                            <div style={{marginTop: '16px', padding: '16px', background: testResult.includes('✓') ? 'var(--bg-sage-light)' : '#FEE2E2', borderRadius: '8px'}}>
+                                {testResult}
+                            </div>
+                        )}
+
+                        {provider === 'none' && (
+                            <div className="info-box" style={{marginTop: '24px'}}>
+                                <div className="info-box-title">AI Features Disabled</div>
+                                <p style={{color: 'var(--text-medium)'}}>
+                                    Select a provider above to enable AI-powered summaries and document extraction.
+                                </p>
+                            </div>
+                        )}
+                    </div>
+                </div>
+            );
+        }
+
+        function AboutPage({ onBack }) {
+            return (
+                <div className="dashboard active">
+                    <div className="dashboard-header">
+                        <h1 className="dashboard-title">About Community Captioner</h1>
+                        <button className="back-btn" onClick={onBack}>← Back</button>
+                    </div>
+
+                    <div style={{maxWidth: '900px', margin: '0 auto', padding: '40px'}} className="about-content">
+                        <div className="card">
+                            <h2>Project Overview</h2>
+                            <p>
+                                Community Captioner v2 is a free, open-source live captioning system built specifically for
+                                community media organizations. It provides real-time speech-to-text with local AI-powered
+                                corrections for proper nouns (names, places, organizations).
+                            </p>
+
+                            <h3>Primary User</h3>
+                            <p>
+                                Brookline Interactive Group (BIG) - a community media organization in Brookline, MA that
+                                broadcasts town meetings, events, and local programming.
+                            </p>
+
+                            <h3>Problem Solved</h3>
+                            <p>
+                                Commercial captioning encoders cost $30,000+. Community Captioner provides a zero-cost
+                                alternative using browser APIs and optional local Whisper AI.
+                            </p>
+                        </div>
+
+                        <div className="card">
+                            <h2>What Makes It Unique</h2>
+                            <p>
+                                The AI Caption Engine is the standout feature. Unlike generic speech recognition systems,
+                                Community Captioner learns your community's specific vocabulary.
+                            </p>
+
+                            <div className="info-box">
+                                <div className="info-box-title">The Caption Engine</div>
+                                <p>
+                                    Uses a local knowledge base to correct ASR (Automatic Speech Recognition) errors in real-time:
+                                </p>
+                                <div className="example-correction">
+                                    <div>"Brooklyn" → "Brookline"</div>
+                                    <div>"bernard green" → "Bernard Greene"</div>
+                                    <div>"selectboard" → "Select Board"</div>
+                                </div>
+                                <p style={{marginTop: '12px'}}>
+                                    This correction system is built using RAG (Retrieval-Augmented Generation) principles,
+                                    maintaining a database of proper nouns with common misspellings and aliases.
+                                </p>
+                            </div>
+                        </div>
+
+                        <div className="card">
+                            <h2>Architecture</h2>
+                            <div className="architecture-diagram">
+{`┌─────────────────────────────────────────────────────────────┐
+│                    Browser (index.html)                      │
+│  ┌─────────────┐  ┌─────────────┐  ┌─────────────────────┐  │
+│  │ Web Speech  │  │   React     │  │  Settings/Controls  │  │
+│  │    API      │  │    UI       │  │                     │  │
+│  └──────┬──────┘  └──────┬──────┘  └──────────┬──────────┘  │
+└─────────┼────────────────┼───────────────────┼──────────────┘
+          │                │                   │
+          ▼                ▼                   ▼
+┌─────────────────────────────────────────────────────────────┐
+│                 Python Server (start-server.py)              │
+│  ┌─────────────┐  ┌─────────────┐  ┌─────────────────────┐  │
+│  │   Whisper   │  │   Caption   │  │     Session         │  │
+│  │   Engine    │  │   Engine    │  │     Manager         │  │
+│  │ (optional)  │  │   (RAG)     │  │                     │  │
+│  └─────────────┘  └─────────────┘  └─────────────────────┘  │
+└─────────────────────────────────────────────────────────────┘
+          │                │                   │
+          ▼                ▼                   ▼
+┌─────────────────────────────────────────────────────────────┐
+│                      File System                             │
+│  context-data/     sessions/          engines/               │
+│  (engine state)    (recordings)       (portable engines)     │
+└─────────────────────────────────────────────────────────────┘`}
+                            </div>
+
+                            <h3>Core Components</h3>
+                            <ul>
+                                <li><strong>Web Speech API</strong> - Browser-based, real-time (~200ms latency), requires Chrome/Edge + internet</li>
+                                <li><strong>Whisper AI</strong> - Local transcription, more accurate, 2-4s latency, works offline</li>
+                                <li><strong>Caption Engine</strong> - RAG-based correction system for local proper nouns</li>
+                                <li><strong>Session Manager</strong> - Records timestamps, corrections, exports to SRT/VTT/TXT/JSON</li>
+                                <li><strong>Portable Engines</strong> - Export/import correction databases as JSON</li>
+                            </ul>
+                        </div>
+
+                        <div className="card">
+                            <h2>Feature Comparison</h2>
+                            <table className="comparison-table">
+                                <thead>
+                                    <tr>
+                                        <th>Feature</th>
+                                        <th>Community Captioner</th>
+                                        <th>Commercial Systems</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr>
+                                        <td>Cost</td>
+                                        <td>Free / Open Source</td>
+                                        <td>$30,000+</td>
+                                    </tr>
+                                    <tr>
+                                        <td>Local Name Correction</td>
+                                        <td>Yes (AI Engine)</td>
+                                        <td>No</td>
+                                    </tr>
+                                    <tr>
+                                        <td>Offline Mode</td>
+                                        <td>Yes (with Whisper)</td>
+                                        <td>Usually No</td>
+                                    </tr>
+                                    <tr>
+                                        <td>Export Formats</td>
+                                        <td>SRT, VTT, TXT, JSON</td>
+                                        <td>Varies</td>
+                                    </tr>
+                                    <tr>
+                                        <td>OBS/vMix Integration</td>
+                                        <td>Yes</td>
+                                        <td>Yes</td>
+                                    </tr>
+                                    <tr>
+                                        <td>Customizable Styling</td>
+                                        <td>Full Control</td>
+                                        <td>Limited</td>
+                                    </tr>
+                                    <tr>
+                                        <td>Source Code Access</td>
+                                        <td>Yes (CC BY-SA 4.0)</td>
+                                        <td>No</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+
+                        <div className="card">
+                            <h2>Installation</h2>
+                            <h3>Basic Installation (Browser Speech Only)</h3>
+                            <p>No dependencies required! Just run:</p>
+                            <div className="architecture-diagram">
+python3 start-server.py
+                            </div>
+                            <p>Then open http://localhost:8080 in Chrome or Edge.</p>
+
+                            <h3>Full Installation (with Whisper AI)</h3>
+                            <div className="architecture-diagram">
+{`# Install Python dependencies
+pip3 install faster-whisper sounddevice numpy
+
+# Mac users
+brew install portaudio
+
+# Linux users
+sudo apt install portaudio19-dev
+
+# Start server
+python3 start-server.py`}
+                            </div>
+                        </div>
+
+                        <div className="card">
+                            <h2>Use Cases</h2>
+                            <ul>
+                                <li><strong>Town Meetings</strong> - Live caption city council, select board, and committee meetings</li>
+                                <li><strong>Public Events</strong> - Community forums, candidate debates, public hearings</li>
+                                <li><strong>Local News</strong> - Community TV news programs and interviews</li>
+                                <li><strong>Educational Content</strong> - School board meetings, educational programming</li>
+                                <li><strong>Accessibility</strong> - Make all public content accessible to deaf/hard-of-hearing viewers</li>
+                                <li><strong>Archival</strong> - Create searchable transcripts of all public meetings</li>
+                            </ul>
+                        </div>
+
+                        <div className="card">
+                            <h2>Credits</h2>
+                            <h3>Developed By</h3>
+                            <p>
+                                <strong>Stephen Walter</strong> - weirdmachine.org<br/>
+                                In partnership with <strong>Brookline Interactive Group (BIG)</strong>
+                            </p>
+
+                            <h3>Powered By</h3>
+                            <ul>
+                                <li>React (UI framework)</li>
+                                <li>Web Speech API (browser speech recognition)</li>
+                                <li>faster-whisper (local AI transcription)</li>
+                                <li>Python standard library (zero-dependency server)</li>
+                            </ul>
+
+                            <h3>Special Thanks</h3>
+                            <ul>
+                                <li>Brookline Interactive Group for testing and feedback</li>
+                                <li>Neighborhood.AI for AI consulting</li>
+                                <li>The open-source community</li>
+                            </ul>
+                        </div>
+
+                        <div className="card">
+                            <h2>License</h2>
+                            <p>
+                                Community Captioner is licensed under <strong>CC BY-SA 4.0</strong>
+                                (Creative Commons Attribution-ShareAlike 4.0 International).
+                            </p>
+                            <p>
+                                This means you are free to:
+                            </p>
+                            <ul>
+                                <li><strong>Share</strong> - Copy and redistribute in any medium or format</li>
+                                <li><strong>Adapt</strong> - Remix, transform, and build upon the material</li>
+                            </ul>
+                            <p>
+                                Under the following terms:
+                            </p>
+                            <ul>
+                                <li><strong>Attribution</strong> - Give appropriate credit to the original creator</li>
+                                <li><strong>ShareAlike</strong> - Distribute your contributions under the same license</li>
+                            </ul>
+                            <p style={{marginTop: '16px', fontStyle: 'italic', color: 'var(--text-light)'}}>
+                                Built for the public good. Use it, improve it, share it.
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            );
+        }
+
+        ReactDOM.render(<App />, document.getElementById('root'));
     </script>
 </body>
 </html>

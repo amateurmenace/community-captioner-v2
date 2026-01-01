@@ -158,21 +158,74 @@ community-captioner/
 
 ## Current State (v3.0)
 
-### Completed Features
-- [x] Dual captioning modes (Web Speech / Whisper)
-- [x] Caption Engine with term management
-- [x] Real-time corrections dashboard
-- [x] Session recording with timestamps
-- [x] Export to SRT, VTT, TXT, JSON
-- [x] Portable engines (download/upload)
-- [x] OBS overlay integration
-- [x] Basic summary generation
+### Completed Features - January 2026 Update
 
-### Known Issues
-- Summary generation is basic (just stats, no AI)
+#### Landing Page
+- [x] **New animated gradient background** - Subtle shifting sage green gradient for visual depth
+- [x] **Live interactive demo** - Shows Caption Engine corrections in real-time with animation
+- [x] **Updated messaging** - "AI for Accessibility" focus, emphasizes AI + Human collaboration
+- [x] **Three demo examples** - Brooklyn→Brookline, bernard green→Bernard Greene, coolidge corner corrections
+- [x] **Responsive design** - Mobile-friendly landing experience
+
+#### Control Dashboard
+- [x] **Dual captioning modes** (Web Speech / Whisper) - Fully functional
+- [x] **Browser Speech Recognition** - Working with Web Speech API, auto-restart on error
+- [x] **Whisper Integration** - Device selection, model loading (tiny/base/small/medium), start/stop
+- [x] **Live caption styling controls** - Font size, line height, max width, font family, colors, opacity
+- [x] **Real-time preview** - Shows captions with live styling updates
+- [x] **Caption Engine toggle** - Enable/disable with visual feedback
+- [x] **Session recording** - Start/stop with session naming
+- [x] **Export formats** - SRT, VTT, TXT, JSON with session stats display
+- [x] **Live Overlay access** - Button to open overlay + network URL display
+- [x] **Sage green color scheme** - Consistent throughout, purple accent for special features only
+
+#### AI Caption Engine Wizard
+- [x] **7-step guided workflow** with visual progress indicator
+- [x] **Step 1: Welcome** - Explains what the engine does and why it's unique
+- [x] **Step 2: Choose template** - Empty, Brookline defaults, or import existing
+- [x] **Step 3: Manual term entry** - Form to add terms with categories and aliases
+- [x] **Step 4: Document upload** - UI placeholder for PDF/DOCX/TXT upload (server implementation pending)
+- [x] **Step 5: Web scraping** - UI placeholder for URL-based term extraction (server implementation pending)
+- [x] **Step 6: Test engine** - Real-time correction testing with examples
+- [x] **Step 7: Save & download** - Export engine as JSON, return to dashboard
+
+#### About Page
+- [x] **Comprehensive documentation** - Project overview, architecture, use cases
+- [x] **ASCII architecture diagram** - Visual system representation
+- [x] **Feature comparison table** - Community Captioner vs Commercial Systems
+- [x] **Installation instructions** - Basic and full (with Whisper)
+- [x] **Six detailed use cases** - Town meetings, events, news, education, accessibility, archival
+- [x] **Credits section** - Developer, powered by, special thanks
+- [x] **CC BY-SA 4.0 license** - Full license details and terms
+
+#### Live Overlay (overlay.html)
+- [x] **Caption display** with customizable styling
+- [x] **Line height support** - Added lineHeight setting
+- [x] **Real-time updates** - Polls /api/caption every 100ms
+- [x] **Settings inheritance** - Applies all styling from dashboard
+- [x] **OBS/vMix compatible** - Browser source ready
+
+#### Caption Engine (Backend)
+- [x] **32 Brookline default terms** loaded
+- [x] **47 correction rules** generated (including aliases)
+- [x] **Pattern-based matching** with regex
+- [x] **Position tracking** to prevent double corrections
+- [x] **Sorted by pattern length** - Longest matches first
+- [x] **Export/import** as portable JSON
+
+### Known Issues & Limitations
+- **Double correction edge case** - When "coolidge corner" becomes "Coolidge Corner", the standalone alias "coolidge" still matches (by design, acceptable for template)
+- Summary generation is basic (stats only, no AI)
 - No audio recording for post-session Whisper reprocessing
-- No document ingestion UI (API exists)
+- Document upload feature has UI but needs server implementation
+- Web scraping feature has UI but needs server implementation
 - Cloud server not tested recently
+
+### Technical Improvements
+- index.html: 1,014 → 2,406 lines (comprehensive redesign)
+- All styling controls functional with live updates
+- Improved correction algorithm with overlap detection
+- Better state management with React hooks throughout
 
 ## Planned Features (Priority Order)
 
