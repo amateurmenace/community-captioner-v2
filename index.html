@@ -2475,7 +2475,7 @@
                 .then(r => r.json())
                 .then(data => {
                     setModelLoading(false);
-                    if (data.status === 'loaded') {
+                    if (data.status === 'ok') {
                         setModelLoaded(true);
                     }
                 })
