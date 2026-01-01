@@ -153,7 +153,8 @@ community-captioner/
 
 ### Caption
 - `GET /api/caption` - Get current caption state
-- `POST /api/caption` - Send caption text + settings
+- `POST /api/caption` - Send caption text + settings (accepts `is_final` flag to prevent duplication)
+- `GET /api/caption/stream` - Server-Sent Events stream for real-time caption push (hardware encoder integration)
 
 ### Engine (Core)
 - `GET /api/engine/status` - Engine stats, RAG status, recent corrections
@@ -637,6 +638,93 @@ community-captioner/
 - **Whisper real-time latency** - 2-4s delay may be too slow for some live events
 - **Browser Speech API reliability** - Occasional crashes/restarts needed
 - **Mobile browser constraints** - Web Speech API limited on mobile browsers
+
+## Browser Limitations & Mitigations (v4.1)
+
+The browser-based architecture has inherent limitations that affect reliability for broadcast use. Here are the issues and solutions:
+
+### Problem 1: Browser Tab Loses Focus = Microphone Shuts Off
+When a browser tab loses focus or is backgrounded, the Web Speech API stops capturing audio.
+
+**Mitigations Implemented:**
+- **Whisper Mode with Server-Side Audio**: Use `sounddevice` in Python to capture audio directly, bypassing the browser entirely. Enable with "Record audio for Whisper second pass" checkbox.
+- **Auto-Restart Logic**: The Web Speech API automatically restarts when it stops unexpectedly.
+- **Visual Indicators**: Dashboard shows clear recording status (REC badge, Recording indicator).
+
+**Future Options:**
+- Electron wrapper to keep the app in focus
+- Browser extension with persistent background script
+
+### Problem 2: Browser Crashes = No Backup
+If Chrome/Edge crashes, captions stop.
+
+**Mitigations Implemented:**
+- **Continuous Session Saving**: Captions are saved to the server after every segment, not just at session end.
+- **Audio Recording**: When enabled, raw audio is recorded server-side for full Whisper reprocessing.
+- **Session Recovery**: Sessions are persisted to JSON files in `sessions/` directory.
+
+### Problem 3: Hardware Encoders Can't Use Browser Overlay
+Professional broadcast environments use hardware encoders that can't incorporate a browser source.
+
+**Current Solutions:**
+1. **OBS/vMix Browser Source**: The `overlay.html` file works as a browser source in software mixers.
+2. **API Access**: Any system can poll `/api/caption` for current caption text and render it independently.
+
+**Future Hardware Integration Options:**
+
+| Method | Description | Status |
+|--------|-------------|--------|
+| **NDI Output** | Send captions as NDI stream using `ndi-python` | Planned |
+| **CEA-608/708** | Output closed caption data for hardware embedders | Researching |
+| **SRT/SDI Embedder** | Use Blackmagic DeckLink for direct video embedding | Requires hardware |
+| **WebSocket Feed** | Real-time push of caption text to external systems | Planned |
+
+### Recommended Architecture for Reliability
+
+```
+┌─────────────────────────────────────────────────────────────────────────┐
+│                     RELIABLE CAPTIONING SETUP                            │
+├─────────────────────────────────────────────────────────────────────────┤
+│                                                                          │
+│  AUDIO SOURCE                PYTHON SERVER              OUTPUT           │
+│  ┌─────────────┐            ┌──────────────┐         ┌──────────────┐   │
+│  │ Audio       │───────────▶│  Whisper     │────────▶│ Browser      │   │
+│  │ Interface   │  USB/Line  │  + RAG       │         │ Overlay      │   │
+│  │ (Mixer)     │            │  Engine      │         └──────────────┘   │
+│  └─────────────┘            └──────────────┘         ┌──────────────┐   │
+│                                    │                 │ NDI Stream   │   │
+│                                    └────────────────▶│ (Future)     │   │
+│                                                      └──────────────┘   │
+│                                                                          │
+│  CONTROL (browser can lose focus without stopping captioning):          │
+│  └──────────────────────────────────────────────────────────────────┘   │
+│                                                                          │
+└─────────────────────────────────────────────────────────────────────────┘
+```
+
+**Key Insight**: The Python server should be the stable core. The browser is optional for control. When using Whisper mode with server-side audio capture, the captioning pipeline runs entirely in Python and doesn't depend on browser focus.
+
+### NDI Output Implementation (Roadmap)
+
+To output captions directly to NDI for hardware integration:
+
+```python
+# Future: ndi-python integration
+import ndi
+
+def send_caption_to_ndi(text: str, style: dict):
+    """Send caption as NDI overlay"""
+    # Create NDI sender
+    sender = ndi.create_sender("Community Captioner")
+
+    # Render caption to frame
+    frame = render_caption_frame(text, style)
+
+    # Send via NDI
+    sender.send_frame(frame)
+```
+
+This would allow hardware encoders with NDI input to receive captions directly without any browser dependency.
 
 ### v4.0 Summary - What's New
 The v4.0 release transforms Community Captioner from a basic pattern-matching system into a sophisticated AI-powered caption correction engine:

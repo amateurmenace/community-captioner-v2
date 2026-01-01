@@ -1713,10 +1713,27 @@ class SessionManager:
         return None
     
     def add_caption(self, raw: str, corrected: str, corrections: list):
-        """Add a caption to the current session"""
+        """Add a caption to the current session with deduplication"""
         if not self.is_recording:
             return
-        
+
+        # Deduplication: check if this text was recently added
+        corrected_clean = corrected.strip().lower()
+        if self.captions:
+            # Check last 3 captions for duplicates
+            for recent in self.captions[-3:]:
+                recent_text = (recent.get('corrected') or recent.get('raw', '')).strip().lower()
+                # Skip if exact match or if new text is substring of recent (interim result)
+                if corrected_clean == recent_text or corrected_clean in recent_text:
+                    return
+                # Also skip if recent is substring of new (we're replacing interim with final)
+                if recent_text in corrected_clean and len(corrected_clean) > len(recent_text):
+                    # Update the recent caption instead of adding new
+                    recent['raw'] = raw
+                    recent['corrected'] = corrected
+                    recent['corrections'] = corrections
+                    return
+
         elapsed = (datetime.now() - self.start_time).total_seconds()
         self.captions.append({
             "timestamp": elapsed,
@@ -2836,10 +2853,38 @@ class Handler(http.server.SimpleHTTPRequestHandler):
         elif path == '/api/whisper/devices':
             self.send_json({"devices": whisper_engine.get_audio_devices()})
         
+        # Server-Sent Events for real-time caption streaming (hardware encoder integration)
+        elif path == '/api/caption/stream':
+            self.send_response(200)
+            self.send_header('Content-Type', 'text/event-stream')
+            self.send_header('Cache-Control', 'no-cache')
+            self.send_header('Connection', 'keep-alive')
+            self.send_header('Access-Control-Allow-Origin', '*')
+            self.end_headers()
+
+            last_caption = ""
+            try:
+                while True:
+                    current = caption_state.get('caption', '')
+                    if current != last_caption:
+                        last_caption = current
+                        data = json.dumps({
+                            'text': current,
+                            'raw': caption_state.get('raw_caption', ''),
+                            'corrections': caption_state.get('corrections', []),
+                            'timestamp': datetime.now().isoformat()
+                        })
+                        self.wfile.write(f"data: {data}\n\n".encode())
+                        self.wfile.flush()
+                    import time
+                    time.sleep(0.1)  # 100ms polling
+            except (BrokenPipeError, ConnectionResetError):
+                pass  # Client disconnected
+
         # Session endpoints
         elif path == '/api/session/status':
             self.send_json(session_manager.get_status())
-        
+
         elif path == '/api/session/captions':
             self.send_json({"captions": session_manager.get_captions()})
         
@@ -2947,9 +2992,10 @@ class Handler(http.server.SimpleHTTPRequestHandler):
                 caption_state['raw_caption'] = result["raw"]
                 caption_state['caption'] = result["corrected"]
                 caption_state['corrections'] = result["corrections"]
-                
-                # Add to session
-                if session_manager.is_recording and result["corrected"]:
+
+                # Only add FINAL captions to session (not interim results)
+                is_final = data.get('is_final', True)  # Default True for backwards compatibility
+                if session_manager.is_recording and result["corrected"] and is_final:
                     session_manager.add_caption(result["raw"], result["corrected"], result["corrections"])
             
             if 'settings' in data:
@@ -3317,6 +3363,85 @@ class Handler(http.server.SimpleHTTPRequestHandler):
             else:
                 self.send_json({"error": "No captions provided"}, 400)
 
+        elif path == '/api/session/analytics':
+            # POST handler for AI-powered session analytics
+            # Accepts OpenAI API key in header for client-side key storage
+            api_key = self.headers.get('X-OpenAI-Key', '')
+            captions = data.get('captions', session_manager.get_captions())
+            transcript = data.get('transcript', '')
+
+            if not transcript and captions:
+                transcript = ' '.join(
+                    c.get('corrected', c.get('text', c.get('raw', '')))
+                    for c in captions if isinstance(c, dict)
+                )
+
+            if not transcript:
+                self.send_json({"error": "No transcript data available"}, 400)
+                return
+
+            # Use provided API key or fall back to configured client
+            client = None
+            if api_key and OPENAI_AVAILABLE:
+                try:
+                    client = OpenAI(api_key=api_key)
+                except Exception as e:
+                    self.send_json({"error": f"Invalid API key: {e}"}, 400)
+                    return
+            elif openai_client:
+                client = openai_client
+
+            if not client:
+                self.send_json({"error": "No AI provider available. Please provide an OpenAI API key."}, 400)
+                return
+
+            try:
+                # Generate comprehensive AI analysis
+                response = client.chat.completions.create(
+                    model=get_ai_model() if client == openai_client else "gpt-4o-mini",
+                    messages=[
+                        {
+                            "role": "system",
+                            "content": (
+                                "Analyze this meeting/event transcript comprehensively. Provide:\n"
+                                "1. summary: A 3-5 sentence summary of the session\n"
+                                "2. highlights: Array of 5 key moments with {title, description, timestamp_estimate}\n"
+                                "3. topics: Array of main topics with {name, percentage} (should sum to ~100)\n"
+                                "4. sentiment: Overall tone analysis {overall: positive/neutral/negative, score: -1 to 1}\n"
+                                "5. speakers: List of people mentioned or speaking\n"
+                                "6. action_items: Any action items or decisions made\n\n"
+                                "Return ONLY valid JSON."
+                            )
+                        },
+                        {
+                            "role": "user",
+                            "content": transcript[:12000]  # Limit context
+                        }
+                    ],
+                    temperature=0.3,
+                    max_tokens=2000
+                )
+
+                try:
+                    result = json.loads(response.choices[0].message.content)
+                    self.send_json(result)
+                except json.JSONDecodeError:
+                    # Try to extract JSON from response
+                    content = response.choices[0].message.content
+                    import re
+                    json_match = re.search(r'\{[\s\S]*\}', content)
+                    if json_match:
+                        try:
+                            result = json.loads(json_match.group())
+                            self.send_json(result)
+                        except:
+                            self.send_json({"error": "Failed to parse AI response", "raw": content}, 500)
+                    else:
+                        self.send_json({"error": "Failed to parse AI response", "raw": content}, 500)
+
+            except Exception as e:
+                self.send_json({"error": f"AI analysis failed: {str(e)}"}, 500)
+
         # AI Configuration endpoints (POST)
         elif path == '/api/ai/config/update':
             # Update AI configuration
@@ -3543,6 +3668,96 @@ class Handler(http.server.SimpleHTTPRequestHandler):
 
             result = video_intelligence.generate_highlight_reel(video_path, highlights)
             self.send_json(result)
+
+        elif path == '/api/video/transcribe':
+            # Transcribe video using Whisper
+            video_path = data.get('video_path') or (
+                video_intelligence.current_video.get('path') if video_intelligence.current_video else None
+            )
+
+            if not video_path:
+                self.send_json({"error": "No video loaded. Please upload a video first."}, 400)
+                return
+
+            if not Path(video_path).exists():
+                self.send_json({"error": "Video file not found"}, 404)
+                return
+
+            if not WHISPER_AVAILABLE:
+                self.send_json({"error": "Whisper not installed. Run: pip3 install faster-whisper"}, 400)
+                return
+
+            if not whisper_engine.model:
+                self.send_json({"error": "Whisper model not loaded. Load a model from the dashboard first."}, 400)
+                return
+
+            try:
+                # Extract audio from video using ffmpeg
+                import subprocess
+                import tempfile
+
+                with tempfile.NamedTemporaryFile(suffix='.wav', delete=False) as tmp:
+                    audio_path = tmp.name
+
+                # Extract audio
+                result = subprocess.run([
+                    'ffmpeg', '-y', '-i', video_path,
+                    '-vn', '-acodec', 'pcm_s16le', '-ar', '16000', '-ac', '1',
+                    audio_path
+                ], capture_output=True, text=True)
+
+                if result.returncode != 0:
+                    self.send_json({"error": f"Audio extraction failed: {result.stderr}"}, 500)
+                    return
+
+                # Load audio and transcribe
+                import wave
+                with wave.open(audio_path, 'rb') as wf:
+                    frames = wf.readframes(wf.getnframes())
+                    audio_data = np.frombuffer(frames, dtype=np.int16).astype(np.float32) / 32768.0
+
+                # Transcribe with Whisper
+                segments, info = whisper_engine.model.transcribe(
+                    audio_data,
+                    beam_size=5,
+                    language="en",
+                    vad_filter=True
+                )
+
+                # Build transcript with timestamps
+                transcript_lines = []
+                captions = []
+                for seg in segments:
+                    text = seg.text.strip()
+                    if text:
+                        # Apply caption engine corrections
+                        corrected = caption_engine.correct(text)
+                        timestamp = f"{int(seg.start // 60):02d}:{int(seg.start % 60):02d}"
+                        transcript_lines.append(f"[{timestamp}] {corrected['corrected']}")
+                        captions.append({
+                            "timestamp": seg.start,
+                            "end": seg.end,
+                            "text": text,
+                            "corrected": corrected['corrected'],
+                            "corrections": corrected['corrections']
+                        })
+
+                # Clean up temp file
+                try:
+                    Path(audio_path).unlink()
+                except:
+                    pass
+
+                self.send_json({
+                    "status": "ok",
+                    "transcript": "\n".join(transcript_lines),
+                    "captions": captions,
+                    "duration": info.duration if hasattr(info, 'duration') else 0,
+                    "language": info.language if hasattr(info, 'language') else 'en'
+                })
+
+            except Exception as e:
+                self.send_json({"error": f"Transcription failed: {str(e)}"}, 500)
 
         else:
             self.send_response(404)
