@@ -2304,6 +2304,7 @@
             const [corrections, setCorrections] = useState([]);
             const [recording, setRecording] = useState(false);
             const [sessionName, setSessionName] = useState('');
+            const [showEnginePanel, setShowEnginePanel] = useState(false);
             const [engineEnabled, setEngineEnabled] = useState(false);
             const [whisperRunning, setWhisperRunning] = useState(false);
             const [browserListening, setBrowserListening] = useState(false);
@@ -2727,8 +2728,12 @@
                                 )}
 
                                 <div style={{display: 'flex', gap: '12px', marginTop: '16px', flexWrap: 'wrap'}}>
-                                    <button className="btn-large btn-outline" style={{flex: '1', minWidth: '140px'}} onClick={onConfigureEngine}>
-                                        {t('Configure Engine')}
+                                    <button
+                                        className="btn-large btn-outline"
+                                        style={{flex: '1', minWidth: '140px'}}
+                                        onClick={() => setShowEnginePanel(!showEnginePanel)}
+                                    >
+                                        {showEnginePanel ? '▼ Hide Engine Panel' : '▶ Show Engine Panel'}
                                     </button>
                                     <label className="btn-large btn-outline" style={{flex: '1', minWidth: '140px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer'}}>
                                         {t('Upload Engine')}
@@ -2742,6 +2747,13 @@
                                 </div>
                             </div>
                         </div>
+
+                        {/* Collapsible Engine Panel */}
+                        {showEnginePanel && (
+                            <div className="card" style={{gridColumn: '1 / -1', marginTop: '20px', border: '2px solid var(--purple-accent)'}}>
+                                <EngineWizardInline onClose={() => setShowEnginePanel(false)} />
+                            </div>
+                        )}
 
                         <div className="sidebar-column">
                             <div className="card">
@@ -2946,6 +2958,236 @@
                                         value={bgOpacity}
                                         onChange={(e) => setBgOpacity(parseFloat(e.target.value))}
                                     />
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            );
+        }
+
+        function EngineWizardInline({ onClose }) {
+            const [engineStats, setEngineStats] = useState(null);
+            const [newTerm, setNewTerm] = useState({ term: '', category: 'person', aliases: '' });
+            const [testText, setTestText] = useState('');
+            const [testResult, setTestResult] = useState('');
+            const [aiConfig, setAiConfig] = useState(null);
+            const [recentTerms, setRecentTerms] = useState([]);
+
+            // Load AI config and engine stats
+            useEffect(() => {
+                fetch('/api/ai/config')
+                    .then(r => r.json())
+                    .then(data => setAiConfig(data));
+
+                loadEngineStats();
+                const interval = setInterval(loadEngineStats, 2000);
+                return () => clearInterval(interval);
+            }, []);
+
+            const loadEngineStats = () => {
+                fetch('/api/engine/status')
+                    .then(r => r.json())
+                    .then(data => {
+                        setEngineStats(data);
+                    });
+
+                fetch('/api/engine/terms')
+                    .then(r => r.json())
+                    .then(data => {
+                        if (data.terms) {
+                            const termsList = Object.entries(data.terms)
+                                .map(([key, val]) => ({ key, ...val }))
+                                .slice(0, 10);
+                            setRecentTerms(termsList);
+                        }
+                    });
+            };
+
+            const isAILocal = aiConfig && (
+                aiConfig.provider === 'ollama' ||
+                aiConfig.provider === 'lmstudio' ||
+                (aiConfig.provider === 'custom' && (aiConfig.custom_base_url.includes('localhost') || aiConfig.custom_base_url.includes('127.0.0.1')))
+            );
+
+            const addTerm = () => {
+                if (!newTerm.term) return;
+
+                const aliasArray = newTerm.aliases.split(',').map(a => a.trim()).filter(a => a);
+
+                fetch('/api/engine/term', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        term: newTerm.term,
+                        category: newTerm.category,
+                        aliases: aliasArray
+                    })
+                })
+                .then(r => r.json())
+                .then(data => {
+                    setNewTerm({ term: '', category: 'person', aliases: '' });
+                    loadEngineStats();
+                    alert('Term added successfully!');
+                });
+            };
+
+            const loadBrooklineDefaults = () => {
+                if (confirm('Load Brookline, MA template? This will add default terms for Brookline government.')) {
+                    fetch('/api/engine/defaults', { method: 'POST' })
+                        .then(r => r.json())
+                        .then(data => {
+                            alert('Brookline defaults loaded!');
+                            loadEngineStats();
+                        });
+                }
+            };
+
+            const testCorrection = () => {
+                fetch(`/api/engine/test?text=${encodeURIComponent(testText)}`)
+                    .then(r => r.json())
+                    .then(data => {
+                        setTestResult(data.corrected_text || testText);
+                    });
+            };
+
+            const exportEngine = () => {
+                window.open('/api/engine/export', '_blank');
+            };
+
+            const uploadEngine = (event) => {
+                const file = event.target.files[0];
+                if (!file) return;
+
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    try {
+                        const engineData = JSON.parse(e.target.result);
+                        fetch('/api/engine/import', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify(engineData)
+                        })
+                        .then(r => r.json())
+                        .then(data => {
+                            if (data.status === 'success') {
+                                alert(`Engine uploaded! Loaded ${data.terms_count || 0} terms.`);
+                                loadEngineStats();
+                            } else {
+                                alert('Error: ' + (data.error || 'Unknown error'));
+                            }
+                        });
+                    } catch (err) {
+                        alert('Invalid engine file: ' + err.message);
+                    }
+                };
+                reader.readAsText(file);
+                event.target.value = '';
+            };
+
+            return (
+                <div>
+                    <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px'}}>
+                        <h2 style={{fontSize: '24px', fontWeight: '700', color: 'var(--text-dark)', margin: 0}}>
+                            AI Caption Engine Dashboard
+                        </h2>
+                        <button onClick={onClose} className="btn-large btn-outline">
+                            Close ✕
+                        </button>
+                    </div>
+
+                    <div style={{padding: '0'}}>
+                        {/* Stats Overview */}
+                        <div style={{display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px', marginBottom: '24px'}}>
+                            <div className="card" style={{textAlign: 'center', padding: '20px', background: 'var(--bg-sage-light)', border: 'none'}}>
+                                <div style={{fontSize: '36px', fontWeight: '700', color: 'var(--sage-primary)'}}>
+                                    {engineStats ? engineStats.term_count : '...'}
+                                </div>
+                                <div style={{fontSize: '14px', color: 'var(--text-medium)', fontWeight: '600'}}>Total Terms</div>
+                            </div>
+                            <div className="card" style={{textAlign: 'center', padding: '20px', background: 'var(--bg-sage-light)', border: 'none'}}>
+                                <div style={{fontSize: '36px', fontWeight: '700', color: 'var(--purple-accent)'}}>
+                                    {engineStats ? engineStats.correction_count : '...'}
+                                </div>
+                                <div style={{fontSize: '14px', color: 'var(--text-medium)', fontWeight: '600'}}>Corrections Made</div>
+                            </div>
+                            <div className="card" style={{textAlign: 'center', padding: '20px', background: 'var(--bg-sage-light)', border: 'none'}}>
+                                <div style={{fontSize: '36px', fontWeight: '700', color: engineStats?.enabled ? 'var(--green-bright)' : 'var(--text-light)'}}>
+                                    {engineStats?.enabled ? 'ON' : 'OFF'}
+                                </div>
+                                <div style={{fontSize: '14px', color: 'var(--text-medium)', fontWeight: '600'}}>Engine Status</div>
+                            </div>
+                        </div>
+
+                        {/* Compact Grid */}
+                        <div style={{display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '16px'}}>
+                            {/* Quick Actions */}
+                            <div className="card" style={{background: 'white'}}>
+                                <h3 style={{fontSize: '18px', fontWeight: '600', marginBottom: '12px'}}>Quick Actions</h3>
+                                <div style={{display: 'flex', flexDirection: 'column', gap: '8px'}}>
+                                    <button className="btn-large btn-primary" style={{fontSize: '14px', padding: '10px'}} onClick={loadBrooklineDefaults}>
+                                        Load Brookline Template
+                                    </button>
+                                    <button className="btn-large btn-outline" style={{fontSize: '14px', padding: '10px'}} onClick={exportEngine}>
+                                        Download Current Engine
+                                    </button>
+                                </div>
+                            </div>
+
+                            {/* Add Term */}
+                            <div className="card" style={{background: 'white'}}>
+                                <h3 style={{fontSize: '18px', fontWeight: '600', marginBottom: '12px'}}>Add Term</h3>
+                                <div style={{display: 'flex', flexDirection: 'column', gap: '8px'}}>
+                                    <input
+                                        type="text"
+                                        className="setting-input"
+                                        placeholder="Term (e.g., Bernard Greene)"
+                                        value={newTerm.term}
+                                        onChange={(e) => setNewTerm({...newTerm, term: e.target.value})}
+                                        style={{fontSize: '14px', padding: '8px'}}
+                                    />
+                                    <select
+                                        className="setting-input"
+                                        value={newTerm.category}
+                                        onChange={(e) => setNewTerm({...newTerm, category: e.target.value})}
+                                        style={{fontSize: '14px', padding: '8px'}}
+                                    >
+                                        <option value="person">Person</option>
+                                        <option value="place">Place</option>
+                                        <option value="organization">Organization</option>
+                                    </select>
+                                    <input
+                                        type="text"
+                                        className="setting-input"
+                                        placeholder="Aliases (comma-separated)"
+                                        value={newTerm.aliases}
+                                        onChange={(e) => setNewTerm({...newTerm, aliases: e.target.value})}
+                                        style={{fontSize: '14px', padding: '8px'}}
+                                    />
+                                    <button className="btn-large btn-primary" style={{fontSize: '14px', padding: '10px'}} onClick={addTerm}>
+                                        Add Term
+                                    </button>
+                                </div>
+                            </div>
+
+                            {/* Test Engine */}
+                            <div className="card" style={{background: 'white', gridColumn: 'span 2'}}>
+                                <h3 style={{fontSize: '18px', fontWeight: '600', marginBottom: '12px'}}>Test Corrections</h3>
+                                <div style={{display: 'grid', gridTemplateColumns: '1fr auto 1fr', gap: '12px', alignItems: 'center'}}>
+                                    <textarea
+                                        className="setting-input"
+                                        rows="3"
+                                        placeholder="Type text to test..."
+                                        value={testText}
+                                        onChange={(e) => setTestText(e.target.value)}
+                                        style={{fontSize: '14px'}}
+                                    />
+                                    <button className="btn-large btn-primary" style={{fontSize: '14px', padding: '10px'}} onClick={testCorrection}>
+                                        Test →
+                                    </button>
+                                    <div style={{padding: '12px', background: 'var(--bg-sage-light)', borderRadius: '8px', minHeight: '78px', fontSize: '14px'}}>
+                                        {testResult || 'Result will appear here...'}
+                                    </div>
                                 </div>
                             </div>
                         </div>
