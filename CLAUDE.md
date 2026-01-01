@@ -267,19 +267,41 @@ community-captioner/
 
 ### High Priority - Major AI Enhancements (v4.0)
 
-#### 1. Advanced RAG Caption Engine
-- **True RAG Implementation** with vector embeddings for term matching
-- **Context-aware corrections** using semantic similarity
-- **Multi-term phrase corrections** (e.g., "Select Board Chair" as single entity)
-- **Confidence scoring** for correction suggestions
-- **Learning mode** that suggests new terms based on context
+#### 1. Advanced RAG Caption Engine - **THE CORE FEATURE**
+
+**What Makes This Different:**
+Current caption engine is basic pattern matching. v4.0 will be a TRUE RAG system that revolutionizes caption correction.
+
+**Real-Time Correction Architecture:**
+- **Vector embeddings** for all terms using sentence-transformers
+- **Semantic similarity matching** instead of regex patterns
+- **Context-aware corrections** that understand "Brookline Select Board" vs "Brooklyn Nets"
+- **Multi-word entity recognition** ("Bernard Greene" not "bernard" + "greene")
+- **Fuzzy matching** with confidence thresholds (0.8+ = auto-correct, 0.5-0.8 = suggest)
+- **Real-time learning** that observes ASR mistakes and builds correction rules automatically
+
+**Post-Session Refinement:**
+- **Second-pass correction** using full transcript context
+- **Consistency enforcement** (if "Bernard Greene" appears 10x, fix the 2 "Bernard Green" errors)
+- **Acronym expansion** based on first usage (DPW → Department of Public Works)
+- **Cross-reference validation** against knowledge base
+- **Bulk find-and-replace** across entire session with preview
+
+**Knowledge Base Integration:**
+- **Document ingestion**: Upload PDFs, meeting minutes, org charts
+- **Web scraping**: Pull names from town website, LinkedIn, public records
+- **Entity extraction**: GPT-4 extracts people, places, orgs with relationships
+- **Automatic alias generation**: "Select Board" → ["selectboard", "board", "select bored"]
+- **Contextual metadata**: Store job titles, locations, affiliations for disambiguation
+
+**Why This Matters:**
+This isn't just spell-check. It's an AI that learns your organization's unique language and corrects captions with near-human accuracy in BOTH real-time AND post-session.
 
 #### 2. AI-Enhanced Real-Time Captions
 - **GPT-4 post-processing** of ASR output for grammar, punctuation, capitalization
 - **Real-time translation** to multiple languages
 - **Sentiment analysis** and topic detection
 - **Named entity recognition** to auto-populate caption engine
-- **Speaker attribution** using diarization + AI inference
 
 #### 3. Post-Session Analytics Dashboard
 Comprehensive data visualization and analysis page:
@@ -342,13 +364,12 @@ Comprehensive data visualization and analysis page:
 - **Cultural adaptation** not just literal translation
 
 ### Medium Priority
-1. **Speaker Diarization** - Identify different speakers with AI
-2. **Custom Vocabulary** - Feed Whisper domain-specific words
-3. **Live Corrections UI** - Edit corrections in real-time
-4. **Searchable History** - Search across all past sessions
-5. **Remote Control** - Control from phone/tablet
-6. **Collaborative Editing** - Multiple users edit transcript simultaneously
-7. **API Access** - RESTful API for integration with other tools
+1. **Custom Vocabulary** - Feed Whisper domain-specific words
+2. **Live Corrections UI** - Edit corrections in real-time during session
+3. **Searchable History** - Search across all past sessions
+4. **Remote Control** - Control from phone/tablet
+5. **Collaborative Editing** - Multiple users edit transcript simultaneously
+6. **API Access** - RESTful API for integration with other tools
 
 ### Lower Priority
 1. **Auto-punctuation** - Better sentence detection
