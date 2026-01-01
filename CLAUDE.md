@@ -394,6 +394,53 @@ community-captioner/
   - Analytics tab with sentiment timeline, topic distribution, pace analysis
   - Export tab with SRT, VTT, TXT, JSON download cards
 
+### v4.0 Frontend Updates - Continued (January 2026)
+
+#### Header & Branding Update
+- [x] **New Site Tagline** - "Free, Context-Understanding Captions for Broadcast and Streaming" (multiline, no badge bubble)
+- [x] **Larger Title** - Hero title increased to 96px, subtitle to 32px
+- [x] **Weird Machine Logo** - SVG inline logo in footer (replaced broken PNG reference)
+
+#### How To Section Redesign
+- [x] **Card-Based Layout** - 4 interactive cards in a grid replacing old numbered list
+- [x] **Hover Animations** - Cards lift on hover with top border reveal effect
+- [x] **Step Numbers** - Gradient circular badges (56px)
+- [x] **Feature Tags** - Small pill badges showing key capabilities per step
+- [x] **Custom SVG Icons** - Unique icons for each step (mic, AI, record, display)
+- [x] **Click-Through Navigation** - Cards link directly to relevant dashboard sections
+- [x] **Responsive Grid** - 4 columns → 2 columns → 1 column on smaller screens
+
+#### AI Caption Engine Card SVG
+- [x] **New Icon Design** - Brain/lightbulb shape with checkmark, representing AI-powered corrections
+- [x] **Replaced Bizarre SVG** - Removed confusing person-with-checkmark icon
+
+#### Values Section Enhancement
+- [x] **SVG Icons Added** - Each value card now has a unique icon:
+  - Accessibility First: Person in circle
+  - Truly Open Source: Hexagon with plus
+  - Community-Powered: Three connected nodes
+  - Privacy by Design: Padlock
+  - Human + AI Collaboration: Person + circuit
+  - Legal Compliance: Document with checkmark
+- [x] **3-Column Grid** - Responsive layout for better visual balance
+- [x] **Hover Effects** - Icons scale and change color on hover
+
+#### System Architecture Diagram
+- [x] **Center Alignment** - Diagram now properly centered in container
+- [x] **Improved Layout** - Flexbox-based with consistent spacing
+- [x] **Interactive Tooltips** - Hover/tap on any node to see detailed description
+- [x] **Wikipedia Links** - Each tooltip links to relevant Wikipedia article:
+  - Speech Input → Microphone article
+  - ASR Engine → Speech recognition article
+  - RAG Engine → Retrieval-augmented generation article
+  - Live Overlay → OBS Studio article
+  - Knowledge Base → Knowledge base article
+  - Embeddings → Word embedding article
+  - ASR Learner → Machine learning article
+  - Analytics → Text mining article
+- [x] **Connector Lines** - Visual flow lines between main pipeline and secondary components
+- [x] **Microphone Icon Updated** - More recognizable microphone shape
+
 ### Known Issues & Limitations
 - **Double correction edge case** - When "coolidge corner" becomes "Coolidge Corner", the standalone alias "coolidge" still matches (by design, acceptable for template)
 - Cloud server not tested recently
@@ -425,11 +472,18 @@ community-captioner/
 3. **Video Intelligence Panel** - Upload video, generate highlights, download reel
 4. **Editable Corrections** - Allow editing corrections in post-session analysis
 
+### High Priority - UX Polish
+1. **Mobile Responsive** - Test and fix layout on tablets/phones
+2. **Keyboard Shortcuts** - Quick actions for common operations
+3. **Onboarding Tour** - First-time user walkthrough
+4. **Error State UI** - Better feedback when things go wrong
+
 ### Medium Priority
 1. **Live Corrections UI** - Edit corrections in real-time during session
 2. **Searchable History** - Search across all past sessions
 3. **Remote Control** - Control from phone/tablet
 4. **YouTube Integration** - Paste URL to download and sync video
+5. **Session Templates** - Pre-configured settings for different event types
 
 ### Lower Priority (Translation - Deprioritized)
 1. **Real-time translation** during live captioning
