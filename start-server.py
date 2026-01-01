@@ -1251,36 +1251,159 @@ class KnowledgeBase:
         except Exception as e:
             print(f"Warning: Could not save knowledge index: {e}")
 
-    def extract_text_from_pdf(self, file_path: Path) -> str:
-        """Extract text from PDF file"""
+    def extract_text_from_pdf(self, file_path: Path) -> tuple:
+        """Extract text from PDF file. Returns (text, error_message)"""
+        # Try PyPDF2 first
         try:
-            # Try PyPDF2 first
-            try:
-                import PyPDF2
-                text_parts = []
-                with open(file_path, 'rb') as f:
-                    reader = PyPDF2.PdfReader(f)
-                    for page in reader.pages:
-                        text_parts.append(page.extract_text() or "")
-                return "\n".join(text_parts)
-            except ImportError:
-                pass
-
-            # Try pdfplumber as fallback
-            try:
-                import pdfplumber
-                text_parts = []
-                with pdfplumber.open(file_path) as pdf:
-                    for page in pdf.pages:
-                        text_parts.append(page.extract_text() or "")
-                return "\n".join(text_parts)
-            except ImportError:
-                pass
-
-            return ""
+            import PyPDF2
+            text_parts = []
+            with open(file_path, 'rb') as f:
+                reader = PyPDF2.PdfReader(f)
+                for page in reader.pages:
+                    text_parts.append(page.extract_text() or "")
+            result = "\n".join(text_parts).strip()
+            if result:
+                return result, None
+        except ImportError:
+            pass
         except Exception as e:
-            print(f"PDF extraction error: {e}")
-            return ""
+            print(f"PyPDF2 extraction error: {e}")
+
+        # Try pdfplumber as fallback
+        try:
+            import pdfplumber
+            text_parts = []
+            with pdfplumber.open(file_path) as pdf:
+                for page in pdf.pages:
+                    text_parts.append(page.extract_text() or "")
+            result = "\n".join(text_parts).strip()
+            if result:
+                return result, None
+        except ImportError:
+            pass
+        except Exception as e:
+            print(f"pdfplumber extraction error: {e}")
+
+        # Check if any PDF library is available
+        try:
+            import PyPDF2
+            pypdf_available = True
+        except ImportError:
+            pypdf_available = False
+
+        try:
+            import pdfplumber
+            pdfplumber_available = True
+        except ImportError:
+            pdfplumber_available = False
+
+        if not pypdf_available and not pdfplumber_available:
+            return "", "PDF libraries not installed. Run: pip3 install PyPDF2 pdfplumber"
+
+        return "", "Could not extract text from PDF. The file may be scanned/image-based."
+
+    def extract_text_from_url(self, url: str) -> tuple:
+        """Extract text from a URL. Returns (text, error_message)"""
+        try:
+            import urllib.request
+            from html.parser import HTMLParser
+
+            class TextExtractor(HTMLParser):
+                def __init__(self):
+                    super().__init__()
+                    self.text = []
+                    self.skip_tags = {'script', 'style', 'nav', 'footer', 'header'}
+                    self.current_tag = None
+
+                def handle_starttag(self, tag, attrs):
+                    self.current_tag = tag
+
+                def handle_endtag(self, tag):
+                    self.current_tag = None
+
+                def handle_data(self, data):
+                    if self.current_tag not in self.skip_tags:
+                        text = data.strip()
+                        if text:
+                            self.text.append(text)
+
+            req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0'})
+            with urllib.request.urlopen(req, timeout=30) as response:
+                html = response.read().decode('utf-8', errors='ignore')
+
+            parser = TextExtractor()
+            parser.feed(html)
+            text = ' '.join(parser.text)
+
+            if len(text) < 100:
+                return "", "Could not extract meaningful text from URL"
+
+            return text, None
+        except Exception as e:
+            return "", f"Error fetching URL: {str(e)}"
+
+    def extract_youtube_transcript(self, url: str) -> tuple:
+        """Extract transcript from YouTube video. Returns (text, error_message)"""
+        import re
+
+        # Extract video ID from URL
+        video_id = None
+        patterns = [
+            r'(?:v=|/v/|youtu\.be/)([a-zA-Z0-9_-]{11})',
+            r'(?:embed/)([a-zA-Z0-9_-]{11})',
+        ]
+        for pattern in patterns:
+            match = re.search(pattern, url)
+            if match:
+                video_id = match.group(1)
+                break
+
+        if not video_id:
+            return "", "Could not extract YouTube video ID from URL"
+
+        # Try youtube_transcript_api
+        try:
+            from youtube_transcript_api import YouTubeTranscriptApi
+            transcript_list = YouTubeTranscriptApi.get_transcript(video_id)
+            text = ' '.join([t['text'] for t in transcript_list])
+            return text, None
+        except ImportError:
+            pass
+        except Exception as e:
+            print(f"YouTube transcript API error: {e}")
+
+        # Fallback: Try to fetch auto-generated captions via unofficial method
+        try:
+            import urllib.request
+            import json
+
+            # Fetch video page to get caption tracks
+            url = f"https://www.youtube.com/watch?v={video_id}"
+            req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0'})
+            with urllib.request.urlopen(req, timeout=30) as response:
+                html = response.read().decode('utf-8', errors='ignore')
+
+            # Look for captions in the page
+            caption_match = re.search(r'"captions":.*?"captionTracks":\[(.*?)\]', html)
+            if caption_match:
+                tracks = caption_match.group(1)
+                url_match = re.search(r'"baseUrl":"(.*?)"', tracks)
+                if url_match:
+                    caption_url = url_match.group(1).replace('\\u0026', '&')
+                    req = urllib.request.Request(caption_url, headers={'User-Agent': 'Mozilla/5.0'})
+                    with urllib.request.urlopen(req, timeout=30) as response:
+                        caption_xml = response.read().decode('utf-8', errors='ignore')
+
+                    # Extract text from XML
+                    texts = re.findall(r'<text[^>]*>(.*?)</text>', caption_xml, re.DOTALL)
+                    if texts:
+                        import html as html_lib
+                        text = ' '.join([html_lib.unescape(t) for t in texts])
+                        return text, None
+        except Exception as e:
+            print(f"YouTube fallback error: {e}")
+
+        return "", "Could not fetch YouTube transcript. Install: pip3 install youtube-transcript-api"
 
     def extract_text_from_docx(self, file_path: Path) -> str:
         """Extract text from DOCX file"""
@@ -1353,17 +1476,20 @@ class KnowledgeBase:
 
         # Extract text based on file type
         extracted_text = text or ""
+        extraction_error = None
         if not extracted_text and content:
             ext = filename.lower().split('.')[-1] if '.' in filename else ''
             if ext == 'pdf':
-                extracted_text = self.extract_text_from_pdf(file_path)
+                extracted_text, extraction_error = self.extract_text_from_pdf(file_path)
             elif ext in ['docx', 'doc']:
                 extracted_text = self.extract_text_from_docx(file_path)
+                if not extracted_text:
+                    extraction_error = "Could not extract text from DOCX. Install: pip3 install python-docx"
             elif ext in ['txt', 'md', 'csv']:
                 extracted_text = content.decode('utf-8', errors='ignore')
 
         if not extracted_text:
-            return {"error": "Could not extract text from document"}
+            return {"error": extraction_error or "Could not extract text from document"}
 
         # Chunk text for embeddings
         chunks = self.chunk_text(extracted_text)
@@ -3288,6 +3414,45 @@ class Handler(http.server.SimpleHTTPRequestHandler):
                 self.send_json({"results": results})
             else:
                 self.send_json({"error": "No query provided"}, 400)
+
+        elif path == '/api/knowledge/import-url':
+            # Import text from a URL
+            url = data.get('url', '')
+            if not url:
+                self.send_json({"error": "No URL provided"}, 400)
+            else:
+                text, error = knowledge_base.extract_text_from_url(url)
+                if error:
+                    self.send_json({"error": error}, 400)
+                else:
+                    # Extract domain for filename
+                    import urllib.parse
+                    parsed = urllib.parse.urlparse(url)
+                    filename = f"{parsed.netloc.replace('.', '_')}.txt"
+                    result = knowledge_base.add_document(filename, text=text)
+                    result['source'] = 'url'
+                    result['url'] = url
+                    self.send_json(result)
+
+        elif path == '/api/knowledge/import-youtube':
+            # Import transcript from YouTube video
+            url = data.get('url', '')
+            if not url:
+                self.send_json({"error": "No URL provided"}, 400)
+            else:
+                text, error = knowledge_base.extract_youtube_transcript(url)
+                if error:
+                    self.send_json({"error": error}, 400)
+                else:
+                    # Extract video ID for filename
+                    import re
+                    video_id = re.search(r'(?:v=|/v/|youtu\.be/)([a-zA-Z0-9_-]{11})', url)
+                    video_id = video_id.group(1) if video_id else 'video'
+                    filename = f"youtube_{video_id}.txt"
+                    result = knowledge_base.add_document(filename, text=text)
+                    result['source'] = 'youtube'
+                    result['url'] = url
+                    self.send_json(result)
 
         # GPT Post-Processor endpoints (POST)
         elif path == '/api/gpt/enable':

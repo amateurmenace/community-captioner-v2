@@ -3631,12 +3631,18 @@
             const [ragSuggestions, setRagSuggestions] = useState([]);
             const [showSuggestionsPanel, setShowSuggestionsPanel] = useState(false);
 
-            // Knowledge Base state
+            // Knowledge Base state (Create Your Own Engine)
             const [showKnowledgePanel, setShowKnowledgePanel] = useState(false);
             const [knowledgeStatus, setKnowledgeStatus] = useState({ documents: [], entity_count: 0 });
             const [knowledgeEntities, setKnowledgeEntities] = useState([]);
             const [knowledgeUploadText, setKnowledgeUploadText] = useState('');
             const [knowledgeUploading, setKnowledgeUploading] = useState(false);
+            const [knowledgeUrlInput, setKnowledgeUrlInput] = useState('');
+            const [knowledgeUrlLoading, setKnowledgeUrlLoading] = useState(false);
+            const [knowledgeYoutubeInput, setKnowledgeYoutubeInput] = useState('');
+            const [knowledgeYoutubeLoading, setKnowledgeYoutubeLoading] = useState(false);
+            const [knowledgeProgress, setKnowledgeProgress] = useState({ active: false, step: '', progress: 0 });
+            const [knowledgeDragActive, setKnowledgeDragActive] = useState(false);
 
             // Video Intelligence state
             const [showVideoPanel, setShowVideoPanel] = useState(false);
@@ -4135,6 +4141,129 @@
                     .catch(err => console.error('Error syncing:', err));
             };
 
+            // URL import function
+            const importFromUrl = () => {
+                if (!knowledgeUrlInput.trim()) return;
+                setKnowledgeUrlLoading(true);
+                setKnowledgeProgress({ active: true, step: 'Fetching webpage...', progress: 20 });
+                fetch('/api/knowledge/import-url', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ url: knowledgeUrlInput })
+                })
+                .then(r => r.json())
+                .then(data => {
+                    setKnowledgeUrlLoading(false);
+                    setKnowledgeProgress({ active: false, step: '', progress: 0 });
+                    if (data.doc_id) {
+                        setKnowledgeUrlInput('');
+                        loadKnowledgeStatus();
+                        alert('URL imported! Entities extracted: ' + (Object.values(data.entities || {}).reduce((a,b) => a + b, 0)));
+                    } else {
+                        alert('Error: ' + (data.error || 'Unknown error'));
+                    }
+                })
+                .catch(err => {
+                    setKnowledgeUrlLoading(false);
+                    setKnowledgeProgress({ active: false, step: '', progress: 0 });
+                    console.error('Error importing URL:', err);
+                    alert('Error importing URL: ' + err.message);
+                });
+            };
+
+            // YouTube import function
+            const importFromYoutube = () => {
+                if (!knowledgeYoutubeInput.trim()) return;
+                setKnowledgeYoutubeLoading(true);
+                setKnowledgeProgress({ active: true, step: 'Fetching YouTube transcript...', progress: 30 });
+                fetch('/api/knowledge/import-youtube', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ url: knowledgeYoutubeInput })
+                })
+                .then(r => r.json())
+                .then(data => {
+                    setKnowledgeYoutubeLoading(false);
+                    setKnowledgeProgress({ active: false, step: '', progress: 0 });
+                    if (data.doc_id) {
+                        setKnowledgeYoutubeInput('');
+                        loadKnowledgeStatus();
+                        alert('YouTube transcript imported! Entities extracted: ' + (Object.values(data.entities || {}).reduce((a,b) => a + b, 0)));
+                    } else {
+                        alert('Error: ' + (data.error || 'Unknown error'));
+                    }
+                })
+                .catch(err => {
+                    setKnowledgeYoutubeLoading(false);
+                    setKnowledgeProgress({ active: false, step: '', progress: 0 });
+                    console.error('Error importing YouTube:', err);
+                    alert('Error importing YouTube: ' + err.message);
+                });
+            };
+
+            // Drag and drop handlers
+            const handleDragEnter = (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                setKnowledgeDragActive(true);
+            };
+
+            const handleDragLeave = (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                setKnowledgeDragActive(false);
+            };
+
+            const handleDragOver = (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+            };
+
+            const handleDrop = (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                setKnowledgeDragActive(false);
+
+                const files = e.dataTransfer.files;
+                if (files && files.length > 0) {
+                    const file = files[0];
+                    if (file.name.match(/\.(pdf|docx?|txt)$/i)) {
+                        // Process the dropped file
+                        setKnowledgeUploading(true);
+                        setKnowledgeProgress({ active: true, step: 'Reading file...', progress: 20 });
+                        const reader = new FileReader();
+                        reader.onload = (evt) => {
+                            setKnowledgeProgress({ active: true, step: 'Extracting text...', progress: 50 });
+                            const base64 = evt.target.result.split(',')[1];
+                            fetch('/api/knowledge/upload', {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({ filename: file.name, content: base64 })
+                            })
+                            .then(r => r.json())
+                            .then(data => {
+                                setKnowledgeUploading(false);
+                                setKnowledgeProgress({ active: false, step: '', progress: 0 });
+                                if (data.doc_id) {
+                                    loadKnowledgeStatus();
+                                    alert('File uploaded! Entities extracted.');
+                                } else {
+                                    alert('Error: ' + (data.error || 'Unknown error'));
+                                }
+                            })
+                            .catch(err => {
+                                setKnowledgeUploading(false);
+                                setKnowledgeProgress({ active: false, step: '', progress: 0 });
+                                alert('Error uploading file.');
+                            });
+                        };
+                        reader.readAsDataURL(file);
+                    } else {
+                        alert('Please drop a PDF, DOCX, or TXT file.');
+                    }
+                }
+            };
+
             // Video Intelligence functions
             const loadVideoStatus = () => {
                 fetch('/api/video/status')
@@ -4359,15 +4488,6 @@
                                     </div>
                                 )}
 
-                                {/* Session name input - shown when not recording */}
-                                {!recording && (
-                                    <div style={{marginTop: '12px', paddingTop: '12px', borderTop: '1px solid var(--border-light)', display: 'flex', alignItems: 'center', gap: '12px'}}>
-                                        <label style={{fontSize: '13px', color: 'var(--text-medium)'}}>Session Name:</label>
-                                        <input type="text" className="setting-input" placeholder="Optional - for recording"
-                                            value={sessionName} onChange={(e) => setSessionName(e.target.value)}
-                                            style={{flex: 1, maxWidth: '300px'}} />
-                                    </div>
-                                )}
                             </div>
 
                             {/* Live Preview - 1920x1080 aspect ratio simulation */}
@@ -4634,80 +4754,299 @@
                             {showEnginePanel && <EngineWizardInline onClose={() => setShowEnginePanel(false)} />}
                         </div>
 
-                        {/* Document Import Panel - Full Width */}
-                        <div className="card" style={{gridColumn: '1 / -1', border: '1px solid var(--border-sage)'}}>
-                            <div
-                                style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer'}}
-                                onClick={() => { setShowKnowledgePanel(!showKnowledgePanel); if (!showKnowledgePanel) loadKnowledgeStatus(); }}
-                            >
-                                <h2 className="card-title" style={{margin: 0, borderBottom: 'none', paddingBottom: 0, display: 'flex', alignItems: 'center', gap: '12px'}}>
-                                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--sage-primary)" strokeWidth="2">
-                                        <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path>
-                                        <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path>
+                        {/* Create Your Own Engine Panel - Full Width */}
+                        {!showKnowledgePanel ? (
+                            <div style={{gridColumn: '1 / -1', display: 'flex', justifyContent: 'center', padding: '20px 0'}}>
+                                <button
+                                    onClick={() => { setShowKnowledgePanel(true); loadKnowledgeStatus(); }}
+                                    style={{
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        gap: '12px',
+                                        padding: '16px 32px',
+                                        fontSize: '16px',
+                                        fontWeight: '600',
+                                        background: 'linear-gradient(135deg, var(--sage-primary) 0%, var(--sage-dark) 100%)',
+                                        color: 'white',
+                                        border: 'none',
+                                        borderRadius: '12px',
+                                        cursor: 'pointer',
+                                        boxShadow: '0 4px 15px rgba(104, 132, 103, 0.3)',
+                                        transition: 'all 0.3s ease',
+                                    }}
+                                    onMouseEnter={e => {
+                                        e.target.style.transform = 'translateY(-2px)';
+                                        e.target.style.boxShadow = '0 6px 20px rgba(104, 132, 103, 0.4)';
+                                    }}
+                                    onMouseLeave={e => {
+                                        e.target.style.transform = 'translateY(0)';
+                                        e.target.style.boxShadow = '0 4px 15px rgba(104, 132, 103, 0.3)';
+                                    }}
+                                >
+                                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                        <circle cx="12" cy="12" r="10"/>
+                                        <path d="M12 8v8M8 12h8" strokeLinecap="round"/>
                                     </svg>
-                                    Import Terms from Documents
+                                    Create Your Own Engine
                                     {knowledgeStatus.documents?.length > 0 && (
                                         <span style={{
-                                            background: 'var(--sage-primary)',
-                                            color: 'white',
-                                            fontSize: '12px',
-                                            fontWeight: '600',
-                                            padding: '2px 8px',
-                                            borderRadius: '12px'
+                                            background: 'rgba(255,255,255,0.2)',
+                                            padding: '4px 10px',
+                                            borderRadius: '20px',
+                                            fontSize: '13px'
                                         }}>
-                                            {knowledgeStatus.documents.length} docs
+                                            {knowledgeStatus.documents.length} sources
                                         </span>
                                     )}
-                                </h2>
-                                <button className="btn-large btn-outline" style={{padding: '8px 16px'}}>
-                                    {showKnowledgePanel ? 'Collapse ▲' : 'Expand ▼'}
                                 </button>
                             </div>
+                        ) : (
+                            <div className="card" style={{
+                                gridColumn: '1 / -1',
+                                border: '2px solid var(--sage-primary)',
+                                background: 'linear-gradient(180deg, var(--bg-sage-light) 0%, white 100%)',
+                                animation: 'slideDown 0.3s ease-out'
+                            }}>
+                                <style>{`
+                                    @keyframes slideDown {
+                                        from { opacity: 0; transform: translateY(-10px); }
+                                        to { opacity: 1; transform: translateY(0); }
+                                    }
+                                `}</style>
 
-                            {showKnowledgePanel && (
-                                <div style={{marginTop: '20px'}}>
-                                    <p style={{fontSize: '14px', color: 'var(--text-medium)', marginBottom: '20px'}}>
-                                        Upload documents (PDFs, DOCX, or text) to automatically extract proper nouns for the caption engine.
-                                    </p>
+                                {/* Header */}
+                                <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '20px'}}>
+                                    <div>
+                                        <h2 className="card-title" style={{margin: 0, borderBottom: 'none', paddingBottom: 0, display: 'flex', alignItems: 'center', gap: '12px'}}>
+                                            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="var(--sage-primary)" strokeWidth="2">
+                                                <circle cx="12" cy="12" r="3"/>
+                                                <path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/>
+                                            </svg>
+                                            Create Your Own Engine
+                                        </h2>
+                                        <p style={{margin: '8px 0 0', fontSize: '14px', color: 'var(--text-medium)', maxWidth: '600px'}}>
+                                            Build a custom correction engine by importing documents, webpages, or YouTube transcripts.
+                                            AI will automatically extract proper nouns (names, places, organizations) to improve caption accuracy.
+                                        </p>
+                                    </div>
+                                    <div style={{display: 'flex', gap: '12px'}}>
+                                        <button
+                                            onClick={() => {
+                                                fetch('/api/engine/export')
+                                                    .then(r => r.json())
+                                                    .then(data => {
+                                                        const blob = new Blob([JSON.stringify(data, null, 2)], {type: 'application/json'});
+                                                        const url = URL.createObjectURL(blob);
+                                                        const a = document.createElement('a');
+                                                        a.href = url;
+                                                        a.download = 'custom_engine.json';
+                                                        a.click();
+                                                    });
+                                            }}
+                                            className="btn-large btn-outline"
+                                            style={{padding: '8px 16px', display: 'flex', alignItems: 'center', gap: '8px'}}
+                                        >
+                                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                                <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3"/>
+                                            </svg>
+                                            Download Engine
+                                        </button>
+                                        <button onClick={() => setShowKnowledgePanel(false)} className="btn-large btn-outline" style={{padding: '8px 16px'}}>
+                                            Close
+                                        </button>
+                                    </div>
+                                </div>
 
-                                    <div style={{display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '20px'}}>
-                                        {/* Upload Section */}
-                                        <div className="card" style={{background: 'var(--bg-sage-light)', border: 'none'}}>
-                                            <h3 style={{fontSize: '16px', fontWeight: '600', marginBottom: '12px'}}>Add Documents</h3>
-                                            <div style={{display: 'flex', flexDirection: 'column', gap: '12px'}}>
-                                                <label className="btn-large btn-primary" style={{display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer'}}>
-                                                    {knowledgeUploading ? 'Uploading...' : 'Upload PDF / DOCX'}
-                                                    <input type="file" accept=".pdf,.docx,.doc,.txt" onChange={uploadKnowledgeFile} style={{display: 'none'}} disabled={knowledgeUploading} />
-                                                </label>
-                                                <div style={{textAlign: 'center', fontSize: '13px', color: 'var(--text-light)'}}>or paste text below</div>
-                                                <textarea
+                                {/* Progress Indicator */}
+                                {knowledgeProgress.active && (
+                                    <div style={{
+                                        background: 'white',
+                                        border: '1px solid var(--sage-primary)',
+                                        borderRadius: '8px',
+                                        padding: '16px',
+                                        marginBottom: '20px'
+                                    }}>
+                                        <div style={{display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '8px'}}>
+                                            <div className="loading-spinner" style={{width: '20px', height: '20px'}}></div>
+                                            <span style={{fontWeight: '500'}}>{knowledgeProgress.step}</span>
+                                        </div>
+                                        <div style={{
+                                            height: '6px',
+                                            background: 'var(--bg-sage-light)',
+                                            borderRadius: '3px',
+                                            overflow: 'hidden'
+                                        }}>
+                                            <div style={{
+                                                height: '100%',
+                                                width: `${knowledgeProgress.progress}%`,
+                                                background: 'var(--sage-primary)',
+                                                borderRadius: '3px',
+                                                transition: 'width 0.3s ease'
+                                            }}></div>
+                                        </div>
+                                    </div>
+                                )}
+
+                                {/* Main Content Grid */}
+                                <div style={{display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '24px'}}>
+
+                                    {/* Left Column - Import Sources */}
+                                    <div style={{display: 'flex', flexDirection: 'column', gap: '16px'}}>
+
+                                        {/* Drag & Drop Zone */}
+                                        <div
+                                            onDragEnter={handleDragEnter}
+                                            onDragLeave={handleDragLeave}
+                                            onDragOver={handleDragOver}
+                                            onDrop={handleDrop}
+                                            style={{
+                                                border: knowledgeDragActive ? '3px dashed var(--sage-primary)' : '2px dashed var(--border-sage)',
+                                                borderRadius: '12px',
+                                                padding: '32px',
+                                                textAlign: 'center',
+                                                background: knowledgeDragActive ? 'var(--bg-sage-light)' : 'white',
+                                                transition: 'all 0.2s ease',
+                                                cursor: 'pointer'
+                                            }}
+                                            onClick={() => document.getElementById('file-upload-input').click()}
+                                        >
+                                            <input
+                                                id="file-upload-input"
+                                                type="file"
+                                                accept=".pdf,.docx,.doc,.txt"
+                                                onChange={uploadKnowledgeFile}
+                                                style={{display: 'none'}}
+                                                disabled={knowledgeUploading}
+                                            />
+                                            <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke={knowledgeDragActive ? 'var(--sage-primary)' : 'var(--text-light)'} strokeWidth="1.5" style={{marginBottom: '12px'}}>
+                                                <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M17 8l-5-5-5 5M12 3v12"/>
+                                            </svg>
+                                            <div style={{fontWeight: '600', fontSize: '16px', color: knowledgeDragActive ? 'var(--sage-primary)' : 'var(--text-dark)', marginBottom: '4px'}}>
+                                                {knowledgeDragActive ? 'Drop file here' : 'Drag & drop files here'}
+                                            </div>
+                                            <div style={{fontSize: '13px', color: 'var(--text-light)'}}>
+                                                or click to browse (PDF, DOCX, TXT)
+                                            </div>
+                                        </div>
+
+                                        {/* URL Import */}
+                                        <div style={{background: 'white', borderRadius: '12px', padding: '16px', border: '1px solid var(--border-light)'}}>
+                                            <div style={{display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px'}}>
+                                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--sage-primary)" strokeWidth="2">
+                                                    <circle cx="12" cy="12" r="10"/>
+                                                    <path d="M2 12h20M12 2a15.3 15.3 0 014 10 15.3 15.3 0 01-4 10 15.3 15.3 0 01-4-10 15.3 15.3 0 014-10z"/>
+                                                </svg>
+                                                <span style={{fontWeight: '600'}}>Import from Website</span>
+                                            </div>
+                                            <div style={{display: 'flex', gap: '8px'}}>
+                                                <input
+                                                    type="url"
                                                     className="setting-input"
-                                                    rows="4"
-                                                    placeholder="Paste meeting agenda, roster, or any document with names..."
-                                                    value={knowledgeUploadText}
-                                                    onChange={(e) => setKnowledgeUploadText(e.target.value)}
-                                                    style={{fontSize: '13px'}}
+                                                    placeholder="https://example.com/meeting-agenda"
+                                                    value={knowledgeUrlInput}
+                                                    onChange={(e) => setKnowledgeUrlInput(e.target.value)}
+                                                    style={{flex: 1, fontSize: '13px'}}
                                                 />
-                                                <button className="btn-large btn-outline" onClick={uploadKnowledgeText} disabled={knowledgeUploading || !knowledgeUploadText.trim()}>
-                                                    Extract Entities from Text
+                                                <button
+                                                    onClick={importFromUrl}
+                                                    disabled={knowledgeUrlLoading || !knowledgeUrlInput.trim()}
+                                                    className="btn-large btn-primary"
+                                                    style={{padding: '8px 16px', whiteSpace: 'nowrap'}}
+                                                >
+                                                    {knowledgeUrlLoading ? 'Loading...' : 'Import'}
                                                 </button>
                                             </div>
                                         </div>
 
-                                        {/* Documents List */}
-                                        <div className="card" style={{background: 'white'}}>
+                                        {/* YouTube Import */}
+                                        <div style={{background: 'white', borderRadius: '12px', padding: '16px', border: '1px solid var(--border-light)'}}>
+                                            <div style={{display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px'}}>
+                                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#FF0000" strokeWidth="2">
+                                                    <rect x="2" y="4" width="20" height="16" rx="4"/>
+                                                    <polygon points="10 8 16 12 10 16" fill="#FF0000"/>
+                                                </svg>
+                                                <span style={{fontWeight: '600'}}>Import YouTube Transcript</span>
+                                            </div>
+                                            <div style={{display: 'flex', gap: '8px'}}>
+                                                <input
+                                                    type="url"
+                                                    className="setting-input"
+                                                    placeholder="https://youtube.com/watch?v=..."
+                                                    value={knowledgeYoutubeInput}
+                                                    onChange={(e) => setKnowledgeYoutubeInput(e.target.value)}
+                                                    style={{flex: 1, fontSize: '13px'}}
+                                                />
+                                                <button
+                                                    onClick={importFromYoutube}
+                                                    disabled={knowledgeYoutubeLoading || !knowledgeYoutubeInput.trim()}
+                                                    className="btn-large btn-primary"
+                                                    style={{padding: '8px 16px', whiteSpace: 'nowrap'}}
+                                                >
+                                                    {knowledgeYoutubeLoading ? 'Loading...' : 'Import'}
+                                                </button>
+                                            </div>
+                                            <div style={{fontSize: '11px', color: 'var(--text-light)', marginTop: '8px'}}>
+                                                Uses the video's captions/transcript to extract names and terms
+                                            </div>
+                                        </div>
+
+                                        {/* Paste Text */}
+                                        <div style={{background: 'white', borderRadius: '12px', padding: '16px', border: '1px solid var(--border-light)'}}>
+                                            <div style={{display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px'}}>
+                                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--sage-primary)" strokeWidth="2">
+                                                    <rect x="9" y="9" width="13" height="13" rx="2"/>
+                                                    <path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/>
+                                                </svg>
+                                                <span style={{fontWeight: '600'}}>Paste Text</span>
+                                            </div>
+                                            <textarea
+                                                className="setting-input"
+                                                rows="3"
+                                                placeholder="Paste meeting agenda, roster, or any document with names..."
+                                                value={knowledgeUploadText}
+                                                onChange={(e) => setKnowledgeUploadText(e.target.value)}
+                                                style={{fontSize: '13px', marginBottom: '8px'}}
+                                            />
+                                            <button
+                                                onClick={uploadKnowledgeText}
+                                                disabled={knowledgeUploading || !knowledgeUploadText.trim()}
+                                                className="btn-large btn-outline"
+                                                style={{width: '100%'}}
+                                            >
+                                                Extract Names from Text
+                                            </button>
+                                        </div>
+
+                                    </div>
+
+                                    {/* Right Column - Results */}
+                                    <div style={{display: 'flex', flexDirection: 'column', gap: '16px'}}>
+
+                                        {/* Imported Sources */}
+                                        <div style={{background: 'white', borderRadius: '12px', padding: '16px', border: '1px solid var(--border-light)', flex: 1}}>
                                             <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px'}}>
-                                                <h3 style={{fontSize: '16px', fontWeight: '600'}}>Documents ({knowledgeStatus.documents?.length || 0})</h3>
-                                                <button className="btn-large btn-primary" onClick={syncKnowledgeToEngine} style={{padding: '8px 16px', fontSize: '13px'}}>
+                                                <h3 style={{margin: 0, fontSize: '16px', fontWeight: '600', display: 'flex', alignItems: 'center', gap: '8px'}}>
+                                                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--sage-primary)" strokeWidth="2">
+                                                        <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/>
+                                                        <path d="M14 2v6h6M16 13H8M16 17H8M10 9H8"/>
+                                                    </svg>
+                                                    Imported Sources ({knowledgeStatus.documents?.length || 0})
+                                                </h3>
+                                                <button onClick={syncKnowledgeToEngine} className="btn-large btn-primary" style={{padding: '6px 12px', fontSize: '12px'}}>
                                                     Sync to Engine
                                                 </button>
                                             </div>
                                             {(!knowledgeStatus.documents || knowledgeStatus.documents.length === 0) ? (
-                                                <div style={{padding: '20px', textAlign: 'center', color: 'var(--text-light)', fontSize: '14px'}}>
-                                                    No documents uploaded yet
+                                                <div style={{padding: '30px', textAlign: 'center', color: 'var(--text-light)', fontSize: '14px'}}>
+                                                    <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" style={{marginBottom: '12px', opacity: 0.5}}>
+                                                        <path d="M13 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V9z"/>
+                                                        <path d="M13 2v7h7"/>
+                                                    </svg>
+                                                    <div>No sources imported yet</div>
+                                                    <div style={{fontSize: '12px', marginTop: '4px'}}>Add a document, URL, or YouTube video to get started</div>
                                                 </div>
                                             ) : (
-                                                <div style={{display: 'flex', flexDirection: 'column', gap: '8px', maxHeight: '200px', overflowY: 'auto'}}>
+                                                <div style={{display: 'flex', flexDirection: 'column', gap: '8px', maxHeight: '180px', overflowY: 'auto'}}>
                                                     {knowledgeStatus.documents.map((doc, i) => (
                                                         <div key={i} style={{
                                                             display: 'flex',
@@ -4715,18 +5054,27 @@
                                                             alignItems: 'center',
                                                             padding: '10px 12px',
                                                             background: 'var(--bg-warm)',
-                                                            borderRadius: '6px',
+                                                            borderRadius: '8px',
                                                             fontSize: '13px'
                                                         }}>
-                                                            <span style={{flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap'}}>
-                                                                {doc.filename || doc.doc_id}
-                                                            </span>
-                                                            <span style={{color: 'var(--text-light)', marginLeft: '12px'}}>
-                                                                {doc.entity_count || 0} entities
+                                                            <div style={{display: 'flex', alignItems: 'center', gap: '8px', flex: 1, overflow: 'hidden'}}>
+                                                                {(doc.filename || '').includes('youtube') ? (
+                                                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="#FF0000"><rect x="2" y="4" width="20" height="16" rx="4"/><polygon points="10 8 16 12 10 16" fill="white"/></svg>
+                                                                ) : (doc.filename || '').includes('.pdf') ? (
+                                                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#E53935" strokeWidth="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><path d="M14 2v6h6"/></svg>
+                                                                ) : (
+                                                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--text-medium)" strokeWidth="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><path d="M14 2v6h6"/></svg>
+                                                                )}
+                                                                <span style={{overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap'}}>
+                                                                    {doc.filename || doc.doc_id}
+                                                                </span>
+                                                            </div>
+                                                            <span style={{color: 'var(--sage-primary)', fontWeight: '500', marginLeft: '12px', whiteSpace: 'nowrap'}}>
+                                                                {doc.entity_count || 0} names
                                                             </span>
                                                             <button
                                                                 onClick={() => removeKnowledgeDocument(doc.doc_id)}
-                                                                style={{marginLeft: '12px', padding: '4px 8px', fontSize: '11px', background: 'transparent', border: '1px solid var(--border-light)', borderRadius: '4px', cursor: 'pointer'}}
+                                                                style={{marginLeft: '8px', padding: '4px 8px', fontSize: '11px', background: 'transparent', border: '1px solid var(--border-light)', borderRadius: '4px', cursor: 'pointer'}}
                                                             >
                                                                 Remove
                                                             </button>
@@ -4736,18 +5084,23 @@
                                             )}
                                         </div>
 
-                                        {/* Entities Preview */}
-                                        <div className="card" style={{background: 'white', gridColumn: 'span 2'}}>
-                                            <h3 style={{fontSize: '16px', fontWeight: '600', marginBottom: '12px'}}>
-                                                Extracted Entities ({knowledgeEntities.length})
+                                        {/* Extracted Entities */}
+                                        <div style={{background: 'white', borderRadius: '12px', padding: '16px', border: '1px solid var(--border-light)'}}>
+                                            <h3 style={{margin: '0 0 12px', fontSize: '16px', fontWeight: '600', display: 'flex', alignItems: 'center', gap: '8px'}}>
+                                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--sage-primary)" strokeWidth="2">
+                                                    <path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/>
+                                                    <circle cx="9" cy="7" r="4"/>
+                                                    <path d="M23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75"/>
+                                                </svg>
+                                                Extracted Names ({knowledgeEntities.length})
                                             </h3>
                                             {knowledgeEntities.length === 0 ? (
-                                                <div style={{padding: '20px', textAlign: 'center', color: 'var(--text-light)', fontSize: '14px'}}>
-                                                    No entities extracted yet. Upload a document to get started.
+                                                <div style={{padding: '20px', textAlign: 'center', color: 'var(--text-light)', fontSize: '13px'}}>
+                                                    Names extracted from your sources will appear here
                                                 </div>
                                             ) : (
-                                                <div style={{display: 'flex', flexWrap: 'wrap', gap: '8px', maxHeight: '150px', overflowY: 'auto'}}>
-                                                    {knowledgeEntities.slice(0, 50).map((entity, i) => (
+                                                <div style={{display: 'flex', flexWrap: 'wrap', gap: '6px', maxHeight: '120px', overflowY: 'auto'}}>
+                                                    {knowledgeEntities.slice(0, 40).map((entity, i) => (
                                                         <span key={i} style={{
                                                             padding: '4px 10px',
                                                             background: entity.category === 'person' ? '#E8F5E9' : entity.category === 'place' ? '#E3F2FD' : '#FFF3E0',
@@ -4759,18 +5112,35 @@
                                                             {entity.term || entity.name}
                                                         </span>
                                                     ))}
-                                                    {knowledgeEntities.length > 50 && (
+                                                    {knowledgeEntities.length > 40 && (
                                                         <span style={{padding: '4px 10px', color: 'var(--text-light)', fontSize: '12px'}}>
-                                                            +{knowledgeEntities.length - 50} more
+                                                            +{knowledgeEntities.length - 40} more
                                                         </span>
                                                     )}
                                                 </div>
                                             )}
                                         </div>
+
+                                        {/* Legend */}
+                                        <div style={{display: 'flex', gap: '16px', fontSize: '12px', color: 'var(--text-medium)'}}>
+                                            <div style={{display: 'flex', alignItems: 'center', gap: '6px'}}>
+                                                <span style={{width: '12px', height: '12px', borderRadius: '50%', background: '#E8F5E9', border: '1px solid #2E7D32'}}></span>
+                                                People
+                                            </div>
+                                            <div style={{display: 'flex', alignItems: 'center', gap: '6px'}}>
+                                                <span style={{width: '12px', height: '12px', borderRadius: '50%', background: '#E3F2FD', border: '1px solid #1565C0'}}></span>
+                                                Places
+                                            </div>
+                                            <div style={{display: 'flex', alignItems: 'center', gap: '6px'}}>
+                                                <span style={{width: '12px', height: '12px', borderRadius: '50%', background: '#FFF3E0', border: '1px solid #E65100'}}></span>
+                                                Organizations
+                                            </div>
+                                        </div>
+
                                     </div>
                                 </div>
-                            )}
-                        </div>
+                            </div>
+                        )}
 
                         {/* Video Intelligence Panel - Full Width */}
                         <div className="card" style={{gridColumn: '1 / -1', border: '1px solid var(--border-sage)'}}>
