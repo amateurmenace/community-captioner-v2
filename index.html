@@ -54,16 +54,23 @@
         .landing-page {
             min-height: 100vh;
             padding: 0;
-            background: linear-gradient(135deg, #F5F3EE 0%, #E8EDE7 50%, #F5F3EE 100%);
+            background: linear-gradient(135deg,
+                #E8F5E9 0%,
+                #C8E6C9 25%,
+                #A5D6A7 50%,
+                #C8E6C9 75%,
+                #E8F5E9 100%);
             background-size: 400% 400%;
-            animation: gradientShift 15s ease infinite;
+            animation: gradientShift 8s ease-in-out infinite;
             position: relative;
+            overflow-x: hidden;
         }
 
         @keyframes gradientShift {
-            0% { background-position: 0% 50%; }
-            50% { background-position: 100% 50%; }
-            100% { background-position: 0% 50%; }
+            0%, 100% { background-position: 0% 50%; }
+            25% { background-position: 100% 50%; }
+            50% { background-position: 100% 100%; }
+            75% { background-position: 0% 100%; }
         }
 
         .landing-header {
@@ -121,86 +128,138 @@
 
         /* Demo Section */
         .demo-section {
-            max-width: 1200px;
+            max-width: 1000px;
             margin: 0 auto 80px;
             padding: 0 32px;
         }
 
         .demo-card {
-            background: var(--bg-white);
-            border: 2px solid var(--border-light);
-            border-radius: var(--radius-xl);
-            padding: 48px;
-            box-shadow: 0 10px 40px rgba(61, 90, 71, 0.08);
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            border: 3px solid var(--sage-primary);
+            border-radius: 24px;
+            padding: 40px;
+            box-shadow: 0 20px 60px rgba(61, 90, 71, 0.15);
+        }
+
+        .demo-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 28px;
         }
 
         .demo-title {
-            font-size: 24px;
-            font-weight: 700;
-            margin-bottom: 24px;
+            font-size: 28px;
+            font-weight: 800;
+            color: var(--sage-darker);
+            margin: 0;
+        }
+
+        .demo-indicator {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 10px 18px;
+            background: #f5f5f5;
+            border-radius: 20px;
+        }
+
+        .indicator-dot {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            background: #9E9E9E;
+            transition: all 0.3s;
+        }
+
+        .indicator-dot.active {
+            background: #00A676;
+            animation: pulse 1s ease-in-out infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { transform: scale(1); opacity: 1; }
+            50% { transform: scale(1.2); opacity: 0.7; }
+        }
+
+        .indicator-text {
+            font-size: 14px;
+            font-weight: 600;
             color: var(--text-dark);
-            text-align: center;
+            min-width: 100px;
         }
 
         .demo-box {
-            background: #1a1a1a;
-            border-radius: var(--radius-lg);
-            padding: 32px;
-            margin-bottom: 24px;
-            min-height: 120px;
+            background: linear-gradient(135deg, #1a1a1a 0%, #2d2d2d 100%);
+            border-radius: 16px;
+            padding: 48px 40px;
+            margin-bottom: 20px;
+            min-height: 140px;
             display: flex;
             align-items: center;
             justify-content: center;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .demo-box::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: linear-gradient(45deg, transparent 30%, rgba(255,255,255,0.03) 50%, transparent 70%);
+            animation: shimmer 3s infinite;
+        }
+
+        @keyframes shimmer {
+            0% { transform: translateX(-100%); }
+            100% { transform: translateX(100%); }
         }
 
         .demo-text {
-            font-size: 28px;
+            font-size: 32px;
             font-weight: 600;
             color: white;
             text-align: center;
-            line-height: 1.5;
+            line-height: 1.6;
+            transition: all 0.5s ease;
+            position: relative;
+            z-index: 1;
         }
 
-        .demo-word {
-            display: inline-block;
-            transition: all 0.6s ease;
+        .demo-text.phase-correcting {
+            color: #FF6B6B;
+            transform: scale(1.02);
+            text-shadow: 0 0 20px rgba(255, 107, 107, 0.4);
         }
 
-        .demo-word.correcting {
-            color: #DC2626;
-            transform: scale(1.1);
+        .demo-text.phase-corrected,
+        .demo-text.phase-waiting {
+            color: #51CF66;
+            text-shadow: 0 0 20px rgba(81, 207, 102, 0.4);
         }
 
-        .demo-word.corrected {
-            color: #00A676;
-            transform: scale(1);
-        }
-
-        .demo-controls {
+        .demo-progress {
             display: flex;
-            gap: 16px;
+            gap: 12px;
             justify-content: center;
         }
 
-        .demo-btn {
-            padding: 12px 24px;
-            background: var(--sage-darker);
-            color: white;
-            border: none;
-            border-radius: var(--radius-md);
-            font-size: 15px;
-            font-weight: 600;
-            cursor: pointer;
-            transition: all 0.2s;
+        .progress-dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background: #D1D5DB;
+            transition: all 0.3s;
         }
 
-        .demo-btn:hover {
+        .progress-dot.active {
+            width: 32px;
+            border-radius: 5px;
             background: var(--sage-primary);
-            transform: translateY(-2px);
-        }
-
-        .demo-btn.secondary {
-            background: transparent;
             border: 2px solid var(--border-light);
             color: var(--text-medium);
         }
@@ -214,24 +273,34 @@
         .hero-section {
             max-width: 1200px;
             margin: 0 auto;
-            padding: 80px 32px 60px;
+            padding: 100px 32px 80px;
             text-align: center;
         }
 
         .hero-title {
-            font-size: 68px;
-            font-weight: 800;
-            color: var(--text-dark);
+            font-size: 72px;
+            font-weight: 900;
+            background: linear-gradient(135deg, #2E7D32 0%, #388E3C 50%, #43A047 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
             line-height: 1.1;
-            margin-bottom: 24px;
-            letter-spacing: -1.5px;
+            margin-bottom: 28px;
+            letter-spacing: -2px;
+            animation: titleFloat 3s ease-in-out infinite;
+        }
+
+        @keyframes titleFloat {
+            0%, 100% { transform: translateY(0px); }
+            50% { transform: translateY(-5px); }
         }
 
         .hero-subtitle {
-            font-size: 24px;
-            color: var(--text-medium);
-            margin-bottom: 16px;
-            font-weight: 500;
+            font-size: 26px;
+            color: var(--text-dark);
+            margin-bottom: 20px;
+            font-weight: 600;
+            line-height: 1.4;
         }
 
         .hero-subtitle strong {
@@ -240,50 +309,74 @@
         }
 
         .hero-description {
-            font-size: 18px;
+            font-size: 19px;
             color: var(--text-medium);
-            max-width: 800px;
-            margin: 0 auto 40px;
-            line-height: 1.7;
+            max-width: 750px;
+            margin: 0 auto 48px;
+            line-height: 1.8;
+            font-weight: 400;
         }
 
         .cta-buttons {
             display: flex;
-            gap: 16px;
+            gap: 20px;
             justify-content: center;
             margin-bottom: 80px;
         }
 
         .cta-btn {
-            padding: 18px 36px;
+            padding: 20px 42px;
             font-size: 18px;
             font-weight: 700;
-            border-radius: var(--radius-md);
+            border-radius: 14px;
             border: none;
             cursor: pointer;
-            transition: all 0.2s;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
             font-family: inherit;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .cta-btn::before {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            width: 0;
+            height: 0;
+            border-radius: 50%;
+            background: rgba(255, 255, 255, 0.3);
+            transform: translate(-50%, -50%);
+            transition: width 0.6s, height 0.6s;
+        }
+
+        .cta-btn:hover::before {
+            width: 300px;
+            height: 300px;
         }
 
         .cta-btn-primary {
-            background: var(--sage-darker);
+            background: linear-gradient(135deg, #2E7D32 0%, #43A047 100%);
             color: white;
+            box-shadow: 0 4px 15px rgba(46, 125, 50, 0.3);
         }
 
         .cta-btn-primary:hover {
-            background: var(--sage-primary);
-            transform: translateY(-2px);
-            box-shadow: 0 8px 20px rgba(61, 90, 71, 0.3);
+            transform: translateY(-3px);
+            box-shadow: 0 12px 30px rgba(46, 125, 50, 0.4);
         }
 
         .cta-btn-secondary {
-            background: transparent;
+            background: rgba(255, 255, 255, 0.9);
             color: var(--sage-darker);
-            border: 2px solid var(--sage-darker);
+            border: 3px solid var(--sage-primary);
+            box-shadow: 0 4px 15px rgba(61, 90, 71, 0.1);
         }
 
         .cta-btn-secondary:hover {
-            background: var(--bg-sage-light);
+            background: white;
+            transform: translateY(-3px);
+            box-shadow: 0 12px 30px rgba(61, 90, 71, 0.2);
         }
 
         .feature-cards {
@@ -1136,82 +1229,78 @@
 
         function CaptionDemo() {
             const [demoIndex, setDemoIndex] = useState(0);
-            const [isAnimating, setIsAnimating] = useState(false);
+            const [phase, setPhase] = useState('showing'); // showing, correcting, corrected, waiting
 
             const demos = [
                 {
-                    original: ["Welcome", "to", "the", "Brooklyn", "Select", "Board", "meeting"],
-                    corrected: ["Welcome", "to", "the", "Brookline", "Select", "Board", "meeting"],
-                    corrections: [3] // Index of words to correct
+                    original: "Welcome to the Brooklyn Select Board meeting",
+                    corrected: "Welcome to the Brookline Select Board meeting",
+                    highlight: "Brookline"
                 },
                 {
-                    original: ["Chair", "bernard", "green", "will", "lead", "the", "discussion"],
-                    corrected: ["Chair", "Bernard", "Greene", "will", "lead", "the", "discussion"],
-                    corrections: [1, 2]
+                    original: "Chair bernard green will lead the discussion",
+                    corrected: "Chair Bernard Greene will lead the discussion",
+                    highlight: "Bernard Greene"
                 },
                 {
-                    original: ["Meeting", "at", "coolidge", "corner", "town", "hall"],
-                    corrected: ["Meeting", "at", "Coolidge", "Corner", "Town", "Hall"],
-                    corrections: [2, 3, 4, 5]
+                    original: "Meeting at coolidge corner town hall",
+                    corrected: "Meeting at Coolidge Corner Town Hall",
+                    highlight: "Coolidge Corner Town Hall"
                 }
             ];
 
             const currentDemo = demos[demoIndex];
-            const [displayWords, setDisplayWords] = useState(currentDemo.original);
 
+            // Auto-loop animation
             useEffect(() => {
-                if (isAnimating) {
-                    const timer = setTimeout(() => {
-                        setDisplayWords(currentDemo.corrected);
-                        setTimeout(() => {
-                            setIsAnimating(false);
-                        }, 1000);
-                    }, 800);
-                    return () => clearTimeout(timer);
-                }
-            }, [isAnimating, currentDemo]);
+                const timers = [];
 
-            const playDemo = () => {
-                setIsAnimating(true);
-                setDisplayWords(currentDemo.original);
-            };
+                // Phase 1: Show original (2s)
+                timers.push(setTimeout(() => setPhase('correcting'), 2000));
 
-            const nextDemo = () => {
-                setDemoIndex((demoIndex + 1) % demos.length);
-                setDisplayWords(demos[(demoIndex + 1) % demos.length].original);
-                setIsAnimating(false);
-            };
+                // Phase 2: Correcting animation (800ms)
+                timers.push(setTimeout(() => setPhase('corrected'), 2800));
+
+                // Phase 3: Show corrected (2s)
+                timers.push(setTimeout(() => setPhase('waiting'), 4800));
+
+                // Phase 4: Next demo (500ms fade)
+                timers.push(setTimeout(() => {
+                    setDemoIndex((prev) => (prev + 1) % demos.length);
+                    setPhase('showing');
+                }, 5300));
+
+                return () => timers.forEach(t => clearTimeout(t));
+            }, [demoIndex]);
+
+            const displayText = phase === 'showing' || phase === 'correcting' ? currentDemo.original : currentDemo.corrected;
 
             return (
                 <div className="demo-section">
                     <div className="demo-card">
-                        <h2 className="demo-title">See the AI Correction Engine in Action</h2>
-                        <div className="demo-box">
-                            <div className="demo-text">
-                                {displayWords.map((word, idx) => {
-                                    const isCorrecting = isAnimating && currentDemo.corrections.includes(idx);
-                                    const isCorrected = !isAnimating &&
-                                                       currentDemo.corrections.includes(idx) &&
-                                                       displayWords === currentDemo.corrected;
-
-                                    return (
-                                        <span
-                                            key={idx}
-                                            className={`demo-word ${isCorrecting ? 'correcting' : ''} ${isCorrected ? 'corrected' : ''}`}
-                                        >
-                                            {word}{' '}
-                                        </span>
-                                    );
-                                })}
+                        <div className="demo-header">
+                            <h2 className="demo-title">AI Correction Engine</h2>
+                            <div className="demo-indicator">
+                                <div className={`indicator-dot ${phase === 'correcting' ? 'active' : ''}`}></div>
+                                <span className="indicator-text">
+                                    {phase === 'showing' && 'Listening...'}
+                                    {phase === 'correcting' && 'Correcting...'}
+                                    {(phase === 'corrected' || phase === 'waiting') && 'Corrected ✓'}
+                                </span>
                             </div>
                         </div>
-                        <div className="demo-controls">
-                            <button className="demo-btn" onClick={playDemo} disabled={isAnimating}>
-                                {isAnimating ? 'Correcting...' : 'Watch Correction'}
-                            </button>
-                            <button className="demo-btn secondary" onClick={nextDemo}>
-                                Next Example
-                            </button>
+                        <div className="demo-box">
+                            <div className={`demo-text phase-${phase}`}>
+                                {displayText}
+                            </div>
+                        </div>
+                        <div className="demo-progress">
+                            {demos.map((_, idx) => (
+                                <div
+                                    key={idx}
+                                    className={`progress-dot ${idx === demoIndex ? 'active' : ''}`}
+                                />
+                            ))}
                         </div>
                     </div>
                 </div>
@@ -1256,13 +1345,10 @@
                     <section className="hero-section">
                         <h1 className="hero-title">AI for Accessibility</h1>
                         <p className="hero-subtitle">
-                            Making civic information <strong>accessible</strong>, <strong>searchable</strong>, and <strong>understandable</strong> for everyone.
+                            Professional live captioning for community media. Zero cost. Powered by AI + Human intelligence.
                         </p>
                         <p className="hero-description">
-                            Professional-grade live captioning for community media organizations.
-                            No subscription fees, using tech you already have. First ever free corrections engine that lets you make sure captions are correct and locally-accurate.
-                            No more having to manually build custom dictionaries - just upload documents or share websites relevant to your local context and AI will craft an engine to correct things like proper names, places, and organizations.
-                            An accessibility platform powered by AI + Humans working together.
+                            Free, open-source captioning that actually gets local names right. Automatically corrects "Brooklyn" to "Brookline" and "bernard green" to "Bernard Greene" using AI trained on your community's documents.
                         </p>
 
                         <div className="cta-buttons">
