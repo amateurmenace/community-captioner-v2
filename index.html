@@ -2426,7 +2426,7 @@
                             method: 'POST',
                             headers: { 'Content-Type': 'application/json' },
                             body: JSON.stringify({
-                                text: textToSend,
+                                caption: textToSend,
                                 settings: {
                                     fontSize,
                                     lineHeight,
@@ -3049,7 +3049,7 @@
                 fetch(`/api/engine/test?text=${encodeURIComponent(testText)}`)
                     .then(r => r.json())
                     .then(data => {
-                        setTestResult(data.corrected_text || testText);
+                        setTestResult(data.corrected || testText);
                     });
             };
 
@@ -3279,7 +3279,7 @@
                 fetch(`/api/engine/test?text=${encodeURIComponent(testText)}`)
                     .then(r => r.json())
                     .then(data => {
-                        setTestResult(data.corrected_text || testText);
+                        setTestResult(data.corrected || testText);
                     });
             };
 
