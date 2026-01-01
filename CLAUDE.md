@@ -258,26 +258,105 @@ community-captioner/
 
 ## Planned Features (Priority Order)
 
-### High Priority
-1. ~~**Engine Wizard Redesign**~~ - ✅ COMPLETED (v3.1)
-2. ~~**Engine Upload**~~ - ✅ COMPLETED (v3.1)
-3. ~~**Multilanguage Translation**~~ - ✅ COMPLETED (v3.1 - UI only, caption translation pending)
-4. ~~**Typing Animations**~~ - ✅ COMPLETED (v3.1)
-5. **Audio Recording** - Record session audio for Whisper reprocessing
-6. **Accuracy Pass** - Re-run Whisper on recorded audio for cleaner export
-7. **Caption Translation** - Translate captions in real-time using AI
+### High Priority - Core Functionality Fixes
+1. **Fix Browser Speech Recognition** - Debug why mic recognition not generating captions
+2. **Fix Whisper Mode** - Debug why Whisper not working
+3. **Fix Caption Engine** - Brooklyn should become Brookline in test function
+4. **Audio Recording** - Record session audio for Whisper reprocessing
+5. **Accuracy Pass** - Re-run Whisper on recorded audio for cleaner export
+
+### High Priority - Major AI Enhancements (v4.0)
+
+#### 1. Advanced RAG Caption Engine
+- **True RAG Implementation** with vector embeddings for term matching
+- **Context-aware corrections** using semantic similarity
+- **Multi-term phrase corrections** (e.g., "Select Board Chair" as single entity)
+- **Confidence scoring** for correction suggestions
+- **Learning mode** that suggests new terms based on context
+
+#### 2. AI-Enhanced Real-Time Captions
+- **GPT-4 post-processing** of ASR output for grammar, punctuation, capitalization
+- **Real-time translation** to multiple languages
+- **Sentiment analysis** and topic detection
+- **Named entity recognition** to auto-populate caption engine
+- **Speaker attribution** using diarization + AI inference
+
+#### 3. Post-Session Analytics Dashboard
+Comprehensive data visualization and analysis page:
+
+**Transcript Analytics:**
+- Word cloud of most frequent terms
+- Sentiment timeline (positive/negative/neutral over time)
+- Topic modeling and segmentation
+- Speaker participation charts
+- Pace/speed analysis (words per minute over time)
+
+**Interactive Search:**
+- Full-text search with highlighting
+- Jump to timestamp in transcript
+- Filter by speaker
+- Filter by topic/sentiment
+- Export search results
+
+**Quality Metrics:**
+- Correction frequency heatmap
+- Confidence score distribution
+- ASR accuracy estimation
+- Engine effectiveness metrics
+
+#### 4. AI-Powered Whisper Enhancement
+- **Post-session reprocessing** using Whisper on recorded audio
+- **Side-by-side comparison** of real-time vs. reprocessed
+- **Automatic merge** of best results from both
+- **Batch processing** for multiple sessions
+- **Quality improvement metrics**
+
+#### 5. Video Intelligence Integration
+
+**Video Upload & Sync:**
+- Upload video file or paste YouTube URL
+- Auto-sync transcript timestamps with video
+- Frame-accurate seeking via transcript search
+- Visual preview of search results
+
+**AI Video Highlights:**
+- GPT-4 analyzes full transcript
+- Identifies 5-10 key moments with justification
+- Extracts exact quotes and timestamps
+- Creates highlight clips using ffmpeg
+- Auto-generates title cards
+- Compiles into downloadable highlight reel (MP4)
+
+**Advanced Video Features:**
+- Chapter generation from topic segmentation
+- Automatic B-roll suggestions
+- Visual sentiment matching
+- Quote overlays for social media clips
+- Multi-clip compilation editor
+
+#### 6. Smart Caption Translation
+- **Real-time translation** during live captioning
+- **Post-session batch translation** of entire transcript
+- **Multiple simultaneous languages**
+- **Context-aware translation** using full transcript
+- **Cultural adaptation** not just literal translation
 
 ### Medium Priority
-1. **Speaker Diarization** - Identify different speakers
+1. **Speaker Diarization** - Identify different speakers with AI
 2. **Custom Vocabulary** - Feed Whisper domain-specific words
 3. **Live Corrections UI** - Edit corrections in real-time
-4. **Searchable History** - Search past sessions
+4. **Searchable History** - Search across all past sessions
 5. **Remote Control** - Control from phone/tablet
+6. **Collaborative Editing** - Multiple users edit transcript simultaneously
+7. **API Access** - RESTful API for integration with other tools
 
 ### Lower Priority
 1. **Auto-punctuation** - Better sentence detection
-2. **Confidence Scores** - Show ASR confidence
+2. **Confidence Scores** - Show ASR confidence in UI
 3. **Dark Mode** - Optional dark theme for operators
+4. **Mobile App** - Native iOS/Android apps
+5. **Cloud Sync** - Optional cloud backup/sync
+6. **Monetization** - Optional paid tiers for cloud AI features
 
 ## Development Notes
 
