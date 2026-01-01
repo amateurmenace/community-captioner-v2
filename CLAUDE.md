@@ -160,12 +160,18 @@ community-captioner/
 
 ### Completed Features - January 2026 Update
 
-#### Landing Page
-- [x] **New animated gradient background** - Subtle shifting sage green gradient for visual depth
+#### Landing Page (Major Redesign - January 2026)
+- [x] **Animated blob background** - 5 circular sage/purple globs floating with smooth animations
+- [x] **Warm beige color scheme** - Professional #F5F3EE background replacing pure white
+- [x] **Repositioned demo** - AI Correction Engine demo directly under "AI for Accessibility" headline
+- [x] **Emoji-free design** - Clean, professional interface without decorative emojis
+- [x] **Legal requirements section** - FCC CVAA and state captioning law information
+- [x] **Modern About section** - Gradient cards with left borders, uppercase headings
+- [x] **Numbered How-To section** - Circular step badges with background gradient
+- [x] **Interactive FAQ section** - Q badges, hover animations, accordion-style
+- [x] **Professional footer** - Partner logos (BIG, CC), links to community partners
 - [x] **Live interactive demo** - Shows Caption Engine corrections in real-time with animation
-- [x] **Updated messaging** - "AI for Accessibility" focus, emphasizes AI + Human collaboration
 - [x] **Three demo examples** - Brooklyn→Brookline, bernard green→Bernard Greene, coolidge corner corrections
-- [x] **Responsive design** - Mobile-friendly landing experience
 
 #### Control Dashboard
 - [x] **Dual captioning modes** (Web Speech / Whisper) - Fully functional
@@ -222,18 +228,29 @@ community-captioner/
 - Cloud server not tested recently
 
 ### Technical Improvements
-- index.html: 1,014 → 2,406 lines (comprehensive redesign)
+- index.html: 1,014 → 3,717 lines (major redesign + enhancements)
 - All styling controls functional with live updates
 - Improved correction algorithm with overlap detection
 - Better state management with React hooks throughout
+- Unique visual identities for About/FAQ/How-To sections
+- Professional, AI-designed look removed in favor of bold, clean design
+
+### Design Philosophy - January 2026
+- **No emojis** - Professional interface for government and media organizations
+- **Bold typography** - Clear hierarchy with strong heading styles
+- **Distinct sections** - Each major section has unique visual treatment
+- **Warm color palette** - Beige backgrounds with sage green accents
+- **Legal compliance** - Prominent messaging about captioning requirements
 
 ## Planned Features (Priority Order)
 
 ### High Priority
-1. **Audio Recording** - Record session audio for Whisper reprocessing
-2. **Accuracy Pass** - Re-run Whisper on recorded audio for cleaner export
-3. **AI Summaries** - Use LLM to generate meeting summaries
-4. **Document Ingestion UI** - Upload agendas/documents to extract terms
+1. **Engine Wizard Redesign** - Convert from 7-step wizard to interactive dashboard
+2. **Engine Upload** - Allow users to upload saved engines to dashboard sessions
+3. **Multilanguage Translation** - Live and post-session caption translation
+4. **Typing Animations** - Character-by-character text animations on page load
+5. **Audio Recording** - Record session audio for Whisper reprocessing
+6. **Accuracy Pass** - Re-run Whisper on recorded audio for cleaner export
 
 ### Medium Priority
 5. **Speaker Diarization** - Identify different speakers
