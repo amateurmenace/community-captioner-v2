@@ -397,9 +397,17 @@ community-captioner/
 ### v4.0 Frontend Updates - Continued (January 2026)
 
 #### Header & Branding Update
-- [x] **New Site Tagline** - "Free, Context-Understanding Captions for Broadcast and Streaming" (multiline, no badge bubble)
-- [x] **Larger Title** - Hero title increased to 96px, subtitle to 32px
+- [x] **New Site Tagline** - "A Free, Open Source Contextual Captioning System" (smaller text, multiline)
+- [x] **Larger Title** - "Community Captioner" title increased to 38px, tagline reduced to 10px
 - [x] **Weird Machine Logo** - SVG inline logo in footer (replaced broken PNG reference)
+
+#### Control Dashboard Layout Improvements
+- [x] **Captioning Card at Top** - Moved captioning controls above live preview
+- [x] **Merged Recording Button** - Recording button now part of captioning card with red dot indicator
+- [x] **Removed Session Recording Card** - Eliminated separate sidebar card for recording
+- [x] **Session Name Input** - Inline session name field shown when not recording
+- [x] **Whisper Device Selector** - Inline device dropdown when Whisper mode active
+- [x] **Visual Recording State** - Card border turns red during recording
 
 #### How To Section Redesign
 - [x] **Card-Based Layout** - 4 interactive cards in a grid replacing old numbered list
