@@ -1502,7 +1502,7 @@
             }
 
             if (view === 'dashboard') {
-                return <Dashboard onBack={() => setView('landing')} />;
+                return <Dashboard onBack={() => setView('landing')} onConfigureEngine={startEngineWizard} />;
             }
 
             if (view === 'engine-wizard') {
@@ -1620,24 +1620,21 @@
                                 <span className="badge-tag">Open Source Captioning for Community Media</span>
                             </div>
                         </div>
-                        <div style={{display: 'flex', gap: '12px', alignItems: 'center'}}>
-                            <button
-                                onClick={onShowAISettings}
-                                style={{
-                                    padding: '8px 16px',
-                                    background: 'var(--sage-primary)',
-                                    color: 'white',
-                                    border: 'none',
-                                    borderRadius: '8px',
-                                    cursor: 'pointer',
-                                    fontSize: '14px',
-                                    fontWeight: '500'
-                                }}
-                            >
-                                AI Settings
-                            </button>
-                            <img src="/big-logo.png" alt="BIG" className="big-logo" style={{height: '60px'}} />
-                        </div>
+                        <button
+                            onClick={onShowAISettings}
+                            style={{
+                                padding: '8px 16px',
+                                background: 'var(--sage-primary)',
+                                color: 'white',
+                                border: 'none',
+                                borderRadius: '8px',
+                                cursor: 'pointer',
+                                fontSize: '14px',
+                                fontWeight: '500'
+                            }}
+                        >
+                            AI Settings
+                        </button>
                     </header>
 
                     <section className="hero-section">
@@ -1878,7 +1875,7 @@
             );
         }
 
-        function Dashboard({ onBack }) {
+        function Dashboard({ onBack, onConfigureEngine }) {
             const [mode, setMode] = useState('browser');
             const [caption, setCaption] = useState('');
             const [rawCaption, setRawCaption] = useState('');
@@ -2117,7 +2114,10 @@
             return (
                 <div className="dashboard active">
                     <div className="dashboard-header">
-                        <h1 className="dashboard-title">Control Dashboard</h1>
+                        <div style={{display: 'flex', alignItems: 'center', gap: '16px'}}>
+                            <h1 className="dashboard-title">Control Dashboard</h1>
+                            <img src="/big-logo.png" alt="BIG" style={{height: '50px', marginTop: '4px'}} />
+                        </div>
                         <button className="back-btn" onClick={onBack}>← Back to Home</button>
                     </div>
 
@@ -2268,7 +2268,7 @@
                                     </div>
                                 )}
 
-                                <button className="btn-large btn-outline" style={{marginTop: '16px'}}>
+                                <button className="btn-large btn-outline" style={{marginTop: '16px'}} onClick={onConfigureEngine}>
                                     Configure Engine
                                 </button>
                             </div>
