@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="400" height="120" viewBox="0 0 400 120" xmlns="http://www.w3.org/2000/svg">
+  <!-- Define colors -->
+  <defs>
+    <style>
+      .text-dark { fill: #2D3A2E; }
+      .sage-darker { fill: #3D5A47; }
+      .sage-primary { fill: #7D9B76; }
+      .sage-muted { fill: #A8BAA3; }
+    </style>
+  </defs>
+
+  <!-- Three colored bars (logo icon) -->
+  <g id="logo-bars">
+    <!-- Bar 1 - Full width, darkest -->
+    <rect x="10" y="25" width="50" height="5" rx="2.5" class="sage-darker"/>
+    <!-- Bar 2 - 75% width, medium -->
+    <rect x="10" y="35" width="37.5" height="5" rx="2.5" class="sage-primary"/>
+    <!-- Bar 3 - 50% width, lightest -->
+    <rect x="10" y="45" width="25" height="5" rx="2.5" class="sage-muted"/>
+  </g>
+
+  <!-- Text: COMMUNITY -->
+  <text x="75" y="45" class="text-dark" font-family="DM Sans, Inter, -apple-system, sans-serif" font-size="36" font-weight="800" letter-spacing="0.5">COMMUNITY</text>
+
+  <!-- Text: CAPTIONER -->
+  <text x="75" y="80" class="text-dark" font-family="DM Sans, Inter, -apple-system, sans-serif" font-size="36" font-weight="800" letter-spacing="0.5">CAPTIONER</text>
+
+  <!-- CC icon box -->
+  <g id="cc-icon">
+    <rect x="316" y="57" width="42" height="28" rx="3" fill="none" stroke="#3D5A47" stroke-width="1.5"/>
+    <text x="326" y="76" class="sage-darker" font-family="Inter, -apple-system, sans-serif" font-size="17" font-weight="900" letter-spacing="0.5">CC</text>
+  </g>
+
+  <!-- Tagline -->
+  <text x="75" y="100" fill="#5A6B5E" font-family="DM Sans, Inter, -apple-system, sans-serif" font-size="14" font-weight="500" letter-spacing="0.2">Free, Open Source Captions + More</text>
+</svg>
