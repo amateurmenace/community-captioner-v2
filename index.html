@@ -2601,28 +2601,365 @@
             );
         }
 
+        // Session Analysis Page Component - Post-session data analysis
+        function SessionAnalysisPage({ data, onBack, t }) {
+            const [activeTab, setActiveTab] = useState('overview');
+            const [editingCorrection, setEditingCorrection] = useState(null);
+
+            const tabs = [
+                { id: 'overview', label: 'Overview' },
+                { id: 'transcript', label: 'Transcript' },
+                { id: 'corrections', label: 'Corrections' },
+                { id: 'analytics', label: 'Analytics' },
+                { id: 'export', label: 'Export' }
+            ];
+
+            const formatTime = (seconds) => {
+                const h = Math.floor(seconds / 3600);
+                const m = Math.floor((seconds % 3600) / 60);
+                const s = Math.floor(seconds % 60);
+                if (h > 0) return `${h}h ${m}m ${s}s`;
+                return `${m}m ${s}s`;
+            };
+
+            return (
+                <div className="dashboard active">
+                    <div className="dashboard-header">
+                        <div style={{display: 'flex', alignItems: 'center', gap: '16px'}}>
+                            <div className="logo-section">
+                                <div className="logo-icon">
+                                    <div className="logo-bar logo-bar-1"></div>
+                                    <div className="logo-bar logo-bar-2"></div>
+                                    <div className="logo-bar logo-bar-3"></div>
+                                </div>
+                                <div className="logo-text" style={{fontSize: '22px'}}>Community Captioner</div>
+                            </div>
+                            <span style={{color: 'var(--text-medium)', fontSize: '14px'}}>Session Analysis</span>
+                        </div>
+                        <button className="back-btn" onClick={onBack}>← Back to Dashboard</button>
+                    </div>
+
+                    {/* Session Summary Header */}
+                    <div style={{background: 'linear-gradient(135deg, var(--sage-primary), var(--sage-darker))', color: 'white', padding: '32px', borderRadius: 'var(--radius-lg)', marginBottom: '24px'}}>
+                        <h1 style={{margin: '0 0 8px 0', fontSize: '28px'}}>{data.name || 'Untitled Session'}</h1>
+                        <p style={{margin: 0, opacity: 0.8}}>{new Date(data.start_time || Date.now()).toLocaleString()}</p>
+
+                        <div style={{display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '24px', marginTop: '24px'}}>
+                            <div style={{background: 'rgba(255,255,255,0.15)', padding: '20px', borderRadius: '12px', textAlign: 'center'}}>
+                                <div style={{fontSize: '36px', fontWeight: '700'}}>{data.wordCount || 0}</div>
+                                <div style={{fontSize: '14px', opacity: 0.8}}>Words</div>
+                            </div>
+                            <div style={{background: 'rgba(255,255,255,0.15)', padding: '20px', borderRadius: '12px', textAlign: 'center'}}>
+                                <div style={{fontSize: '36px', fontWeight: '700'}}>{formatTime(data.duration || 0)}</div>
+                                <div style={{fontSize: '14px', opacity: 0.8}}>Duration</div>
+                            </div>
+                            <div style={{background: 'rgba(255,255,255,0.15)', padding: '20px', borderRadius: '12px', textAlign: 'center'}}>
+                                <div style={{fontSize: '36px', fontWeight: '700'}}>{data.corrections?.length || 0}</div>
+                                <div style={{fontSize: '14px', opacity: 0.8}}>AI Corrections</div>
+                            </div>
+                            <div style={{background: 'rgba(255,255,255,0.15)', padding: '20px', borderRadius: '12px', textAlign: 'center'}}>
+                                <div style={{fontSize: '36px', fontWeight: '700'}}>{data.captions?.length || 0}</div>
+                                <div style={{fontSize: '14px', opacity: 0.8}}>Segments</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Tab Navigation */}
+                    <div style={{display: 'flex', gap: '8px', marginBottom: '24px', borderBottom: '2px solid var(--border-light)', paddingBottom: '8px'}}>
+                        {tabs.map(tab => (
+                            <button
+                                key={tab.id}
+                                onClick={() => setActiveTab(tab.id)}
+                                style={{
+                                    padding: '12px 24px',
+                                    border: 'none',
+                                    background: activeTab === tab.id ? 'var(--sage-primary)' : 'transparent',
+                                    color: activeTab === tab.id ? 'white' : 'var(--text-medium)',
+                                    borderRadius: '8px 8px 0 0',
+                                    cursor: 'pointer',
+                                    fontWeight: '600',
+                                    fontSize: '14px',
+                                    transition: 'all 0.2s'
+                                }}
+                            >
+                                {tab.label}
+                            </button>
+                        ))}
+                    </div>
+
+                    {/* Tab Content */}
+                    {activeTab === 'overview' && (
+                        <div style={{display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '24px'}}>
+                            <div className="card">
+                                <h2 className="card-title">Session Highlights</h2>
+                                <p style={{color: 'var(--text-medium)', marginBottom: '16px'}}>
+                                    Key moments and topics identified in this session.
+                                </p>
+                                {data.highlights && data.highlights.length > 0 ? (
+                                    <div style={{display: 'flex', flexDirection: 'column', gap: '12px'}}>
+                                        {data.highlights.map((h, i) => (
+                                            <div key={i} style={{padding: '16px', background: 'var(--bg-sage-light)', borderRadius: '8px', borderLeft: '4px solid var(--sage-primary)'}}>
+                                                <div style={{fontWeight: '600', marginBottom: '4px'}}>{h.title || `Highlight ${i + 1}`}</div>
+                                                <div style={{fontSize: '14px', color: 'var(--text-medium)'}}>{h.description || h.text}</div>
+                                                {h.timestamp && <div style={{fontSize: '12px', color: 'var(--sage-primary)', marginTop: '8px'}}>{formatTime(h.timestamp)}</div>}
+                                            </div>
+                                        ))}
+                                    </div>
+                                ) : (
+                                    <div style={{padding: '40px', textAlign: 'center', color: 'var(--text-medium)'}}>
+                                        No highlights detected. Use longer sessions for better analysis.
+                                    </div>
+                                )}
+                            </div>
+
+                            <div>
+                                <div className="card" style={{marginBottom: '16px'}}>
+                                    <h2 className="card-title">Word Cloud</h2>
+                                    {data.wordCloud && data.wordCloud.length > 0 ? (
+                                        <div style={{display: 'flex', flexWrap: 'wrap', gap: '8px', justifyContent: 'center'}}>
+                                            {data.wordCloud.slice(0, 20).map((w, i) => (
+                                                <span key={i} style={{
+                                                    padding: '6px 12px',
+                                                    background: i < 3 ? 'var(--sage-primary)' : 'var(--bg-sage-light)',
+                                                    color: i < 3 ? 'white' : 'var(--text-dark)',
+                                                    borderRadius: '20px',
+                                                    fontSize: `${Math.max(12, 18 - i)}px`,
+                                                    fontWeight: i < 5 ? '600' : '400'
+                                                }}>
+                                                    {w.word || w}
+                                                </span>
+                                            ))}
+                                        </div>
+                                    ) : (
+                                        <div style={{padding: '20px', textAlign: 'center', color: 'var(--text-medium)'}}>
+                                            Word cloud requires more content.
+                                        </div>
+                                    )}
+                                </div>
+
+                                <div className="card">
+                                    <h2 className="card-title">Quality Score</h2>
+                                    <div style={{textAlign: 'center', padding: '20px'}}>
+                                        <div style={{
+                                            width: '100px',
+                                            height: '100px',
+                                            borderRadius: '50%',
+                                            background: `conic-gradient(var(--sage-primary) ${(data.qualityScore || 85) * 3.6}deg, var(--border-light) 0deg)`,
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            justifyContent: 'center',
+                                            margin: '0 auto'
+                                        }}>
+                                            <div style={{
+                                                width: '80px',
+                                                height: '80px',
+                                                borderRadius: '50%',
+                                                background: 'white',
+                                                display: 'flex',
+                                                alignItems: 'center',
+                                                justifyContent: 'center',
+                                                fontSize: '24px',
+                                                fontWeight: '700'
+                                            }}>
+                                                {data.qualityScore || 85}%
+                                            </div>
+                                        </div>
+                                        <p style={{marginTop: '12px', fontSize: '14px', color: 'var(--text-medium)'}}>
+                                            Based on correction rate and confidence scores
+                                        </p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    {activeTab === 'transcript' && (
+                        <div className="card">
+                            <h2 className="card-title">Full Transcript</h2>
+                            <div style={{maxHeight: '500px', overflowY: 'auto'}}>
+                                {data.captions && data.captions.length > 0 ? (
+                                    data.captions.map((c, i) => (
+                                        <div key={i} style={{padding: '12px', borderBottom: '1px solid var(--border-light)', display: 'flex', gap: '16px'}}>
+                                            <span style={{fontSize: '12px', color: 'var(--sage-primary)', minWidth: '60px'}}>
+                                                {c.timestamp ? new Date(c.timestamp).toLocaleTimeString() : `${i + 1}`}
+                                            </span>
+                                            <span>{c.corrected || c.text || c}</span>
+                                        </div>
+                                    ))
+                                ) : (
+                                    <div style={{padding: '40px', textAlign: 'center', color: 'var(--text-medium)'}}>
+                                        No transcript available.
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                    )}
+
+                    {activeTab === 'corrections' && (
+                        <div className="card">
+                            <h2 className="card-title">AI Corrections ({data.corrections?.length || 0})</h2>
+                            <p style={{color: 'var(--text-medium)', marginBottom: '16px'}}>
+                                Review and edit corrections. Changes will be reflected in exports.
+                            </p>
+                            <div style={{maxHeight: '500px', overflowY: 'auto'}}>
+                                {data.corrections && data.corrections.length > 0 ? (
+                                    data.corrections.map((c, i) => (
+                                        <div key={i} style={{padding: '16px', borderBottom: '1px solid var(--border-light)', display: 'flex', justifyContent: 'space-between', alignItems: 'center'}}>
+                                            <div>
+                                                <span style={{color: '#DC2626', textDecoration: 'line-through'}}>{c.from}</span>
+                                                <span style={{margin: '0 12px'}}>→</span>
+                                                <span style={{color: '#00A676', fontWeight: '600'}}>{c.to}</span>
+                                                <span style={{marginLeft: '16px', fontSize: '12px', color: 'var(--text-medium)', background: 'var(--bg-sage-light)', padding: '2px 8px', borderRadius: '4px'}}>
+                                                    {c.category || 'term'}
+                                                </span>
+                                            </div>
+                                            <div style={{display: 'flex', gap: '8px'}}>
+                                                <span style={{fontSize: '12px', color: 'var(--text-medium)'}}>
+                                                    {c.timestamp ? new Date(c.timestamp).toLocaleTimeString() : ''}
+                                                </span>
+                                            </div>
+                                        </div>
+                                    ))
+                                ) : (
+                                    <div style={{padding: '40px', textAlign: 'center', color: 'var(--text-medium)'}}>
+                                        No corrections were made in this session.
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                    )}
+
+                    {activeTab === 'analytics' && (
+                        <div style={{display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '24px'}}>
+                            <div className="card">
+                                <h2 className="card-title">Sentiment Timeline</h2>
+                                <div style={{height: '200px', display: 'flex', alignItems: 'flex-end', gap: '4px', padding: '20px'}}>
+                                    {data.sentimentTimeline && data.sentimentTimeline.length > 0 ? (
+                                        data.sentimentTimeline.map((s, i) => (
+                                            <div key={i} style={{
+                                                flex: 1,
+                                                height: `${Math.abs(s.score || 50)}%`,
+                                                background: (s.score || 0) > 0 ? 'var(--sage-primary)' : '#DC2626',
+                                                borderRadius: '4px 4px 0 0',
+                                                minWidth: '8px'
+                                            }} title={`${s.label || 'Segment'}: ${s.score || 0}`}></div>
+                                        ))
+                                    ) : (
+                                        <div style={{width: '100%', textAlign: 'center', color: 'var(--text-medium)'}}>
+                                            Sentiment analysis requires AI processing.
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+
+                            <div className="card">
+                                <h2 className="card-title">Topic Distribution</h2>
+                                {data.topics && data.topics.length > 0 ? (
+                                    <div style={{display: 'flex', flexDirection: 'column', gap: '12px'}}>
+                                        {data.topics.map((topic, i) => (
+                                            <div key={i}>
+                                                <div style={{display: 'flex', justifyContent: 'space-between', marginBottom: '4px'}}>
+                                                    <span>{topic.name || topic}</span>
+                                                    <span style={{color: 'var(--text-medium)'}}>{topic.percentage || Math.round(100 / (i + 2))}%</span>
+                                                </div>
+                                                <div style={{height: '8px', background: 'var(--border-light)', borderRadius: '4px', overflow: 'hidden'}}>
+                                                    <div style={{height: '100%', width: `${topic.percentage || Math.round(100 / (i + 2))}%`, background: 'var(--sage-primary)', borderRadius: '4px'}}></div>
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                ) : (
+                                    <div style={{padding: '40px', textAlign: 'center', color: 'var(--text-medium)'}}>
+                                        Topic analysis requires AI processing.
+                                    </div>
+                                )}
+                            </div>
+
+                            <div className="card" style={{gridColumn: 'span 2'}}>
+                                <h2 className="card-title">Pace Analysis</h2>
+                                <div style={{display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '24px', textAlign: 'center'}}>
+                                    <div>
+                                        <div style={{fontSize: '32px', fontWeight: '700', color: 'var(--sage-primary)'}}>
+                                            {data.wordCount && data.duration ? Math.round(data.wordCount / (data.duration / 60)) : '--'}
+                                        </div>
+                                        <div style={{color: 'var(--text-medium)'}}>Words per minute</div>
+                                    </div>
+                                    <div>
+                                        <div style={{fontSize: '32px', fontWeight: '700', color: 'var(--sage-primary)'}}>
+                                            {data.captions?.length || '--'}
+                                        </div>
+                                        <div style={{color: 'var(--text-medium)'}}>Caption segments</div>
+                                    </div>
+                                    <div>
+                                        <div style={{fontSize: '32px', fontWeight: '700', color: 'var(--sage-primary)'}}>
+                                            {data.corrections?.length && data.wordCount ? ((data.corrections.length / data.wordCount) * 100).toFixed(1) : '--'}%
+                                        </div>
+                                        <div style={{color: 'var(--text-medium)'}}>Correction rate</div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    {activeTab === 'export' && (
+                        <div className="card">
+                            <h2 className="card-title">Export Options</h2>
+                            <p style={{color: 'var(--text-medium)', marginBottom: '24px'}}>
+                                Download your session in various formats for use in video editors, archives, or accessibility compliance.
+                            </p>
+                            <div style={{display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '16px'}}>
+                                <a href="/api/session/export/srt" className="card" download style={{textDecoration: 'none', textAlign: 'center', padding: '24px', cursor: 'pointer', transition: 'all 0.2s'}}>
+                                    <div style={{fontSize: '32px', marginBottom: '8px'}}>📄</div>
+                                    <div style={{fontWeight: '700', color: 'var(--text-dark)'}}>SRT</div>
+                                    <div style={{fontSize: '12px', color: 'var(--text-medium)'}}>Subtitle format</div>
+                                </a>
+                                <a href="/api/session/export/vtt" className="card" download style={{textDecoration: 'none', textAlign: 'center', padding: '24px', cursor: 'pointer', transition: 'all 0.2s'}}>
+                                    <div style={{fontSize: '32px', marginBottom: '8px'}}>📺</div>
+                                    <div style={{fontWeight: '700', color: 'var(--text-dark)'}}>VTT</div>
+                                    <div style={{fontSize: '12px', color: 'var(--text-medium)'}}>Web video</div>
+                                </a>
+                                <a href="/api/session/export/txt" className="card" download style={{textDecoration: 'none', textAlign: 'center', padding: '24px', cursor: 'pointer', transition: 'all 0.2s'}}>
+                                    <div style={{fontSize: '32px', marginBottom: '8px'}}>📝</div>
+                                    <div style={{fontWeight: '700', color: 'var(--text-dark)'}}>TXT</div>
+                                    <div style={{fontSize: '12px', color: 'var(--text-medium)'}}>Plain text</div>
+                                </a>
+                                <a href="/api/session/export/json" className="card" download style={{textDecoration: 'none', textAlign: 'center', padding: '24px', cursor: 'pointer', transition: 'all 0.2s'}}>
+                                    <div style={{fontSize: '32px', marginBottom: '8px'}}>🔧</div>
+                                    <div style={{fontWeight: '700', color: 'var(--text-dark)'}}>JSON</div>
+                                    <div style={{fontSize: '12px', color: 'var(--text-medium)'}}>Full data</div>
+                                </a>
+                            </div>
+                        </div>
+                    )}
+                </div>
+            );
+        }
+
         function Dashboard({ onBack, onConfigureEngine, language, setLanguage, t }) {
             const [mode, setMode] = useState('browser');
             const [caption, setCaption] = useState('');
             const [rawCaption, setRawCaption] = useState('');
             const [corrections, setCorrections] = useState([]);
+            const [allCorrections, setAllCorrections] = useState([]); // Full history for stats
             const [recording, setRecording] = useState(false);
             const [sessionName, setSessionName] = useState('');
-            const [showEnginePanel, setShowEnginePanel] = useState(false);
+            const [showEnginePanel, setShowEnginePanel] = useState(true); // Open by default
             const [engineEnabled, setEngineEnabled] = useState(false);
+            const [engineName, setEngineName] = useState('Default Engine');
             const [whisperRunning, setWhisperRunning] = useState(false);
             const [browserListening, setBrowserListening] = useState(false);
             const [localIP, setLocalIP] = useState(window.location.hostname);
             const port = window.location.port || '8080';
 
             // Caption styling state
-            const [fontSize, setFontSize] = useState(32);
+            const [fontSize, setFontSize] = useState(48);
             const [lineHeight, setLineHeight] = useState(1.4);
-            const [maxWidth, setMaxWidth] = useState(90);
-            const [fontFamily, setFontFamily] = useState('sans-serif');
+            const [maxWidth, setMaxWidth] = useState(80);
+            const [fontFamily, setFontFamily] = useState("'DM Sans', sans-serif");
             const [textColor, setTextColor] = useState('#FFFFFF');
             const [bgColor, setBgColor] = useState('#000000');
-            const [bgOpacity, setBgOpacity] = useState(0.8);
+            const [bgOpacity, setBgOpacity] = useState(0.75);
+            const [captionPosition, setCaptionPosition] = useState('bottom');
 
             // Whisper state
             const [whisperDevices, setWhisperDevices] = useState([]);
@@ -2631,12 +2968,64 @@
             const [modelLoading, setModelLoading] = useState(false);
             const [modelLoaded, setModelLoaded] = useState(false);
 
+            // Session stats state
+            const [wordCount, setWordCount] = useState(0);
+            const [sessionDuration, setSessionDuration] = useState(0);
+            const [sessionStartTime, setSessionStartTime] = useState(null);
+            const [showCorrectionsPanel, setShowCorrectionsPanel] = useState(false);
+
             // Session export state
             const [showExports, setShowExports] = useState(false);
             const [sessionStats, setSessionStats] = useState(null);
 
+            // Post-session analysis state
+            const [showAnalysis, setShowAnalysis] = useState(false);
+            const [analysisData, setAnalysisData] = useState(null);
+
             // Speech recognition ref
             const recognitionRef = useRef(null);
+
+            // Timer for session duration
+            useEffect(() => {
+                let timer;
+                if (browserListening || whisperRunning) {
+                    if (!sessionStartTime) {
+                        setSessionStartTime(Date.now());
+                    }
+                    timer = setInterval(() => {
+                        setSessionDuration(Math.floor((Date.now() - sessionStartTime) / 1000));
+                    }, 1000);
+                }
+                return () => clearInterval(timer);
+            }, [browserListening, whisperRunning, sessionStartTime]);
+
+            // Count words from caption
+            useEffect(() => {
+                if (caption) {
+                    const words = caption.trim().split(/\s+/).filter(w => w.length > 0);
+                    setWordCount(words.length);
+                }
+            }, [caption]);
+
+            // Track all corrections
+            useEffect(() => {
+                if (corrections.length > 0) {
+                    setAllCorrections(prev => {
+                        const newCorrections = corrections.filter(c =>
+                            !prev.some(p => p.timestamp === c.timestamp && p.from === c.from)
+                        );
+                        return [...prev, ...newCorrections];
+                    });
+                }
+            }, [corrections]);
+
+            const formatDuration = (seconds) => {
+                const h = Math.floor(seconds / 3600);
+                const m = Math.floor((seconds % 3600) / 60);
+                const s = seconds % 60;
+                if (h > 0) return `${h}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
+                return `${m}:${s.toString().padStart(2, '0')}`;
+            };
 
             useEffect(() => {
                 // Poll for caption and status updates
@@ -2654,7 +3043,10 @@
 
                     fetch('/api/engine/status')
                         .then(r => r.json())
-                        .then(data => setEngineEnabled(data.enabled))
+                        .then(data => {
+                            setEngineEnabled(data.enabled);
+                            setEngineName(data.name || 'Default Engine');
+                        })
                         .catch(err => console.error('Error fetching engine status:', err));
                 }, 500);
 
@@ -2682,7 +3074,10 @@
                     fontFamily,
                     textColor,
                     backgroundColor: bgColor,
-                    backgroundOpacity: bgOpacity
+                    backgroundOpacity: bgOpacity * 100,
+                    position: captionPosition,
+                    showBackground: true,
+                    textShadow: true
                 };
 
                 fetch('/api/caption', {
@@ -2695,7 +3090,7 @@
 
             useEffect(() => {
                 updateCaptionSettings();
-            }, [fontSize, lineHeight, maxWidth, fontFamily, textColor, bgColor, bgOpacity]);
+            }, [fontSize, lineHeight, maxWidth, fontFamily, textColor, bgColor, bgOpacity, captionPosition]);
 
             const startBrowserCaptions = () => {
                 if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) {
@@ -2803,15 +3198,34 @@
 
             const toggleRecording = () => {
                 if (recording) {
+                    // Stop recording and show analysis
                     fetch('/api/session/stop', { method: 'POST' })
                         .then(() => {
-                            // Fetch session stats for export
-                            fetch('/api/session/status')
-                                .then(r => r.json())
-                                .then(data => {
-                                    setSessionStats(data);
-                                    setShowExports(true);
-                                });
+                            // Fetch session data for analysis
+                            return Promise.all([
+                                fetch('/api/session/status').then(r => r.json()),
+                                fetch('/api/session/captions').then(r => r.json()),
+                                fetch('/api/session/analytics').then(r => r.json()).catch(() => ({}))
+                            ]);
+                        })
+                        .then(([status, captionsData, analytics]) => {
+                            // Build analysis data
+                            const analysisData = {
+                                name: sessionName || 'Untitled Session',
+                                start_time: sessionStartTime,
+                                duration: sessionDuration,
+                                wordCount: wordCount,
+                                corrections: allCorrections,
+                                captions: captionsData.captions || [],
+                                highlights: analytics.highlights || [],
+                                wordCloud: analytics.word_cloud || [],
+                                sentimentTimeline: analytics.sentiment_timeline || [],
+                                topics: analytics.topics || [],
+                                qualityScore: analytics.quality_score || 85
+                            };
+                            setAnalysisData(analysisData);
+                            setShowAnalysis(true);
+                            setSessionStats(status);
                         });
                 } else {
                     const name = sessionName || `Session ${new Date().toLocaleString()}`;
@@ -2821,6 +3235,10 @@
                         body: JSON.stringify({ name })
                     });
                     setShowExports(false);
+                    setSessionStartTime(Date.now());
+                    setWordCount(0);
+                    setSessionDuration(0);
+                    setAllCorrections([]);
                 }
             };
 
@@ -2874,229 +3292,308 @@
                 event.target.value = '';
             };
 
+            // Show analysis page if post-session
+            if (showAnalysis && analysisData) {
+                return (
+                    <SessionAnalysisPage
+                        data={analysisData}
+                        onBack={() => {
+                            setShowAnalysis(false);
+                            setAnalysisData(null);
+                        }}
+                        t={t}
+                    />
+                );
+            }
+
             return (
                 <div className="dashboard active">
                     <div className="dashboard-header">
                         <div style={{display: 'flex', alignItems: 'center', gap: '16px'}}>
-                            <h1 className="dashboard-title">{t('Control Dashboard')}</h1>
-                            <img src="/big-logo.png" alt="BIG" style={{height: '50px', marginTop: '4px'}} />
+                            <div className="logo-section">
+                                <div className="logo-icon">
+                                    <div className="logo-bar logo-bar-1"></div>
+                                    <div className="logo-bar logo-bar-2"></div>
+                                    <div className="logo-bar logo-bar-3"></div>
+                                </div>
+                                <div className="logo-text" style={{fontSize: '22px'}}>Community Captioner</div>
+                            </div>
+                            <span style={{color: 'var(--text-medium)', fontSize: '14px'}}>Control Dashboard</span>
                         </div>
                         <button className="back-btn" onClick={onBack}>← {t('Back to Home')}</button>
                     </div>
 
                     <div className="dashboard-grid">
                         <div className="main-column">
+                            {/* Live Preview - 1920x1080 aspect ratio simulation */}
                             <div className="preview-section" style={{
-                                fontSize: `${fontSize}px`,
-                                lineHeight: lineHeight
+                                background: '#1a1a1a',
+                                aspectRatio: '16/9',
+                                position: 'relative',
+                                overflow: 'hidden',
+                                borderRadius: 'var(--radius-lg)',
+                                border: '2px solid var(--border-light)'
                             }}>
-                                <div className="preview-label">{t('Live Preview')}</div>
-                                <div className="preview-badges">
+                                <div className="preview-label" style={{position: 'absolute', top: '12px', left: '12px', zIndex: 10}}>
+                                    {t('Live Preview')} (1920×1080)
+                                </div>
+                                <div className="preview-badges" style={{position: 'absolute', top: '12px', right: '12px', zIndex: 10}}>
                                     <div className="preview-badge mode">{mode.toUpperCase()}</div>
                                     {browserListening && <div className="preview-badge listening">LISTENING</div>}
                                     {whisperRunning && <div className="preview-badge whisper">WHISPER</div>}
                                     {engineEnabled && <div className="preview-badge engine">ENGINE ON</div>}
-                                    {corrections.length > 0 && (
-                                        <div className="preview-badge corrections">{corrections.length} FIXES</div>
-                                    )}
+                                    {recording && <div className="preview-badge" style={{background: '#DC2626'}}>REC</div>}
                                 </div>
-                                <div
-                                    className={`preview-text ${!caption ? 'empty' : ''}`}
-                                    style={{
-                                        fontSize: `${fontSize}px`,
+
+                                {/* Caption display area - simulates overlay */}
+                                <div style={{
+                                    position: 'absolute',
+                                    left: 0,
+                                    right: 0,
+                                    display: 'flex',
+                                    justifyContent: 'center',
+                                    padding: '0 40px',
+                                    ...(captionPosition === 'top' ? {top: '60px'} :
+                                        captionPosition === 'middle' ? {top: '50%', transform: 'translateY(-50%)'} :
+                                        {bottom: '40px'})
+                                }}>
+                                    <div style={{
+                                        fontSize: `${Math.round(fontSize * 0.5)}px`,
                                         lineHeight: lineHeight,
                                         maxWidth: `${maxWidth}%`,
                                         fontFamily: fontFamily,
-                                        color: textColor
-                                    }}
-                                >
-                                    {caption || 'Captions will appear here...'}
+                                        color: textColor,
+                                        backgroundColor: `rgba(${parseInt(bgColor.slice(1,3),16)}, ${parseInt(bgColor.slice(3,5),16)}, ${parseInt(bgColor.slice(5,7),16)}, ${bgOpacity})`,
+                                        padding: '8px 20px',
+                                        borderRadius: '8px',
+                                        textAlign: 'center',
+                                        textShadow: '2px 2px 4px rgba(0,0,0,0.8)',
+                                        minHeight: caption ? 'auto' : '40px',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'center'
+                                    }}>
+                                        {caption || <span style={{opacity: 0.5, fontStyle: 'italic'}}>Captions will appear here...</span>}
+                                    </div>
                                 </div>
                             </div>
 
-                            <div className="card">
-                                <h2 className="card-title">{t('Captioning Mode')}</h2>
-                                <div className="mode-selector">
-                                    <button
-                                        className={`mode-btn ${mode === 'browser' ? 'active' : ''}`}
-                                        onClick={() => setMode('browser')}
-                                    >
-                                        {t('Browser Speech')}
-                                    </button>
-                                    <button
-                                        className={`mode-btn whisper ${mode === 'whisper' ? 'active whisper' : ''}`}
-                                        onClick={() => setMode('whisper')}
-                                    >
-                                        {t('Whisper AI')}
-                                    </button>
-                                </div>
-
-                                {mode === 'browser' && (
-                                    <div>
-                                        <button
-                                            className="btn-large btn-primary"
-                                            onClick={browserListening ? stopBrowserCaptions : startBrowserCaptions}
-                                        >
-                                            {browserListening ? t('Stop Browser Captions') : t('Start Browser Captions')}
-                                        </button>
-                                        <p style={{fontSize: '14px', color: 'var(--text-medium)', marginTop: '12px'}}>
-                                            Uses Chrome/Edge speech recognition. Requires internet connection.
-                                        </p>
+                            {/* Caption Styling - moved under preview */}
+                            <div className="card" style={{marginTop: '16px'}}>
+                                <h2 className="card-title">Caption Styling</h2>
+                                <div style={{display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '16px'}}>
+                                    <div className="setting-group">
+                                        <label className="setting-label">
+                                            Font Size <span className="setting-value">{fontSize}px</span>
+                                        </label>
+                                        <input type="range" className="setting-slider" min="24" max="72" value={fontSize}
+                                            onChange={(e) => setFontSize(parseInt(e.target.value))} />
                                     </div>
-                                )}
-
-                                {mode === 'whisper' && (
-                                    <div>
-                                        <div className="setting-group">
-                                            <label className="setting-label">Audio Device</label>
-                                            <select
-                                                className="setting-input"
-                                                value={selectedDevice}
-                                                onChange={(e) => setSelectedDevice(e.target.value)}
-                                            >
-                                                {whisperDevices.map(device => (
-                                                    <option key={device.id} value={device.id}>
-                                                        {device.name}
-                                                    </option>
-                                                ))}
-                                            </select>
+                                    <div className="setting-group">
+                                        <label className="setting-label">
+                                            Line Height <span className="setting-value">{lineHeight}</span>
+                                        </label>
+                                        <input type="range" className="setting-slider" min="1.0" max="2.0" step="0.1" value={lineHeight}
+                                            onChange={(e) => setLineHeight(parseFloat(e.target.value))} />
+                                    </div>
+                                    <div className="setting-group">
+                                        <label className="setting-label">
+                                            Max Width <span className="setting-value">{maxWidth}%</span>
+                                        </label>
+                                        <input type="range" className="setting-slider" min="50" max="100" value={maxWidth}
+                                            onChange={(e) => setMaxWidth(parseInt(e.target.value))} />
+                                    </div>
+                                    <div className="setting-group">
+                                        <label className="setting-label">Position</label>
+                                        <select className="setting-input" value={captionPosition}
+                                            onChange={(e) => setCaptionPosition(e.target.value)}>
+                                            <option value="top">Top</option>
+                                            <option value="middle">Middle</option>
+                                            <option value="bottom">Bottom</option>
+                                        </select>
+                                    </div>
+                                    <div className="setting-group">
+                                        <label className="setting-label">Font Family</label>
+                                        <select className="setting-input" value={fontFamily}
+                                            onChange={(e) => setFontFamily(e.target.value)}>
+                                            <option value="'DM Sans', sans-serif">DM Sans</option>
+                                            <option value="sans-serif">Sans Serif</option>
+                                            <option value="serif">Serif</option>
+                                            <option value="'Arial', sans-serif">Arial</option>
+                                            <option value="'Verdana', sans-serif">Verdana</option>
+                                        </select>
+                                    </div>
+                                    <div className="setting-group">
+                                        <label className="setting-label">
+                                            Opacity <span className="setting-value">{Math.round(bgOpacity * 100)}%</span>
+                                        </label>
+                                        <input type="range" className="setting-slider" min="0" max="1" step="0.05" value={bgOpacity}
+                                            onChange={(e) => setBgOpacity(parseFloat(e.target.value))} />
+                                    </div>
+                                </div>
+                                <div style={{display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginTop: '12px'}}>
+                                    <div className="setting-group">
+                                        <label className="setting-label">Text Color</label>
+                                        <div className="color-input-group">
+                                            <input type="text" className="setting-input" value={textColor}
+                                                onChange={(e) => setTextColor(e.target.value)} />
+                                            <input type="color" className="color-input" value={textColor}
+                                                onChange={(e) => setTextColor(e.target.value)} />
                                         </div>
+                                    </div>
+                                    <div className="setting-group">
+                                        <label className="setting-label">Background Color</label>
+                                        <div className="color-input-group">
+                                            <input type="text" className="setting-input" value={bgColor}
+                                                onChange={(e) => setBgColor(e.target.value)} />
+                                            <input type="color" className="color-input" value={bgColor}
+                                                onChange={(e) => setBgColor(e.target.value)} />
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
 
-                                        <div className="setting-group">
-                                            <label className="setting-label">Model Size</label>
-                                            <select
-                                                className="setting-input"
-                                                value={selectedModel}
+                            {/* Captioning Mode - compact horizontal layout */}
+                            <div className="card" style={{marginTop: '16px'}}>
+                                <div style={{display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '16px'}}>
+                                    <div style={{display: 'flex', alignItems: 'center', gap: '12px'}}>
+                                        <h2 className="card-title" style={{margin: 0}}>Captioning</h2>
+                                        <div className="mode-selector" style={{margin: 0}}>
+                                            <button className={`mode-btn ${mode === 'browser' ? 'active' : ''}`}
+                                                onClick={() => setMode('browser')} style={{padding: '8px 16px', fontSize: '13px'}}>
+                                                Browser
+                                            </button>
+                                            <button className={`mode-btn whisper ${mode === 'whisper' ? 'active whisper' : ''}`}
+                                                onClick={() => setMode('whisper')} style={{padding: '8px 16px', fontSize: '13px'}}>
+                                                Whisper
+                                            </button>
+                                        </div>
+                                    </div>
+
+                                    <div style={{display: 'flex', alignItems: 'center', gap: '12px'}}>
+                                        {mode === 'whisper' && !modelLoaded && (
+                                            <button className="btn-large btn-outline" onClick={loadWhisperModel}
+                                                disabled={modelLoading} style={{padding: '10px 20px'}}>
+                                                {modelLoading ? 'Loading...' : 'Load Model'}
+                                            </button>
+                                        )}
+                                        {mode === 'whisper' && (
+                                            <select className="setting-input" value={selectedModel}
                                                 onChange={(e) => setSelectedModel(e.target.value)}
-                                            >
-                                                <option value="tiny">Tiny (fastest, least accurate)</option>
-                                                <option value="base">Base (recommended)</option>
-                                                <option value="small">Small (slower, more accurate)</option>
-                                                <option value="medium">Medium (slowest, most accurate)</option>
+                                                style={{width: 'auto', padding: '10px 12px'}}>
+                                                <option value="tiny">Tiny</option>
+                                                <option value="base">Base</option>
+                                                <option value="small">Small</option>
                                             </select>
-                                        </div>
-
-                                        {!modelLoaded && (
-                                            <button
-                                                className="btn-large btn-primary"
-                                                onClick={loadWhisperModel}
-                                                disabled={modelLoading}
-                                            >
-                                                {modelLoading ? 'Loading Model...' : 'Load Whisper Model'}
-                                            </button>
                                         )}
-
-                                        {modelLoaded && (
-                                            <button
-                                                className="btn-large btn-primary"
-                                                onClick={whisperRunning ? stopWhisper : startWhisper}
-                                            >
-                                                {whisperRunning ? 'Stop Whisper' : 'Start Whisper'}
-                                            </button>
-                                        )}
-
-                                        <p style={{fontSize: '14px', color: 'var(--text-medium)', marginTop: '12px'}}>
-                                            Local AI transcription. Requires faster-whisper package.
-                                        </p>
+                                        <button
+                                            className={`btn-large ${(browserListening || whisperRunning) ? 'btn-danger' : 'btn-primary'}`}
+                                            style={{padding: '10px 24px', minWidth: '160px'}}
+                                            onClick={() => {
+                                                if (mode === 'browser') {
+                                                    browserListening ? stopBrowserCaptions() : startBrowserCaptions();
+                                                } else if (modelLoaded) {
+                                                    whisperRunning ? stopWhisper() : startWhisper();
+                                                } else {
+                                                    loadWhisperModel();
+                                                }
+                                            }}
+                                        >
+                                            {(browserListening || whisperRunning) ? 'Stop Captioning' : 'Start Captioning'}
+                                        </button>
                                     </div>
-                                )}
+                                </div>
                             </div>
 
-                            <div className="card">
-                                <h2 className="card-title">
-                                    AI Caption Engine
-                                </h2>
-                                <div className="toggle-setting">
-                                    <span className="toggle-label">
-                                        {engineEnabled ? 'Engine Active' : 'Engine Disabled'}
-                                    </span>
-                                    <div
-                                        className={`toggle-switch ${engineEnabled ? 'on' : ''}`}
-                                        onClick={toggleEngine}
-                                    ></div>
+                            {/* Hidden whisper device selector - keeping for when needed */}
+                            {mode === 'whisper' && (
+                                <div className="card" style={{marginTop: '8px', padding: '12px 16px'}}>
+                                    <div style={{display: 'flex', alignItems: 'center', gap: '12px'}}>
+                                        <label style={{fontSize: '13px', color: 'var(--text-medium)'}}>Audio Device:</label>
+                                        <select className="setting-input" value={selectedDevice}
+                                            onChange={(e) => setSelectedDevice(e.target.value)}
+                                            style={{flex: 1, padding: '8px 12px'}}>
+                                            {whisperDevices.map(device => (
+                                                <option key={device.id} value={device.id}>{device.name}</option>
+                                            ))}
+                                        </select>
+                                    </div>
+                                </div>
+                            )}
+
+                        </div>
+
+                        {/* Sidebar Column - Caption Stats, Session, Overlay */}
+                        <div className="sidebar-column">
+                            {/* Caption Stats Card - NEW */}
+                            <div className="card" style={{background: 'linear-gradient(135deg, var(--sage-primary), var(--sage-darker))', color: 'white'}}>
+                                <h2 className="card-title" style={{color: 'white', borderColor: 'rgba(255,255,255,0.3)'}}>Caption Stats</h2>
+
+                                <div style={{display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '16px'}}>
+                                    <div style={{background: 'rgba(255,255,255,0.15)', padding: '16px', borderRadius: '8px', textAlign: 'center'}}>
+                                        <div style={{fontSize: '28px', fontWeight: '700'}}>{wordCount}</div>
+                                        <div style={{fontSize: '12px', opacity: 0.8}}>WORDS</div>
+                                    </div>
+                                    <div style={{background: 'rgba(255,255,255,0.15)', padding: '16px', borderRadius: '8px', textAlign: 'center'}}>
+                                        <div style={{fontSize: '28px', fontWeight: '700'}}>{formatDuration(sessionDuration)}</div>
+                                        <div style={{fontSize: '12px', opacity: 0.8}}>DURATION</div>
+                                    </div>
                                 </div>
 
-                                {corrections.length > 0 && (
-                                    <div style={{marginTop: '16px', padding: '14px', background: 'var(--bg-sage-light)', borderRadius: 'var(--radius-sm)'}}>
-                                        <div style={{fontSize: '12px', fontWeight: '700', marginBottom: '8px', color: 'var(--text-medium)'}}>
-                                            RECENT CORRECTIONS
+                                <div style={{background: 'rgba(255,255,255,0.1)', padding: '12px', borderRadius: '8px', marginBottom: '12px'}}>
+                                    <div style={{fontSize: '12px', opacity: 0.8, marginBottom: '4px'}}>AI ENGINE</div>
+                                    <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center'}}>
+                                        <span style={{fontWeight: '600'}}>{engineName}</span>
+                                        <div className={`toggle-switch ${engineEnabled ? 'on' : ''}`}
+                                            onClick={toggleEngine}
+                                            style={{transform: 'scale(0.8)'}}></div>
+                                    </div>
+                                </div>
+
+                                <div
+                                    style={{background: 'rgba(255,255,255,0.1)', padding: '12px', borderRadius: '8px', cursor: 'pointer'}}
+                                    onClick={() => setShowCorrectionsPanel(!showCorrectionsPanel)}
+                                >
+                                    <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center'}}>
+                                        <div>
+                                            <div style={{fontSize: '12px', opacity: 0.8}}>AI CORRECTIONS</div>
+                                            <div style={{fontSize: '20px', fontWeight: '700'}}>{allCorrections.length}</div>
                                         </div>
-                                        {corrections.map((c, i) => (
-                                            <div key={i} style={{fontSize: '14px', marginBottom: '4px'}}>
-                                                <span style={{color: '#DC2626', textDecoration: 'line-through'}}>{c.from}</span>
-                                                {' → '}
-                                                <span style={{color: '#00A676', fontWeight: '600'}}>{c.to}</span>
+                                        <span style={{fontSize: '18px'}}>{showCorrectionsPanel ? '▼' : '▶'}</span>
+                                    </div>
+                                </div>
+
+                                {showCorrectionsPanel && allCorrections.length > 0 && (
+                                    <div style={{marginTop: '12px', maxHeight: '200px', overflowY: 'auto', background: 'rgba(0,0,0,0.2)', borderRadius: '8px', padding: '12px'}}>
+                                        {allCorrections.slice(-10).reverse().map((c, i) => (
+                                            <div key={i} style={{fontSize: '13px', marginBottom: '8px', padding: '8px', background: 'rgba(255,255,255,0.1)', borderRadius: '4px'}}>
+                                                <div style={{display: 'flex', justifyContent: 'space-between', marginBottom: '4px'}}>
+                                                    <span style={{textDecoration: 'line-through', opacity: 0.7}}>{c.from}</span>
+                                                    <span style={{fontSize: '11px', opacity: 0.6}}>{c.timestamp ? new Date(c.timestamp).toLocaleTimeString() : ''}</span>
+                                                </div>
+                                                <div style={{fontWeight: '600'}}>→ {c.to}</div>
                                             </div>
                                         ))}
                                     </div>
                                 )}
-
-                                <div style={{display: 'flex', gap: '12px', marginTop: '16px', flexWrap: 'wrap'}}>
-                                    <button
-                                        className="btn-large btn-outline"
-                                        style={{flex: '1', minWidth: '140px'}}
-                                        onClick={() => setShowEnginePanel(!showEnginePanel)}
-                                    >
-                                        {showEnginePanel ? '▼ Hide Engine Panel' : '▶ Show Engine Panel'}
-                                    </button>
-                                    <label className="btn-large btn-outline" style={{flex: '1', minWidth: '140px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer'}}>
-                                        {t('Upload Engine')}
-                                        <input
-                                            type="file"
-                                            accept=".json"
-                                            onChange={uploadEngine}
-                                            style={{display: 'none'}}
-                                        />
-                                    </label>
-                                </div>
                             </div>
-                        </div>
 
-                        {/* Collapsible Engine Panel */}
-                        {showEnginePanel && (
-                            <div className="card" style={{gridColumn: '1 / -1', marginTop: '20px', border: '2px solid var(--purple-accent)'}}>
-                                <EngineWizardInline onClose={() => setShowEnginePanel(false)} />
-                            </div>
-                        )}
-
-                        <div className="sidebar-column">
+                            {/* Live Overlay Card */}
                             <div className="card">
                                 <h2 className="card-title">Live Overlay</h2>
-                                <button className="btn-large btn-primary" onClick={openOverlay}>
+                                <button className="btn-large btn-primary" onClick={openOverlay} style={{width: '100%'}}>
                                     Open Overlay Window
                                 </button>
-
-                                <div style={{marginTop: '16px'}}>
-                                    <div className="url-display">
-                                        <div className="url-label">This Computer</div>
-                                        <div className="url-text" style={{fontSize: '12px'}}>
-                                            http://localhost:{port}/overlay.html
-                                        </div>
-                                    </div>
-
-                                    <div className="url-display" style={{marginTop: '12px'}}>
-                                        <div className="url-label">Same Network (LAN)</div>
-                                        <div className="url-text" style={{fontSize: '12px'}}>
-                                            http://{localIP}:{port}/overlay.html
-                                        </div>
-                                    </div>
-
-                                    <div className="url-display" style={{marginTop: '12px', background: 'rgba(138, 99, 163, 0.08)', borderColor: 'var(--purple-accent)'}}>
-                                        <div className="url-label" style={{color: 'var(--purple-accent)'}}>Internet (Cloud Mode)</div>
-                                        <div className="url-text" style={{fontSize: '11px', color: 'var(--text-medium)'}}>
-                                            Requires cloud-server.py with public IP or tunnel
-                                        </div>
-                                    </div>
+                                <div style={{marginTop: '12px', fontSize: '12px', color: 'var(--text-medium)'}}>
+                                    <div style={{marginBottom: '4px'}}><strong>Local:</strong> http://localhost:{port}/overlay.html</div>
+                                    <div><strong>Network:</strong> http://{localIP}:{port}/overlay.html</div>
                                 </div>
-
-                                <p style={{fontSize: '12px', color: 'var(--text-medium)', marginTop: '12px', lineHeight: '1.5'}}>
-                                    Use these URLs in OBS Browser Source, vMix, or streaming software.
-                                </p>
                             </div>
 
+                            {/* Session Recording Card */}
                             <div className="card">
                                 <h2 className="card-title">Session Recording</h2>
-                                <div className="rec-indicator" style={{marginBottom: '16px'}}>
+                                <div className="rec-indicator" style={{marginBottom: '12px'}}>
                                     <div className={`rec-indicator ${recording ? 'recording' : ''}`}>
                                         <div className="rec-dot"></div>
                                         {recording ? 'Recording' : 'Not Recording'}
@@ -3104,181 +3601,47 @@
                                 </div>
 
                                 {!recording && !showExports && (
-                                    <div className="setting-group">
-                                        <label className="setting-label">Session Name</label>
-                                        <input
-                                            type="text"
-                                            className="setting-input"
-                                            placeholder="e.g., Select Board Meeting"
-                                            value={sessionName}
-                                            onChange={(e) => setSessionName(e.target.value)}
-                                        />
-                                    </div>
+                                    <input type="text" className="setting-input" placeholder="Session name (optional)"
+                                        value={sessionName} onChange={(e) => setSessionName(e.target.value)}
+                                        style={{marginBottom: '12px'}} />
                                 )}
 
-                                <button
-                                    className={`btn-large ${recording ? 'btn-danger' : 'btn-primary'}`}
-                                    onClick={toggleRecording}
-                                >
-                                    {recording ? 'Stop Recording' : 'Start Recording'}
+                                <button className={`btn-large ${recording ? 'btn-danger' : 'btn-outline'}`}
+                                    onClick={toggleRecording} style={{width: '100%'}}>
+                                    {recording ? 'Stop & Analyze' : 'Start Recording'}
                                 </button>
 
-                                {recording && (
-                                    <div style={{marginTop: '16px', padding: '14px', background: '#FEE2E2', borderRadius: 'var(--radius-sm)', fontSize: '13px', color: '#991B1B'}}>
-                                        All captions and corrections are being saved.
-                                        Export available after stopping.
-                                    </div>
-                                )}
-
                                 {showExports && sessionStats && (
-                                    <div style={{marginTop: '16px'}}>
-                                        <div style={{padding: '14px', background: 'var(--bg-sage-light)', borderRadius: 'var(--radius-sm)', marginBottom: '12px'}}>
-                                            <div style={{fontSize: '12px', fontWeight: '700', color: 'var(--text-medium)', marginBottom: '8px'}}>
-                                                SESSION STATS
-                                            </div>
-                                            <div style={{fontSize: '14px', marginBottom: '4px'}}>
-                                                Captions: {sessionStats.caption_count || 0}
-                                            </div>
-                                            <div style={{fontSize: '14px', marginBottom: '4px'}}>
-                                                Corrections: {sessionStats.correction_count || 0}
-                                            </div>
-                                        </div>
-
+                                    <div style={{marginTop: '12px'}}>
                                         <div className="export-buttons">
-                                            <a href="/api/session/export/srt" className="export-btn" download>
-                                                Export SRT
-                                            </a>
-                                            <a href="/api/session/export/vtt" className="export-btn" download>
-                                                Export VTT
-                                            </a>
-                                            <a href="/api/session/export/txt" className="export-btn" download>
-                                                Export TXT
-                                            </a>
-                                            <a href="/api/session/export/json" className="export-btn" download>
-                                                Export JSON
-                                            </a>
+                                            <a href="/api/session/export/srt" className="export-btn" download>SRT</a>
+                                            <a href="/api/session/export/vtt" className="export-btn" download>VTT</a>
+                                            <a href="/api/session/export/txt" className="export-btn" download>TXT</a>
+                                            <a href="/api/session/export/json" className="export-btn" download>JSON</a>
                                         </div>
                                     </div>
                                 )}
                             </div>
+                        </div>
 
-                            <div className="card">
-                                <h2 className="card-title">Caption Styling</h2>
-
-                                <div className="setting-group">
-                                    <label className="setting-label">
-                                        Font Size
-                                        <span className="setting-value">{fontSize}px</span>
+                        {/* AI Caption Engine Configuration Panel - Full Width */}
+                        <div className="card" style={{gridColumn: '1 / -1', border: '2px solid var(--purple-accent)'}}>
+                            <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px'}}>
+                                <h2 className="card-title" style={{margin: 0, borderBottom: 'none', paddingBottom: 0}}>
+                                    AI Caption Engine Configuration
+                                </h2>
+                                <div style={{display: 'flex', gap: '12px', alignItems: 'center'}}>
+                                    <label className="btn-large btn-outline" style={{display: 'flex', alignItems: 'center', cursor: 'pointer', padding: '8px 16px'}}>
+                                        Upload Engine
+                                        <input type="file" accept=".json" onChange={uploadEngine} style={{display: 'none'}} />
                                     </label>
-                                    <input
-                                        type="range"
-                                        className="setting-slider"
-                                        min="24"
-                                        max="72"
-                                        value={fontSize}
-                                        onChange={(e) => setFontSize(parseInt(e.target.value))}
-                                    />
-                                </div>
-
-                                <div className="setting-group">
-                                    <label className="setting-label">
-                                        Line Height
-                                        <span className="setting-value">{lineHeight}</span>
-                                    </label>
-                                    <input
-                                        type="range"
-                                        className="setting-slider"
-                                        min="1.0"
-                                        max="2.0"
-                                        step="0.1"
-                                        value={lineHeight}
-                                        onChange={(e) => setLineHeight(parseFloat(e.target.value))}
-                                    />
-                                </div>
-
-                                <div className="setting-group">
-                                    <label className="setting-label">
-                                        Max Width
-                                        <span className="setting-value">{maxWidth}%</span>
-                                    </label>
-                                    <input
-                                        type="range"
-                                        className="setting-slider"
-                                        min="50"
-                                        max="100"
-                                        value={maxWidth}
-                                        onChange={(e) => setMaxWidth(parseInt(e.target.value))}
-                                    />
-                                </div>
-
-                                <div className="setting-group">
-                                    <label className="setting-label">Font Family</label>
-                                    <select
-                                        className="setting-input"
-                                        value={fontFamily}
-                                        onChange={(e) => setFontFamily(e.target.value)}
-                                    >
-                                        <option value="sans-serif">Sans Serif</option>
-                                        <option value="serif">Serif</option>
-                                        <option value="monospace">Monospace</option>
-                                        <option value="'Arial', sans-serif">Arial</option>
-                                        <option value="'Helvetica', sans-serif">Helvetica</option>
-                                        <option value="'Verdana', sans-serif">Verdana</option>
-                                    </select>
-                                </div>
-
-                                <div className="setting-group">
-                                    <label className="setting-label">Text Color</label>
-                                    <div className="color-input-group">
-                                        <input
-                                            type="text"
-                                            className="setting-input"
-                                            value={textColor}
-                                            onChange={(e) => setTextColor(e.target.value)}
-                                        />
-                                        <input
-                                            type="color"
-                                            className="color-input"
-                                            value={textColor}
-                                            onChange={(e) => setTextColor(e.target.value)}
-                                        />
-                                    </div>
-                                </div>
-
-                                <div className="setting-group">
-                                    <label className="setting-label">Background Color</label>
-                                    <div className="color-input-group">
-                                        <input
-                                            type="text"
-                                            className="setting-input"
-                                            value={bgColor}
-                                            onChange={(e) => setBgColor(e.target.value)}
-                                        />
-                                        <input
-                                            type="color"
-                                            className="color-input"
-                                            value={bgColor}
-                                            onChange={(e) => setBgColor(e.target.value)}
-                                        />
-                                    </div>
-                                </div>
-
-                                <div className="setting-group">
-                                    <label className="setting-label">
-                                        Background Opacity
-                                        <span className="setting-value">{Math.round(bgOpacity * 100)}%</span>
-                                    </label>
-                                    <input
-                                        type="range"
-                                        className="setting-slider"
-                                        min="0"
-                                        max="1"
-                                        step="0.1"
-                                        value={bgOpacity}
-                                        onChange={(e) => setBgOpacity(parseFloat(e.target.value))}
-                                    />
+                                    <button className="btn-large btn-outline" onClick={() => setShowEnginePanel(!showEnginePanel)}
+                                        style={{padding: '8px 16px'}}>
+                                        {showEnginePanel ? 'Collapse ▲' : 'Expand ▼'}
+                                    </button>
                                 </div>
                             </div>
+                            {showEnginePanel && <EngineWizardInline onClose={() => setShowEnginePanel(false)} />}
                         </div>
                     </div>
                 </div>
