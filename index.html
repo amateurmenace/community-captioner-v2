@@ -2694,36 +2694,48 @@
         }
 
         function EngineWizard({ onBack }) {
-            const [currentStep, setCurrentStep] = useState(0);
-            const [selectedTemplate, setSelectedTemplate] = useState('');
-            const [terms, setTerms] = useState([]);
+            const [engineStats, setEngineStats] = useState(null);
             const [newTerm, setNewTerm] = useState({ term: '', category: 'person', aliases: '' });
             const [testText, setTestText] = useState('');
             const [testResult, setTestResult] = useState('');
             const [aiConfig, setAiConfig] = useState(null);
+            const [recentTerms, setRecentTerms] = useState([]);
 
-            // Load AI config to show privacy status
+            // Load AI config and engine stats
             useEffect(() => {
                 fetch('/api/ai/config')
                     .then(r => r.json())
                     .then(data => setAiConfig(data));
+
+                loadEngineStats();
+                const interval = setInterval(loadEngineStats, 2000);
+                return () => clearInterval(interval);
             }, []);
+
+            const loadEngineStats = () => {
+                fetch('/api/engine/status')
+                    .then(r => r.json())
+                    .then(data => {
+                        setEngineStats(data);
+                    });
+
+                fetch('/api/engine/terms')
+                    .then(r => r.json())
+                    .then(data => {
+                        if (data.terms) {
+                            const termsList = Object.entries(data.terms)
+                                .map(([key, val]) => ({ key, ...val }))
+                                .slice(0, 10);
+                            setRecentTerms(termsList);
+                        }
+                    });
+            };
 
             const isAILocal = aiConfig && (
                 aiConfig.provider === 'ollama' ||
                 aiConfig.provider === 'lmstudio' ||
                 (aiConfig.provider === 'custom' && (aiConfig.custom_base_url.includes('localhost') || aiConfig.custom_base_url.includes('127.0.0.1')))
             );
-
-            const steps = [
-                { label: 'Welcome', num: 1 },
-                { label: 'Start', num: 2 },
-                { label: 'Add Terms', num: 3 },
-                { label: 'Upload', num: 4 },
-                { label: 'Web Source', num: 5 },
-                { label: 'Test', num: 6 },
-                { label: 'Save', num: 7 }
-            ];
 
             const addTerm = () => {
                 if (!newTerm.term) return;
@@ -2741,18 +2753,21 @@
                 })
                 .then(r => r.json())
                 .then(data => {
-                    setTerms([...terms, { ...newTerm, aliases: aliasArray }]);
                     setNewTerm({ term: '', category: 'person', aliases: '' });
+                    loadEngineStats();
+                    alert('Term added successfully!');
                 });
             };
 
             const loadBrooklineDefaults = () => {
-                fetch('/api/engine/defaults', { method: 'POST' })
-                    .then(r => r.json())
-                    .then(data => {
-                        alert('Brookline defaults loaded!');
-                        setSelectedTemplate('brookline');
-                    });
+                if (confirm('Load Brookline, MA template? This will add default terms for Brookline government.')) {
+                    fetch('/api/engine/defaults', { method: 'POST' })
+                        .then(r => r.json())
+                        .then(data => {
+                            alert('Brookline defaults loaded!');
+                            loadEngineStats();
+                        });
+                }
             };
 
             const testCorrection = () => {
@@ -2767,472 +2782,296 @@
                 window.open('/api/engine/export', '_blank');
             };
 
+            const uploadEngine = (event) => {
+                const file = event.target.files[0];
+                if (!file) return;
+
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    try {
+                        const engineData = JSON.parse(e.target.result);
+                        fetch('/api/engine/import', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify(engineData)
+                        })
+                        .then(r => r.json())
+                        .then(data => {
+                            if (data.status === 'success') {
+                                alert(`Engine uploaded! Loaded ${data.terms_count || 0} terms.`);
+                                loadEngineStats();
+                            } else {
+                                alert('Error: ' + (data.error || 'Unknown error'));
+                            }
+                        });
+                    } catch (err) {
+                        alert('Invalid engine file: ' + err.message);
+                    }
+                };
+                reader.readAsText(file);
+                event.target.value = '';
+            };
+
             return (
                 <div className="dashboard active">
                     <div className="dashboard-header">
-                        <h1 className="dashboard-title">AI Caption Engine Wizard</h1>
+                        <h1 className="dashboard-title">AI Caption Engine</h1>
                         <button className="back-btn" onClick={onBack}>← Back</button>
                     </div>
 
-                    <div className="wizard-container">
-                        <div className="wizard-progress">
-                            {steps.map((step, idx) => (
-                                <div
-                                    key={idx}
-                                    className={`wizard-step ${idx === currentStep ? 'active' : ''} ${idx < currentStep ? 'completed' : ''}`}
-                                >
-                                    <div className="wizard-step-circle">{step.num}</div>
-                                    <div className="wizard-step-label">{step.label}</div>
+                    <div style={{padding: '0 24px 24px'}}>
+                        {/* Stats Overview */}
+                        <div style={{display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px', marginBottom: '24px'}}>
+                            <div className="card" style={{textAlign: 'center', padding: '20px'}}>
+                                <div style={{fontSize: '36px', fontWeight: '700', color: 'var(--sage-primary)'}}>
+                                    {engineStats ? engineStats.term_count : '...'}
                                 </div>
-                            ))}
+                                <div style={{fontSize: '14px', color: 'var(--text-medium)', fontWeight: '600'}}>Total Terms</div>
+                            </div>
+                            <div className="card" style={{textAlign: 'center', padding: '20px'}}>
+                                <div style={{fontSize: '36px', fontWeight: '700', color: 'var(--purple-accent)'}}>
+                                    {engineStats ? engineStats.correction_count : '...'}
+                                </div>
+                                <div style={{fontSize: '14px', color: 'var(--text-medium)', fontWeight: '600'}}>Corrections Made</div>
+                            </div>
+                            <div className="card" style={{textAlign: 'center', padding: '20px'}}>
+                                <div style={{fontSize: '36px', fontWeight: '700', color: engineStats?.enabled ? 'var(--green-bright)' : 'var(--text-light)'}}>
+                                    {engineStats?.enabled ? 'ON' : 'OFF'}
+                                </div>
+                                <div style={{fontSize: '14px', color: 'var(--text-medium)', fontWeight: '600'}}>Engine Status</div>
+                            </div>
                         </div>
 
-                        <div className="wizard-content">
-                            {currentStep === 0 && (
-                                <div>
-                                    <h2 style={{fontSize: '32px', marginBottom: '20px', color: 'var(--text-dark)'}}>
-                                        Welcome to the Caption Engine
-                                    </h2>
-                                    <p style={{fontSize: '18px', lineHeight: '1.7', color: 'var(--text-medium)', marginBottom: '20px'}}>
-                                        The Caption Engine is what makes Community Captioner unique. It automatically corrects
-                                        speech recognition errors for local proper nouns - names, places, and organizations
-                                        that generic AI systems get wrong.
-                                    </p>
-
-                                    <div className="info-box">
-                                        <div className="info-box-title">How It Works</div>
-                                        <p style={{color: 'var(--text-medium)', marginBottom: '12px'}}>
-                                            The engine maintains a database of terms specific to your community. When captions
-                                            come through, it checks for common misspellings and corrects them in real-time.
-                                        </p>
-                                        <div className="example-correction">
-                                            <div style={{marginBottom: '8px'}}>
-                                                <span className="correction-before">"Brooklyn Select Board"</span>
-                                                {' → '}
-                                                <span className="correction-after">"Brookline Select Board"</span>
-                                            </div>
-                                            <div>
-                                                <span className="correction-before">"bernard green"</span>
-                                                {' → '}
-                                                <span className="correction-after">"Bernard Greene"</span>
-                                            </div>
-                                        </div>
-                                    </div>
-
-                                    <div style={{marginTop: '24px', padding: '20px', background: 'var(--bg-sage-light)', borderRadius: 'var(--radius-md)'}}>
-                                        <h3 style={{fontSize: '18px', marginBottom: '12px', color: 'var(--sage-darker)'}}>
-                                            Why This Matters for Community Media
-                                        </h3>
-                                        <ul style={{paddingLeft: '20px', color: 'var(--text-medium)'}}>
-                                            <li>Generic AI doesn't know your town's Select Board chair</li>
-                                            <li>Place names get mangled (Brookline becomes Brooklyn)</li>
-                                            <li>Local organizations are unrecognizable</li>
-                                            <li>Manual correction during live broadcasts is impossible</li>
-                                        </ul>
-                                    </div>
-                                </div>
-                            )}
-
-                            {currentStep === 1 && (
-                                <div>
-                                    <h2 style={{fontSize: '28px', marginBottom: '20px', color: 'var(--text-dark)'}}>
-                                        Choose Your Starting Point
-                                    </h2>
-                                    <p style={{fontSize: '16px', color: 'var(--text-medium)', marginBottom: '24px'}}>
-                                        You can start with an empty engine, use the Brookline template, or import
-                                        an existing engine file.
-                                    </p>
-
-                                    <div className="template-options">
-                                        <div
-                                            className={`template-card ${selectedTemplate === 'empty' ? 'selected' : ''}`}
-                                            onClick={() => setSelectedTemplate('empty')}
-                                        >
-                                            <div className="template-icon">📄</div>
-                                            <div className="template-title">Start Empty</div>
-                                            <div className="template-desc">
-                                                Build your own engine from scratch
-                                            </div>
-                                        </div>
-
-                                        <div
-                                            className={`template-card ${selectedTemplate === 'brookline' ? 'selected' : ''}`}
-                                            onClick={() => {
-                                                setSelectedTemplate('brookline');
-                                                loadBrooklineDefaults();
-                                            }}
-                                        >
-                                            <div className="template-icon">🏛️</div>
-                                            <div className="template-title">Brookline Template</div>
-                                            <div className="template-desc">
-                                                Pre-loaded with Brookline, MA terms
-                                            </div>
-                                        </div>
-
-                                        <div
-                                            className={`template-card ${selectedTemplate === 'import' ? 'selected' : ''}`}
-                                            onClick={() => setSelectedTemplate('import')}
-                                        >
-                                            <div className="template-icon">📥</div>
-                                            <div className="template-title">Import Engine</div>
-                                            <div className="template-desc">
-                                                Load a saved engine JSON file
-                                            </div>
-                                        </div>
-                                    </div>
-
-                                    {selectedTemplate === 'brookline' && (
-                                        <div className="info-box" style={{marginTop: '24px'}}>
-                                            <div className="info-box-title">Brookline, MA Template Includes:</div>
-                                            <ul style={{paddingLeft: '20px', color: 'var(--text-medium)', marginTop: '8px'}}>
-                                                <li>Select Board members (Bernard Greene, Heather Hamilton, etc.)</li>
-                                                <li>Town officials (Town Administrator, DPW Commissioner, etc.)</li>
-                                                <li>Locations (Coolidge Corner, Brookline Village, etc.)</li>
-                                                <li>Organizations (BIG, Advisory Committee, Town Meeting, etc.)</li>
-                                            </ul>
-                                        </div>
-                                    )}
-                                </div>
-                            )}
-
-                            {currentStep === 2 && (
-                                <div>
-                                    <h2 style={{fontSize: '28px', marginBottom: '20px', color: 'var(--text-dark)'}}>
-                                        Add Terms Manually
-                                    </h2>
-                                    <p style={{fontSize: '16px', color: 'var(--text-medium)', marginBottom: '24px'}}>
-                                        Add people, places, and organizations one at a time. Include common misspellings
-                                        as aliases.
-                                    </p>
-
-                                    <div className="term-form">
-                                        <div className="setting-group">
-                                            <label className="setting-label">Term (Correct Spelling)</label>
-                                            <input
-                                                type="text"
-                                                className="setting-input"
-                                                placeholder="e.g., Bernard Greene"
-                                                value={newTerm.term}
-                                                onChange={(e) => setNewTerm({...newTerm, term: e.target.value})}
-                                            />
-                                        </div>
-
-                                        <div className="setting-group">
-                                            <label className="setting-label">Category</label>
-                                            <select
-                                                className="setting-input"
-                                                value={newTerm.category}
-                                                onChange={(e) => setNewTerm({...newTerm, category: e.target.value})}
-                                            >
-                                                <option value="person">Person</option>
-                                                <option value="place">Place</option>
-                                                <option value="organization">Organization</option>
-                                            </select>
-                                        </div>
-
-                                        <div className="setting-group">
-                                            <label className="setting-label">Aliases (comma-separated)</label>
-                                            <input
-                                                type="text"
-                                                className="setting-input"
-                                                placeholder="e.g., bernard green, bernie greene"
-                                                value={newTerm.aliases}
-                                                onChange={(e) => setNewTerm({...newTerm, aliases: e.target.value})}
-                                            />
-                                        </div>
-
-                                        <button className="btn-large btn-primary" onClick={addTerm}>
-                                            Add Term
-                                        </button>
-                                    </div>
-
-                                    {terms.length > 0 && (
-                                        <div style={{marginTop: '24px'}}>
-                                            <h3 style={{fontSize: '18px', marginBottom: '12px', color: 'var(--text-dark)'}}>
-                                                Added Terms ({terms.length})
-                                            </h3>
-                                            <div className="term-list">
-                                                {terms.map((term, idx) => (
-                                                    <div key={idx} className="term-item">
-                                                        <div>
-                                                            <span className="term-name">{term.term}</span>
-                                                            <span className="term-category">{term.category}</span>
-                                                        </div>
-                                                        <button
-                                                            className="term-remove"
-                                                            onClick={() => setTerms(terms.filter((_, i) => i !== idx))}
-                                                        >
-                                                            Remove
-                                                        </button>
-                                                    </div>
-                                                ))}
-                                            </div>
-                                        </div>
-                                    )}
-                                </div>
-                            )}
-
-                            {currentStep === 3 && (
-                                <div>
-                                    <h2 style={{fontSize: '28px', marginBottom: '20px', color: 'var(--text-dark)'}}>
-                                        Extract from Documents
-                                    </h2>
-                                    <p style={{fontSize: '16px', color: 'var(--text-medium)', marginBottom: '24px'}}>
-                                        Paste text from meeting agendas, rosters, or other documents. AI will extract
-                                        names and terms automatically.
-                                    </p>
-
-                                    <div className="info-box">
-                                        <div className="info-box-title">How It Works</div>
-                                        <p style={{color: 'var(--text-medium)'}}>
-                                            Using GPT-4, the system identifies person names, place names, and organizations.
-                                            It also generates common misspellings and aliases.
-                                        </p>
-                                    </div>
-
-                                    <div className="setting-group" style={{marginTop: '24px'}}>
-                                        <label className="setting-label">Paste Document Text</label>
-                                        <textarea
-                                            className="setting-input"
-                                            rows="8"
-                                            placeholder="Paste text from meeting agendas, staff directories, etc..."
-                                            id="documentText"
-                                        />
-                                    </div>
-
-                                    <button
-                                        className="btn-large btn-primary"
-                                        onClick={() => {
-                                            const text = document.getElementById('documentText').value;
-                                            if (!text) {
-                                                alert('Please paste some text first');
-                                                return;
-                                            }
-
-                                            fetch('/api/engine/document/extract', {
-                                                method: 'POST',
-                                                headers: { 'Content-Type': 'application/json' },
-                                                body: JSON.stringify({ text })
-                                            })
-                                            .then(r => r.json())
-                                            .then(data => {
-                                                if (data.error) {
-                                                    alert('Error: ' + data.error);
-                                                } else {
-                                                    alert(`AI extracted ${data.terms_added || 0} terms from your document!`);
-                                                    document.getElementById('documentText').value = '';
-                                                }
-                                            })
-                                            .catch(err => {
-                                                alert('Failed to extract terms: ' + err.message);
-                                            });
-                                        }}
-                                    >
-                                        Extract Terms with AI
+                        {/* Main Grid */}
+                        <div style={{display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(400px, 1fr))', gap: '20px'}}>
+                            {/* Quick Start Templates */}
+                            <div className="card">
+                                <h2 className="card-title">Quick Start</h2>
+                                <p style={{fontSize: '14px', color: 'var(--text-medium)', marginBottom: '16px'}}>
+                                    Load a pre-built template or upload an existing engine to get started quickly.
+                                </p>
+                                <div style={{display: 'flex', flexDirection: 'column', gap: '12px'}}>
+                                    <button className="btn-large btn-primary" onClick={loadBrooklineDefaults}>
+                                        Load Brookline Template
                                     </button>
-
-                                    {aiConfig && aiConfig.active && (
-                                        <div style={{marginTop: '16px', padding: '12px', background: isAILocal ? 'var(--bg-sage-light)' : '#FEF3C7', borderRadius: '8px', border: isAILocal ? '2px solid var(--sage-primary)' : '2px solid #FCD34D'}}>
-                                            <strong>{isAILocal ? '🔒 Local Processing' : '☁️ Cloud Processing'}</strong>
-                                            <p style={{fontSize: '14px', marginTop: '4px', color: 'var(--text-dark)'}}>
-                                                {isAILocal
-                                                    ? `Using ${aiConfig.provider.toUpperCase()} - your document text stays on your machine.`
-                                                    : `Using ${aiConfig.provider.toUpperCase()} - document text will be sent to ${aiConfig.provider.toUpperCase()} for processing.`}
-                                            </p>
-                                        </div>
-                                    )}
-
-                                    {(!aiConfig || !aiConfig.active) && (
-                                        <p style={{fontSize: '14px', color: 'var(--text-medium)', marginTop: '16px', fontStyle: 'italic'}}>
-                                            Note: Configure AI provider in AI Settings to enable this feature.
-                                        </p>
-                                    )}
-                                </div>
-                            )}
-
-                            {currentStep === 4 && (
-                                <div>
-                                    <h2 style={{fontSize: '28px', marginBottom: '20px', color: 'var(--text-dark)'}}>
-                                        Extract from Websites
-                                    </h2>
-                                    <p style={{fontSize: '16px', color: 'var(--text-medium)', marginBottom: '24px'}}>
-                                        Enter URLs to web pages containing relevant terms. AI will scrape and
-                                        extract names automatically.
-                                    </p>
-
-                                    <div className="info-box">
-                                        <div className="info-box-title">Example Sources</div>
-                                        <ul style={{paddingLeft: '20px', color: 'var(--text-medium)', marginTop: '8px'}}>
-                                            <li>Town government staff directory</li>
-                                            <li>Select Board / City Council member list</li>
-                                            <li>Local landmarks and attractions pages</li>
-                                            <li>Community organization websites</li>
-                                        </ul>
-                                    </div>
-
-                                    <div className="setting-group" style={{marginTop: '24px'}}>
-                                        <label className="setting-label">Website URL</label>
-                                        <input
-                                            type="url"
-                                            className="setting-input"
-                                            placeholder="https://example.com/staff-directory"
-                                            id="webUrl"
-                                        />
-                                    </div>
-
-                                    <button
-                                        className="btn-large btn-primary"
-                                        onClick={() => {
-                                            const url = document.getElementById('webUrl').value;
-                                            if (!url) {
-                                                alert('Please enter a URL first');
-                                                return;
-                                            }
-
-                                            fetch('/api/engine/web/extract', {
-                                                method: 'POST',
-                                                headers: { 'Content-Type': 'application/json' },
-                                                body: JSON.stringify({ url })
-                                            })
-                                            .then(r => r.json())
-                                            .then(data => {
-                                                if (data.error) {
-                                                    alert('Error: ' + data.error);
-                                                } else {
-                                                    alert(`AI extracted ${data.terms_added || 0} terms from ${url}!`);
-                                                    document.getElementById('webUrl').value = '';
-                                                }
-                                            })
-                                            .catch(err => {
-                                                alert('Failed to scrape website: ' + err.message);
-                                            });
-                                        }}
-                                    >
-                                        Scrape Website with AI
+                                    <label className="btn-large btn-outline" style={{display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer'}}>
+                                        Upload Engine JSON
+                                        <input type="file" accept=".json" onChange={uploadEngine} style={{display: 'none'}} />
+                                    </label>
+                                    <button className="btn-large btn-outline" onClick={exportEngine}>
+                                        Download Current Engine
                                     </button>
-
-                                    {aiConfig && aiConfig.active && (
-                                        <div style={{marginTop: '16px', padding: '12px', background: isAILocal ? 'var(--bg-sage-light)' : '#FEF3C7', borderRadius: '8px', border: isAILocal ? '2px solid var(--sage-primary)' : '2px solid #FCD34D'}}>
-                                            <strong>{isAILocal ? '🔒 Local Processing' : '☁️ Cloud Processing'}</strong>
-                                            <p style={{fontSize: '14px', marginTop: '4px', color: 'var(--text-dark)'}}>
-                                                {isAILocal
-                                                    ? `Using ${aiConfig.provider.toUpperCase()} - web content is processed locally on your machine.`
-                                                    : `Using ${aiConfig.provider.toUpperCase()} - web content will be sent to ${aiConfig.provider.toUpperCase()} for processing.`}
-                                            </p>
-                                        </div>
-                                    )}
-
-                                    {(!aiConfig || !aiConfig.active) && (
-                                        <p style={{fontSize: '14px', color: 'var(--text-medium)', marginTop: '16px', fontStyle: 'italic'}}>
-                                            Note: Configure AI provider in AI Settings to enable this feature.
-                                        </p>
-                                    )}
                                 </div>
-                            )}
+                            </div>
 
-                            {currentStep === 5 && (
-                                <div>
-                                    <h2 style={{fontSize: '28px', marginBottom: '20px', color: 'var(--text-dark)'}}>
-                                        Test Your Engine
-                                    </h2>
-                                    <p style={{fontSize: '16px', color: 'var(--text-medium)', marginBottom: '24px'}}>
-                                        Type some text with misspellings to see how the engine corrects it.
-                                    </p>
-
+                            {/* Manual Term Entry */}
+                            <div className="card">
+                                <h2 className="card-title">Add Term Manually</h2>
+                                <p style={{fontSize: '14px', color: 'var(--text-medium)', marginBottom: '16px'}}>
+                                    Fine-tune your engine by adding individual terms, names, and places.
+                                </p>
+                                <div style={{display: 'flex', flexDirection: 'column', gap: '12px'}}>
                                     <div className="setting-group">
-                                        <label className="setting-label">Test Input</label>
+                                        <label className="setting-label">Term</label>
+                                        <input
+                                            type="text"
+                                            className="setting-input"
+                                            placeholder="e.g., Bernard Greene"
+                                            value={newTerm.term}
+                                            onChange={(e) => setNewTerm({...newTerm, term: e.target.value})}
+                                        />
+                                    </div>
+                                    <div className="setting-group">
+                                        <label className="setting-label">Category</label>
+                                        <select
+                                            className="setting-input"
+                                            value={newTerm.category}
+                                            onChange={(e) => setNewTerm({...newTerm, category: e.target.value})}
+                                        >
+                                            <option value="person">Person</option>
+                                            <option value="place">Place</option>
+                                            <option value="organization">Organization</option>
+                                        </select>
+                                    </div>
+                                    <div className="setting-group">
+                                        <label className="setting-label">Aliases (comma-separated)</label>
+                                        <input
+                                            type="text"
+                                            className="setting-input"
+                                            placeholder="e.g., bernard green, bernie greene"
+                                            value={newTerm.aliases}
+                                            onChange={(e) => setNewTerm({...newTerm, aliases: e.target.value})}
+                                        />
+                                    </div>
+                                    <button className="btn-large btn-primary" onClick={addTerm}>
+                                        Add Term
+                                    </button>
+                                </div>
+                            </div>
+
+                            {/* AI Document Extraction */}
+                            <div className="card">
+                                <h2 className="card-title">Extract from Document</h2>
+                                <p style={{fontSize: '14px', color: 'var(--text-medium)', marginBottom: '16px'}}>
+                                    Paste text from agendas, rosters, or directories. AI extracts names automatically.
+                                </p>
+                                {(!aiConfig || !aiConfig.active) && (
+                                    <div style={{padding: '16px', background: '#FEF3C7', borderRadius: '8px', marginBottom: '12px'}}>
+                                        <p style={{fontSize: '13px', color: 'var(--text-dark)'}}>
+                                            Configure AI provider in AI Settings to enable extraction.
+                                        </p>
+                                    </div>
+                                )}
+                                <div className="setting-group">
+                                    <label className="setting-label">Paste Document Text</label>
+                                    <textarea
+                                        className="setting-input"
+                                        rows="6"
+                                        placeholder="Paste meeting agendas, staff directories, etc..."
+                                        id="documentText"
+                                        disabled={!aiConfig || !aiConfig.active}
+                                    />
+                                </div>
+                                <button
+                                    className="btn-large btn-primary"
+                                    disabled={!aiConfig || !aiConfig.active}
+                                    onClick={() => {
+                                        const text = document.getElementById('documentText').value;
+                                        if (!text) {
+                                            alert('Please paste some text first');
+                                            return;
+                                        }
+                                        fetch('/api/engine/document/extract', {
+                                            method: 'POST',
+                                            headers: { 'Content-Type': 'application/json' },
+                                            body: JSON.stringify({ text })
+                                        })
+                                        .then(r => r.json())
+                                        .then(data => {
+                                            if (data.error) {
+                                                alert('Error: ' + data.error);
+                                            } else {
+                                                alert(`Extracted ${data.terms_added || 0} terms!`);
+                                                document.getElementById('documentText').value = '';
+                                                loadEngineStats();
+                                            }
+                                        });
+                                    }}
+                                >
+                                    Extract Terms with AI
+                                </button>
+                                {aiConfig && aiConfig.active && (
+                                    <p style={{fontSize: '12px', color: 'var(--text-medium)', marginTop: '8px'}}>
+                                        {isAILocal ? '🔒 Local processing' : '☁️ Cloud processing'} via {aiConfig.provider.toUpperCase()}
+                                    </p>
+                                )}
+                            </div>
+
+                            {/* AI Web Scraping */}
+                            <div className="card">
+                                <h2 className="card-title">Extract from Website</h2>
+                                <p style={{fontSize: '14px', color: 'var(--text-medium)', marginBottom: '16px'}}>
+                                    Enter URLs to staff directories, council member lists, or community pages.
+                                </p>
+                                {(!aiConfig || !aiConfig.active) && (
+                                    <div style={{padding: '16px', background: '#FEF3C7', borderRadius: '8px', marginBottom: '12px'}}>
+                                        <p style={{fontSize: '13px', color: 'var(--text-dark)'}}>
+                                            Configure AI provider in AI Settings to enable scraping.
+                                        </p>
+                                    </div>
+                                )}
+                                <div className="setting-group">
+                                    <label className="setting-label">Website URL</label>
+                                    <input
+                                        type="url"
+                                        className="setting-input"
+                                        placeholder="https://example.com/staff-directory"
+                                        id="webUrl"
+                                        disabled={!aiConfig || !aiConfig.active}
+                                    />
+                                </div>
+                                <button
+                                    className="btn-large btn-primary"
+                                    disabled={!aiConfig || !aiConfig.active}
+                                    onClick={() => {
+                                        const url = document.getElementById('webUrl').value;
+                                        if (!url) {
+                                            alert('Please enter a URL first');
+                                            return;
+                                        }
+                                        fetch('/api/engine/web/extract', {
+                                            method: 'POST',
+                                            headers: { 'Content-Type': 'application/json' },
+                                            body: JSON.stringify({ url })
+                                        })
+                                        .then(r => r.json())
+                                        .then(data => {
+                                            if (data.error) {
+                                                alert('Error: ' + data.error);
+                                            } else {
+                                                alert(`Extracted ${data.terms_added || 0} terms from ${url}!`);
+                                                document.getElementById('webUrl').value = '';
+                                                loadEngineStats();
+                                            }
+                                        });
+                                    }}
+                                >
+                                    Scrape Website with AI
+                                </button>
+                                {aiConfig && aiConfig.active && (
+                                    <p style={{fontSize: '12px', color: 'var(--text-medium)', marginTop: '8px'}}>
+                                        {isAILocal ? '🔒 Local processing' : '☁️ Cloud processing'} via {aiConfig.provider.toUpperCase()}
+                                    </p>
+                                )}
+                            </div>
+
+                            {/* Test Engine */}
+                            <div className="card" style={{gridColumn: 'span 2'}}>
+                                <h2 className="card-title">Test Your Engine</h2>
+                                <p style={{fontSize: '14px', color: 'var(--text-medium)', marginBottom: '16px'}}>
+                                    Type text with misspellings to see how the engine corrects it in real-time.
+                                </p>
+                                <div style={{display: 'grid', gridTemplateColumns: '1fr auto 1fr', gap: '16px', alignItems: 'start'}}>
+                                    <div>
+                                        <label className="setting-label">Input (with errors)</label>
                                         <textarea
                                             className="setting-input"
                                             rows="4"
-                                            placeholder="e.g., Welcome to the Brooklyn Select Board meeting with Chair Bernard Green"
+                                            placeholder="e.g., Brooklyn Select Board with bernard green"
                                             value={testText}
                                             onChange={(e) => setTestText(e.target.value)}
                                         />
                                     </div>
-
-                                    <button className="btn-large btn-primary" onClick={testCorrection}>
-                                        Test Correction
-                                    </button>
-
-                                    {testResult && (
-                                        <div style={{marginTop: '24px'}}>
-                                            <h3 style={{fontSize: '18px', marginBottom: '12px', color: 'var(--text-dark)'}}>
-                                                Result:
-                                            </h3>
-                                            <div style={{padding: '20px', background: 'var(--bg-sage-light)', borderRadius: 'var(--radius-md)', fontSize: '16px', lineHeight: '1.7'}}>
-                                                {testResult}
-                                            </div>
+                                    <div style={{display: 'flex', alignItems: 'center', paddingTop: '32px'}}>
+                                        <button className="btn-large btn-primary" onClick={testCorrection}>
+                                            Test →
+                                        </button>
+                                    </div>
+                                    <div>
+                                        <label className="setting-label">Output (corrected)</label>
+                                        <div style={{padding: '16px', background: 'var(--bg-sage-light)', borderRadius: 'var(--radius-md)', minHeight: '96px', fontSize: '14px', lineHeight: '1.6'}}>
+                                            {testResult || 'Corrected text will appear here...'}
                                         </div>
-                                    )}
-
-                                    <div className="info-box" style={{marginTop: '24px'}}>
-                                        <div className="info-box-title">Example Test Cases</div>
-                                        <ul style={{paddingLeft: '20px', color: 'var(--text-medium)', marginTop: '8px'}}>
-                                            <li>"Brooklyn Select Board" → "Brookline Select Board"</li>
-                                            <li>"bernard green" → "Bernard Greene"</li>
-                                            <li>"coolidge corner theater" → "Coolidge Corner Theatre"</li>
-                                        </ul>
                                     </div>
                                 </div>
-                            )}
+                            </div>
 
-                            {currentStep === 6 && (
-                                <div>
-                                    <h2 style={{fontSize: '28px', marginBottom: '20px', color: 'var(--text-dark)'}}>
-                                        Save & Export Your Engine
-                                    </h2>
-                                    <p style={{fontSize: '16px', color: 'var(--text-medium)', marginBottom: '24px'}}>
-                                        Your engine is ready! You can download it as a JSON file to share with other
-                                        community media organizations or use as a backup.
+                            {/* Recent Terms */}
+                            {recentTerms.length > 0 && (
+                                <div className="card" style={{gridColumn: 'span 2'}}>
+                                    <h2 className="card-title">Current Terms ({engineStats?.term_count || 0})</h2>
+                                    <div style={{display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(250px, 1fr))', gap: '8px', marginTop: '12px'}}>
+                                        {recentTerms.map((term, idx) => (
+                                            <div key={idx} style={{padding: '10px', background: 'var(--bg-sage-light)', borderRadius: '8px', fontSize: '14px'}}>
+                                                <div style={{fontWeight: '600', color: 'var(--text-dark)'}}>{term.term}</div>
+                                                <div style={{fontSize: '12px', color: 'var(--text-medium)'}}>{term.category}</div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                    <p style={{fontSize: '12px', color: 'var(--text-medium)', marginTop: '12px', fontStyle: 'italic'}}>
+                                        Showing first 10 terms. Download engine JSON to see all terms.
                                     </p>
-
-                                    <div className="info-box">
-                                        <div className="info-box-title">Your Engine Is Active</div>
-                                        <p style={{color: 'var(--text-medium)'}}>
-                                            All corrections are now being applied in real-time. The engine will continue
-                                            learning as you add more terms through the dashboard.
-                                        </p>
-                                    </div>
-
-                                    <button className="btn-large btn-primary" onClick={exportEngine} style={{marginTop: '24px'}}>
-                                        Download Engine JSON
-                                    </button>
-
-                                    <div style={{marginTop: '32px', padding: '24px', background: 'var(--bg-sage-light)', borderRadius: 'var(--radius-md)'}}>
-                                        <h3 style={{fontSize: '20px', marginBottom: '12px', color: 'var(--sage-darker)'}}>
-                                            Next Steps
-                                        </h3>
-                                        <ul style={{paddingLeft: '20px', color: 'var(--text-medium)', lineHeight: '1.8'}}>
-                                            <li>Return to the dashboard to start captioning</li>
-                                            <li>Monitor corrections in real-time</li>
-                                            <li>Add more terms as you discover errors</li>
-                                            <li>Share your engine file with other organizations</li>
-                                        </ul>
-                                    </div>
-
-                                    <button className="btn-large btn-outline" onClick={onBack} style={{marginTop: '24px'}}>
-                                        Return to Dashboard
-                                    </button>
                                 </div>
-                            )}
-                        </div>
-
-                        <div className="wizard-nav">
-                            {currentStep > 0 && (
-                                <button
-                                    className="wizard-btn wizard-btn-secondary"
-                                    onClick={() => setCurrentStep(currentStep - 1)}
-                                >
-                                    ← Previous
-                                </button>
-                            )}
-                            {currentStep < steps.length - 1 && (
-                                <button
-                                    className="wizard-btn wizard-btn-primary"
-                                    onClick={() => setCurrentStep(currentStep + 1)}
-                                >
-                                    Next →
-                                </button>
                             )}
                         </div>
                     </div>
