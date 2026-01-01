@@ -50,6 +50,26 @@ brew install portaudio
 sudo apt install portaudio19-dev
 ```
 
+### Enable AI Features (Optional)
+
+AI-powered features require an OpenAI API key:
+
+```bash
+# Install OpenAI library
+pip3 install openai
+
+# Set your API key
+export OPENAI_API_KEY="sk-..."
+
+# Or add to your shell profile (.zshrc, .bashrc, etc.)
+echo 'export OPENAI_API_KEY="sk-..."' >> ~/.zshrc
+```
+
+**AI Features:**
+- AI-powered session summaries with GPT-4
+- Document text extraction (paste meeting agendas to extract names)
+- Web scraping (extract terms from staff directory pages)
+
 ---
 
 ## Usage
@@ -163,4 +183,4 @@ A community AI project from [Brookline Interactive Group](https://brooklineinter
 
 Designed and developed by [Stephen Walter](https://weirdmachine.org)
 
-Licensed under CC BY-SA 4.0
+Licensed under CC BY-NC-SA 4.0 (non-commercial use only)
