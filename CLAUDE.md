@@ -372,9 +372,20 @@ community-captioner/
 - [x] **Sorted by pattern length** - Longest matches first
 - [x] **Export/import** as portable JSON
 
+### v4.0 Frontend Updates - COMPLETED (January 2026)
+
+#### Homepage Revamp
+- [x] **SVG Feature Card Graphics** - Custom icons for Live Overlay, AI Caption Engine, Session Refinement
+- [x] **Animated Feature Links** - Arrow animations on hover, click-through to relevant pages
+- [x] **Architecture Diagram** - Visual pipeline showing v4.0 RAG engine flow
+- [x] **Renamed "Session Recording"** → "Session Refinement + Analysis" to reflect v4.0 capabilities
+
+#### Control Dashboard Updates
+- [x] **Live Overlay Network URLs** - Three access scenarios: localhost, LAN, cloud mode
+- [x] **Improved URL Display** - Cleaner layout with context for each access method
+
 ### Known Issues & Limitations
 - **Double correction edge case** - When "coolidge corner" becomes "Coolidge Corner", the standalone alias "coolidge" still matches (by design, acceptable for template)
-- Frontend UI needs updates to use new v4.0 API endpoints
 - Cloud server not tested recently
 - Translation features deprioritized (leave to last)
 
@@ -396,14 +407,14 @@ community-captioner/
 - **Warm color palette** - Beige backgrounds with sage green accents
 - **Legal compliance** - Prominent messaging about captioning requirements
 
-## Remaining Tasks (v4.0)
+## Roadmap (v4.1 and Beyond)
 
-### High Priority - Frontend Updates
-1. **Update Dashboard UI** - Add RAG controls (enable/disable, suggestions review)
-2. **Analytics Dashboard View** - Display word cloud, sentiment, topics from `/api/session/analytics`
-3. **Knowledge Base UI** - Document upload, entity viewer, sync button
-4. **Video Panel** - Upload video, generate highlights, download reel
-5. **Suggestions Panel** - Review and accept/reject low-confidence suggestions
+### Next Steps - Frontend UI for v4.0 Features
+1. **RAG Suggestions Panel** - Review and accept/reject low-confidence suggestions (0.60-0.85)
+2. **Analytics Dashboard View** - Display word cloud, sentiment timeline, topics from `/api/session/analytics`
+3. **Knowledge Base UI** - Document upload panel, entity viewer, sync button
+4. **Video Intelligence Panel** - Upload video, generate highlights, download reel
+5. **Session Refinement UI** - Post-session review with side-by-side comparison
 
 ### Medium Priority
 1. **Live Corrections UI** - Edit corrections in real-time during session
@@ -416,6 +427,21 @@ community-captioner/
 2. **Post-session batch translation** of entire transcript
 3. **Multiple simultaneous languages**
 4. **Context-aware translation** using full transcript
+
+### v4.0 Summary - What's New
+The v4.0 release transforms Community Captioner from a basic pattern-matching system into a sophisticated AI-powered caption correction engine:
+
+| Feature | v3.1 | v4.0 |
+|---------|------|------|
+| Correction Method | Regex only | Regex + Fuzzy + Semantic |
+| Confidence Levels | None | 3-tier (auto/suggest/ignore) |
+| Learning | Static rules | Real-time ASR learning |
+| Document Ingestion | None | PDF/DOCX with AI extraction |
+| Session Analytics | Basic stats | Word cloud, sentiment, topics |
+| Video Support | None | Highlights + clip extraction |
+| Audio Recording | None | WAV capture for reprocessing |
+
+**Backend Complete, Frontend Partially Updated** - The v4.0 backend is fully implemented with ~50 new API endpoints. The homepage and dashboard have been updated with visual improvements, but dedicated UI panels for analytics, video, and knowledge base features are still needed.
 
 ## Development Notes
 
