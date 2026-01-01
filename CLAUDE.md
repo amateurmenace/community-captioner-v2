@@ -1,21 +1,21 @@
-# Community Captioner v2
+# Community Captioner v4.0 - Advanced RAG Engine
 
 ## Project Overview
 
-**Community Captioner v2** is a free, open-source live captioning system for community media organizations. It provides real-time speech-to-text with local AI-powered corrections for proper nouns (names, places, organizations).
+**Community Captioner v4.0** is a free, open-source live captioning system for community media organizations. It provides real-time speech-to-text with an **Advanced RAG Caption Engine** that uses semantic similarity matching, fuzzy matching, and real-time learning for near-human accuracy correction of proper nouns.
 
 **Primary User:** Brookline Interactive Group (BIG) - a community media organization in Brookline, MA that broadcasts town meetings, events, and local programming.
 
-**Problem Solved:** Commercial captioning encoders cost $30K+. This provides a zero-cost alternative using browser APIs and optional local Whisper AI.
+**Problem Solved:** Commercial captioning encoders cost $30K+. This provides a zero-cost alternative using browser APIs, optional local Whisper AI, and advanced AI-powered corrections.
 
-## Architecture
+## Architecture (v4.0)
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
 │                    Browser (index.html)                      │
 │  ┌─────────────┐  ┌─────────────┐  ┌─────────────────────┐  │
 │  │ Web Speech  │  │   React     │  │  Settings/Controls  │  │
-│  │    API      │  │    UI       │  │                     │  │
+│  │    API      │  │    UI       │  │  Analytics Dashboard│  │
 │  └──────┬──────┘  └──────┬──────┘  └──────────┬──────────┘  │
 └─────────┼────────────────┼───────────────────┼──────────────┘
           │                │                   │
@@ -23,17 +23,24 @@
 ┌─────────────────────────────────────────────────────────────┐
 │                 Python Server (start-server.py)              │
 │  ┌─────────────┐  ┌─────────────┐  ┌─────────────────────┐  │
-│  │   Whisper   │  │   Caption   │  │     Session         │  │
-│  │   Engine    │  │   Engine    │  │     Manager         │  │
-│  │ (optional)  │  │   (RAG)     │  │                     │  │
+│  │   Whisper   │  │  Advanced   │  │   Session Manager   │  │
+│  │   Engine    │  │ RAG Engine  │  │  + Audio Recording  │  │
+│  │ (optional)  │  │ (v4.0)      │  │                     │  │
+│  └─────────────┘  └─────────────┘  └─────────────────────┘  │
+│  ┌─────────────┐  ┌─────────────┐  ┌─────────────────────┐  │
+│  │  Knowledge  │  │    GPT      │  │     Video           │  │
+│  │    Base     │  │  Processor  │  │  Intelligence       │  │
+│  │ (PDF/DOCX)  │  │             │  │   (ffmpeg)          │  │
 │  └─────────────┘  └─────────────┘  └─────────────────────┘  │
 └─────────────────────────────────────────────────────────────┘
           │                │                   │
           ▼                ▼                   ▼
 ┌─────────────────────────────────────────────────────────────┐
 │                      File System                             │
-│  context-data/     sessions/          engines/               │
-│  (engine state)    (recordings)       (portable engines)     │
+│  context-data/     sessions/          knowledge/             │
+│  (engine state)    (recordings)       (documents)            │
+│  embeddings/       audio/             videos/                │
+│  (vector cache)    (audio files)      (clips/reels)          │
 └─────────────────────────────────────────────────────────────┘
 ```
 
@@ -43,11 +50,23 @@
 - **Web Speech API** (browser) - Real-time ~200ms, requires Chrome/Edge + internet
 - **Whisper** (local) - Accurate, 2-4s latency, works offline, requires `faster-whisper`
 
-### 2. Caption Engine (RAG)
-Corrects ASR errors for local proper nouns:
-- "Brooklyn" → "Brookline" (common ASR error)
-- "bernard green" → "Bernard Greene" (capitalization + spelling)
-- "selectboard" → "Select Board" (formatting)
+### 2. Advanced RAG Caption Engine (v4.0) - THE CORE FEATURE
+The v4.0 engine uses a hybrid approach combining:
+
+**Real-Time Correction Methods:**
+1. **Regex Pattern Matching** - Fast, exact matching for known terms
+2. **Fuzzy Matching** - Levenshtein distance for typos (threshold: 0.80)
+3. **Semantic Similarity** - Vector embeddings via sentence-transformers or OpenAI
+4. **Learned Patterns** - Auto-learns from observed ASR mistakes
+
+**Confidence Thresholds:**
+- `>= 0.85` - Auto-correct immediately
+- `0.60 - 0.85` - Add to suggestions for review
+- `< 0.60` - Ignore
+
+**Context-Aware Disambiguation:**
+- "Brooklyn Select Board" → "Brookline Select Board" (local context)
+- "Brooklyn Nets game" → unchanged (NYC sports context)
 
 **Data structure:**
 ```python
@@ -56,26 +75,56 @@ terms = {
         "term": "Bernard Greene",
         "category": "person",  # person|place|organization
         "aliases": ["bernard green", "bernie greene"],
-        "source": "default"  # default|manual|document
+        "source": "default",  # default|manual|document|knowledge_base
+        "context": "Brookline Select Board member",
+        "metadata": {"title": "Chair", "organization": "Select Board"}
     }
 }
 ```
 
-### 3. Session Manager
+### 3. Session Manager (v4.0)
 Records captioning sessions with:
 - Timestamps for each caption segment
 - Raw and corrected text
 - All corrections applied
+- **Audio recording** for post-session Whisper reprocessing
 - Export to SRT, VTT, TXT, JSON
 
-### 4. Portable Engines
-Engines can be exported/imported as JSON files to share correction rules between organizations.
+### 4. Knowledge Base
+- Upload PDFs, DOCX, or text documents
+- AI-powered entity extraction (people, places, organizations)
+- Semantic search across documents
+- Auto-sync extracted entities to caption engine
+
+### 5. GPT Post-Processor
+- Real-time grammar and punctuation fixes
+- Named entity recognition
+- Sentence boundary detection
+
+### 6. Session Analytics
+- Word cloud generation
+- Sentiment timeline analysis
+- Topic modeling and segmentation
+- Correction frequency heatmap
+- Quality metrics dashboard
+
+### 7. Video Intelligence
+- Video upload (MP4/MOV)
+- AI-powered highlight detection from transcript
+- Clip extraction with ffmpeg
+- Automated highlight reel generation
+
+### 8. Portable Engines
+Engines can be exported/imported as JSON files including:
+- All terms with aliases and metadata
+- Learned ASR patterns
+- Custom correction rules
 
 ## File Structure
 
 ```
 community-captioner/
-├── start-server.py      # Main Python server (FastAPI-style with http.server)
+├── start-server.py      # Main Python server (v4.0 with all AI features)
 ├── index.html           # React SPA control panel
 ├── overlay.html         # OBS browser source overlay
 ├── cloud-server.py      # Optional cloud relay server
@@ -83,9 +132,19 @@ community-captioner/
 ├── CLAUDE.md            # This file
 ├── README.md            # User documentation
 ├── context-data/        # Engine state persistence
-│   └── engine_state.json
+│   ├── engine_state.json
+│   ├── asr_patterns.json    # Learned ASR corrections
+│   └── embeddings/          # Cached vector embeddings
 ├── sessions/            # Recorded session data
 │   └── {session_id}.json
+├── audio/               # Session audio recordings
+│   └── {session_id}.wav
+├── knowledge/           # Uploaded documents
+│   ├── knowledge_index.json
+│   └── {doc_id}_{filename}
+├── videos/              # Video files and clips
+│   └── clips/           # Generated highlight clips
+├── analytics/           # Analytics data
 └── engines/             # Portable engine files
     └── brookline_ma.json
 ```
@@ -96,17 +155,29 @@ community-captioner/
 - `GET /api/caption` - Get current caption state
 - `POST /api/caption` - Send caption text + settings
 
-### Engine
-- `GET /api/engine/status` - Engine stats and recent corrections
-- `GET /api/engine/terms` - List all terms
+### Engine (Core)
+- `GET /api/engine/status` - Engine stats, RAG status, recent corrections
+- `GET /api/engine/terms` - List all terms with metadata
 - `GET /api/engine/corrections` - Recent corrections log
 - `GET /api/engine/test?text=...` - Test correction on text
 - `GET /api/engine/export` - Download engine as JSON
 - `POST /api/engine/enable` - Enable/disable engine
-- `POST /api/engine/term` - Add term `{term, category, aliases}`
+- `POST /api/engine/term` - Add term `{term, category, aliases, context, metadata}`
 - `POST /api/engine/term/remove` - Remove term
 - `POST /api/engine/import` - Upload engine JSON
 - `POST /api/engine/defaults` - Load Brookline defaults
+
+### RAG Engine (v4.0)
+- `GET /api/engine/suggestions` - Pending low-confidence suggestions
+- `GET /api/engine/learned` - Learned ASR patterns
+- `GET /api/engine/embeddings/status` - Embeddings availability
+- `POST /api/engine/rag/enable` - Enable/disable RAG features
+- `POST /api/engine/suggestion/accept` - Accept a suggestion
+- `POST /api/engine/suggestion/reject` - Reject a suggestion
+- `POST /api/engine/learned/clear` - Clear learned patterns
+- `POST /api/engine/aliases/generate` - Auto-generate aliases for term
+- `POST /api/session/refine` - Post-session consistency analysis
+- `POST /api/session/refine/apply` - Apply a refinement
 
 ### Whisper
 - `GET /api/whisper/status` - Availability and model status
@@ -119,12 +190,39 @@ community-captioner/
 - `GET /api/session/status` - Recording status and stats
 - `GET /api/session/captions` - All captions in session
 - `GET /api/session/summary` - Generate summary
+- `GET /api/session/analytics` - Full analytics dashboard data
+- `GET /api/session/analytics/sentiment` - Sentiment timeline
 - `GET /api/session/export/srt` - Export SRT
 - `GET /api/session/export/vtt` - Export VTT
 - `GET /api/session/export/txt` - Export transcript
 - `GET /api/session/export/json` - Export full JSON
-- `POST /api/session/start` - Start recording `{name}`
+- `POST /api/session/start` - Start recording `{name, record_audio, audio_device}`
 - `POST /api/session/stop` - Stop recording
+- `POST /api/session/reprocess` - Reprocess with Whisper
+- `POST /api/session/reprocess/apply` - Apply reprocessed captions
+
+### Knowledge Base
+- `GET /api/knowledge/status` - Documents and entity counts
+- `GET /api/knowledge/entities` - All extracted entities
+- `GET /api/knowledge/search?q=...` - Semantic search
+- `POST /api/knowledge/upload` - Upload document (base64 or text)
+- `POST /api/knowledge/remove` - Remove document
+- `POST /api/knowledge/sync` - Sync entities to caption engine
+- `POST /api/knowledge/search` - Search with query
+
+### GPT Post-Processor
+- `GET /api/gpt/status` - Processor status
+- `POST /api/gpt/enable` - Enable/disable processing
+- `POST /api/gpt/process` - Process text
+- `POST /api/gpt/extract-entities` - Extract entities from text
+- `POST /api/gpt/clear` - Clear buffer
+
+### Video Intelligence
+- `GET /api/video/status` - Video and ffmpeg status
+- `POST /api/video/upload` - Upload video (base64)
+- `POST /api/video/highlights` - Generate highlight moments
+- `POST /api/video/clip` - Extract single clip
+- `POST /api/video/highlight-reel` - Generate full highlight reel
 
 ## Key Technical Decisions
 
@@ -156,7 +254,51 @@ community-captioner/
 - BIG (Brookline Interactive Group) - Community media
 - Advisory Committee - Finance oversight
 
-## Current State (v3.1)
+## Current State (v4.0)
+
+### v4.0 Backend Implementation - COMPLETED
+
+#### Advanced RAG Caption Engine - IMPLEMENTED
+- [x] **Vector Embeddings** - sentence-transformers integration with fallback to OpenAI
+- [x] **Semantic Similarity Matching** - cosine similarity for context-aware corrections
+- [x] **Fuzzy Matching** - Levenshtein distance with 0.80 threshold
+- [x] **Confidence Thresholds** - 0.85+ auto-correct, 0.60-0.85 suggest
+- [x] **Real-time Learning** - ASRLearner class tracks and learns from corrections
+- [x] **Context-Aware Disambiguation** - NYC vs Brookline context detection
+- [x] **Automatic Alias Generation** - AI-powered and rule-based
+
+#### Post-Session Refinement - IMPLEMENTED
+- [x] **Consistency Enforcement** - Detects spelling variations across session
+- [x] **Bulk Refinement API** - `/api/session/refine` and `/api/session/refine/apply`
+- [x] **Quality Metrics** - Correction rate, proper noun analysis
+
+#### Knowledge Base - IMPLEMENTED
+- [x] **PDF/DOCX Ingestion** - Extracts text from uploaded documents
+- [x] **Entity Extraction** - AI-powered extraction of people/places/orgs
+- [x] **Semantic Search** - Vector-based search across documents
+- [x] **Engine Sync** - One-click sync of entities to caption engine
+
+#### GPT Post-Processor - IMPLEMENTED
+- [x] **Real-time Enhancement** - Grammar, punctuation fixes
+- [x] **Entity Recognition** - Extract entities from caption stream
+- [x] **Buffer Context** - Uses recent context for better processing
+
+#### Session Analytics - IMPLEMENTED
+- [x] **Word Cloud Data** - Frequency analysis for visualization
+- [x] **Sentiment Timeline** - AI-powered sentiment over time
+- [x] **Topic Analysis** - Identifies main discussion topics
+- [x] **Quality Metrics** - Corrections heatmap, pace analysis
+
+#### Audio Recording - IMPLEMENTED
+- [x] **Session Audio Capture** - WAV format recording
+- [x] **Whisper Reprocessing** - Post-session accuracy pass
+- [x] **Side-by-side Comparison** - Compare real-time vs reprocessed
+
+#### Video Intelligence - IMPLEMENTED
+- [x] **Video Upload** - MP4/MOV file handling
+- [x] **AI Highlight Detection** - Identifies key moments from transcript
+- [x] **Clip Extraction** - ffmpeg-based clip generation
+- [x] **Highlight Reel** - Automated compilation of clips
 
 ### Completed Features - January 2026 Update (v3.1)
 
@@ -232,11 +374,9 @@ community-captioner/
 
 ### Known Issues & Limitations
 - **Double correction edge case** - When "coolidge corner" becomes "Coolidge Corner", the standalone alias "coolidge" still matches (by design, acceptable for template)
-- Summary generation is basic (stats only, no AI)
-- No audio recording for post-session Whisper reprocessing
-- Document upload feature has UI but needs server implementation
-- Web scraping feature has UI but needs server implementation
+- Frontend UI needs updates to use new v4.0 API endpoints
 - Cloud server not tested recently
+- Translation features deprioritized (leave to last)
 
 ### Technical Improvements
 - index.html: 3,717 → 3,600 lines (wizard redesign simplified code)
@@ -256,128 +396,26 @@ community-captioner/
 - **Warm color palette** - Beige backgrounds with sage green accents
 - **Legal compliance** - Prominent messaging about captioning requirements
 
-## Planned Features (Priority Order)
+## Remaining Tasks (v4.0)
 
-### High Priority - Core Functionality Fixes
-1. **Fix Browser Speech Recognition** - Debug why mic recognition not generating captions
-2. **Fix Whisper Mode** - Debug why Whisper not working
-3. **Fix Caption Engine** - Brooklyn should become Brookline in test function
-4. **Audio Recording** - Record session audio for Whisper reprocessing
-5. **Accuracy Pass** - Re-run Whisper on recorded audio for cleaner export
-
-### High Priority - Major AI Enhancements (v4.0)
-
-#### 1. Advanced RAG Caption Engine - **THE CORE FEATURE**
-
-**What Makes This Different:**
-Current caption engine is basic pattern matching. v4.0 will be a TRUE RAG system that revolutionizes caption correction.
-
-**Real-Time Correction Architecture:**
-- **Vector embeddings** for all terms using sentence-transformers
-- **Semantic similarity matching** instead of regex patterns
-- **Context-aware corrections** that understand "Brookline Select Board" vs "Brooklyn Nets"
-- **Multi-word entity recognition** ("Bernard Greene" not "bernard" + "greene")
-- **Fuzzy matching** with confidence thresholds (0.8+ = auto-correct, 0.5-0.8 = suggest)
-- **Real-time learning** that observes ASR mistakes and builds correction rules automatically
-
-**Post-Session Refinement:**
-- **Second-pass correction** using full transcript context
-- **Consistency enforcement** (if "Bernard Greene" appears 10x, fix the 2 "Bernard Green" errors)
-- **Acronym expansion** based on first usage (DPW → Department of Public Works)
-- **Cross-reference validation** against knowledge base
-- **Bulk find-and-replace** across entire session with preview
-
-**Knowledge Base Integration:**
-- **Document ingestion**: Upload PDFs, meeting minutes, org charts
-- **Web scraping**: Pull names from town website, LinkedIn, public records
-- **Entity extraction**: GPT-4 extracts people, places, orgs with relationships
-- **Automatic alias generation**: "Select Board" → ["selectboard", "board", "select bored"]
-- **Contextual metadata**: Store job titles, locations, affiliations for disambiguation
-
-**Why This Matters:**
-This isn't just spell-check. It's an AI that learns your organization's unique language and corrects captions with near-human accuracy in BOTH real-time AND post-session.
-
-#### 2. AI-Enhanced Real-Time Captions
-- **GPT-4 post-processing** of ASR output for grammar, punctuation, capitalization
-- **Real-time translation** to multiple languages
-- **Sentiment analysis** and topic detection
-- **Named entity recognition** to auto-populate caption engine
-
-#### 3. Post-Session Analytics Dashboard
-Comprehensive data visualization and analysis page:
-
-**Transcript Analytics:**
-- Word cloud of most frequent terms
-- Sentiment timeline (positive/negative/neutral over time)
-- Topic modeling and segmentation
-- Speaker participation charts
-- Pace/speed analysis (words per minute over time)
-
-**Interactive Search:**
-- Full-text search with highlighting
-- Jump to timestamp in transcript
-- Filter by speaker
-- Filter by topic/sentiment
-- Export search results
-
-**Quality Metrics:**
-- Correction frequency heatmap
-- Confidence score distribution
-- ASR accuracy estimation
-- Engine effectiveness metrics
-
-#### 4. AI-Powered Whisper Enhancement
-- **Post-session reprocessing** using Whisper on recorded audio
-- **Side-by-side comparison** of real-time vs. reprocessed
-- **Automatic merge** of best results from both
-- **Batch processing** for multiple sessions
-- **Quality improvement metrics**
-
-#### 5. Video Intelligence Integration
-
-**Video Upload & Sync:**
-- Upload video file or paste YouTube URL
-- Auto-sync transcript timestamps with video
-- Frame-accurate seeking via transcript search
-- Visual preview of search results
-
-**AI Video Highlights:**
-- GPT-4 analyzes full transcript
-- Identifies 5-10 key moments with justification
-- Extracts exact quotes and timestamps
-- Creates highlight clips using ffmpeg
-- Auto-generates title cards
-- Compiles into downloadable highlight reel (MP4)
-
-**Advanced Video Features:**
-- Chapter generation from topic segmentation
-- Automatic B-roll suggestions
-- Visual sentiment matching
-- Quote overlays for social media clips
-- Multi-clip compilation editor
-
-#### 6. Smart Caption Translation
-- **Real-time translation** during live captioning
-- **Post-session batch translation** of entire transcript
-- **Multiple simultaneous languages**
-- **Context-aware translation** using full transcript
-- **Cultural adaptation** not just literal translation
+### High Priority - Frontend Updates
+1. **Update Dashboard UI** - Add RAG controls (enable/disable, suggestions review)
+2. **Analytics Dashboard View** - Display word cloud, sentiment, topics from `/api/session/analytics`
+3. **Knowledge Base UI** - Document upload, entity viewer, sync button
+4. **Video Panel** - Upload video, generate highlights, download reel
+5. **Suggestions Panel** - Review and accept/reject low-confidence suggestions
 
 ### Medium Priority
-1. **Custom Vocabulary** - Feed Whisper domain-specific words
-2. **Live Corrections UI** - Edit corrections in real-time during session
-3. **Searchable History** - Search across all past sessions
-4. **Remote Control** - Control from phone/tablet
-5. **Collaborative Editing** - Multiple users edit transcript simultaneously
-6. **API Access** - RESTful API for integration with other tools
+1. **Live Corrections UI** - Edit corrections in real-time during session
+2. **Searchable History** - Search across all past sessions
+3. **Remote Control** - Control from phone/tablet
+4. **YouTube Integration** - Paste URL to download and sync video
 
-### Lower Priority
-1. **Auto-punctuation** - Better sentence detection
-2. **Confidence Scores** - Show ASR confidence in UI
-3. **Dark Mode** - Optional dark theme for operators
-4. **Mobile App** - Native iOS/Android apps
-5. **Cloud Sync** - Optional cloud backup/sync
-6. **Monetization** - Optional paid tiers for cloud AI features
+### Lower Priority (Translation - Deprioritized)
+1. **Real-time translation** during live captioning
+2. **Post-session batch translation** of entire transcript
+3. **Multiple simultaneous languages**
+4. **Context-aware translation** using full transcript
 
 ## Development Notes
 
@@ -387,16 +425,42 @@ python3 start-server.py
 # Opens http://localhost:8080
 ```
 
-### Testing Whisper
+### Installing AI Features
 ```bash
+# For Whisper mode:
 pip3 install faster-whisper sounddevice numpy
 # Mac: brew install portaudio
 # Linux: sudo apt install portaudio19-dev
+
+# For vector embeddings (optional, recommended):
+pip3 install sentence-transformers
+
+# For PDF ingestion (optional):
+pip3 install PyPDF2  # or pdfplumber
+
+# For DOCX ingestion (optional):
+pip3 install python-docx
+
+# For video processing:
+brew install ffmpeg  # Mac
+# or: sudo apt install ffmpeg  # Linux
 ```
 
 ### Testing Corrections
 Say or type: "Welcome to the Brooklyn Select Board meeting with Chair Bernard Green"
 Should correct to: "Welcome to the Brookline Select Board meeting with Chair Bernard Greene"
+
+### Testing RAG Features
+```bash
+# Check embeddings status
+curl http://localhost:8080/api/engine/embeddings/status
+
+# Check learned patterns
+curl http://localhost:8080/api/engine/learned
+
+# Get suggestions
+curl http://localhost:8080/api/engine/suggestions
+```
 
 ### Adding New Terms
 ```python
