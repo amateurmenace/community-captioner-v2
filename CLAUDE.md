@@ -300,6 +300,20 @@ community-captioner/
 - [x] **Clip Extraction** - ffmpeg-based clip generation
 - [x] **Highlight Reel** - Automated compilation of clips
 
+### Latest Updates - January 1, 2026
+
+#### Logo Redesign & Demo Enhancement
+- [x] **Inline CC Icon** - CC now appears inline with "CAPTIONER" text using thin box styling
+  - 17px font size (30% smaller than original 24px)
+  - 1.5px border with 3px border-radius
+  - Inter font at weight 900 for distinction
+  - Consistent across all pages (landing, dashboard, session analysis)
+- [x] **Demo Simulation Update** - Changed third example to show more realistic correction:
+  - Original: "town administrated steven woo presented"
+  - Corrected: "Town Administrator Stephen Wu presented"
+  - Demonstrates spelling correction + capitalization + name correction
+- [x] **Logo Typography** - Two-line "COMMUNITY CAPTIONER" in uppercase, 28px font size
+
 ### Completed Features - January 2026 Update (v3.1)
 
 #### Landing Page (Major Redesign - January 2026)
@@ -541,26 +555,73 @@ community-captioner/
    - Homepage demo fixed (removed fictional "Coolidge Corner Town Hall")
    - Updated tagline: "Free, Open Source Captions + More"
 
-### High Priority - UX Polish
-1. **Mobile Responsive** - Test and fix layout on tablets/phones
-2. **Keyboard Shortcuts** - Quick actions for common operations
-3. **Onboarding Tour** - First-time user walkthrough
-4. **Error State UI** - Better feedback when things go wrong
-5. **Session History** - View and re-analyze past sessions
+## Roadmap - Next Steps (January 2026)
 
-### Medium Priority
-1. **Live Corrections UI** - Edit corrections in real-time during session
-2. **Searchable History** - Search across all past sessions
-3. **Remote Control** - Control from phone/tablet
-4. **YouTube Integration** - Paste URL to download and sync video
-5. **Session Templates** - Pre-configured settings for different event types
-6. **Custom Engine Templates** - Beyond Brookline, allow community templates
+### Immediate Priorities (v4.1)
+
+#### 1. Mobile Responsive Design
+**Why**: Community media organizations need to control captions from phones/tablets during live events
+**Tasks**:
+- Responsive grid breakpoints for all dashboard panels
+- Touch-friendly button sizes (min 44px)
+- Collapsible sections on mobile
+- Test on iOS Safari and Android Chrome
+- Optimize 16:9 preview for small screens
+
+#### 2. Session History & Management
+**Why**: Users need to find and re-analyze past sessions
+**Tasks**:
+- Session list page with search/filter
+- Thumbnail previews with key stats
+- Date range filtering
+- Delete/archive sessions
+- Quick re-analysis from history
+
+#### 3. Keyboard Shortcuts
+**Why**: Power users need quick control during live sessions
+**Tasks**:
+- Start/stop captioning (Ctrl+Space)
+- Start/stop recording (Ctrl+R)
+- Toggle AI engine (Ctrl+E)
+- Open overlay (Ctrl+O)
+- Keyboard shortcut help modal (?)
+
+### Medium Priority (v4.2)
+
+#### 4. Real-time Correction Editor
+**Why**: Operators should be able to fix corrections during live sessions
+**Tasks**:
+- Live correction list in sidebar
+- Inline editing of recent corrections
+- Add new terms on-the-fly
+- Correction history with undo
+
+#### 5. YouTube Integration
+**Why**: Many town meetings are livestreamed to YouTube
+**Tasks**:
+- Paste YouTube URL to download video
+- Auto-sync transcript with video timeline
+- Generate timestamped chapters
+- Export transcript to YouTube description format
+
+#### 6. Session Templates
+**Why**: Different event types need different configurations
+**Tasks**:
+- Pre-configured templates (Town Meeting, News, Event, etc.)
+- Save custom templates
+- Quick template switching
+- Template marketplace/sharing
 
 ### Lower Priority (Translation - Deprioritized)
-1. **Real-time translation** during live captioning
-2. **Post-session batch translation** of entire transcript
-3. **Multiple simultaneous languages**
-4. **Context-aware translation** using full transcript
+- Real-time translation during live captioning
+- Post-session batch translation of entire transcript
+- Multiple simultaneous languages
+- Context-aware translation using full transcript
+
+### Known Blockers
+- **Whisper real-time latency** - 2-4s delay may be too slow for some live events
+- **Browser Speech API reliability** - Occasional crashes/restarts needed
+- **Mobile browser constraints** - Web Speech API limited on mobile browsers
 
 ### v4.0 Summary - What's New
 The v4.0 release transforms Community Captioner from a basic pattern-matching system into a sophisticated AI-powered caption correction engine:
