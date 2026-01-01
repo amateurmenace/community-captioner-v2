@@ -156,9 +156,9 @@ community-captioner/
 - BIG (Brookline Interactive Group) - Community media
 - Advisory Committee - Finance oversight
 
-## Current State (v3.0)
+## Current State (v3.1)
 
-### Completed Features - January 2026 Update
+### Completed Features - January 2026 Update (v3.1)
 
 #### Landing Page (Major Redesign - January 2026)
 - [x] **Animated blob background** - 5 circular sage/purple globs floating with smooth animations
@@ -172,6 +172,14 @@ community-captioner/
 - [x] **Professional footer** - Partner logos (BIG, CC), links to community partners
 - [x] **Live interactive demo** - Shows Caption Engine corrections in real-time with animation
 - [x] **Three demo examples** - Brooklyn→Brookline, bernard green→Bernard Greene, coolidge corner corrections
+- [x] **Typing Animations** - Character-by-character typing effect on hero title and subtitle with blinking cursor
+
+#### Internationalization
+- [x] **Multilanguage Support** - 4 languages: English, Spanish (Español), Portuguese (Português), French (Français)
+- [x] **Language Selector** - Dropdown in header for easy switching
+- [x] **Translation System** - 100+ UI strings translated across all pages
+- [x] **Automatic Re-rendering** - Components update instantly when language changes
+- [x] **TypeWriter Animation** - Re-animates text when language switches for smooth UX
 
 #### Control Dashboard
 - [x] **Dual captioning modes** (Web Speech / Whisper) - Fully functional
@@ -184,16 +192,19 @@ community-captioner/
 - [x] **Export formats** - SRT, VTT, TXT, JSON with session stats display
 - [x] **Live Overlay access** - Button to open overlay + network URL display
 - [x] **Sage green color scheme** - Consistent throughout, purple accent for special features only
+- [x] **Engine Upload** - Upload saved engine JSON directly from dashboard
 
-#### AI Caption Engine Wizard
-- [x] **7-step guided workflow** with visual progress indicator
-- [x] **Step 1: Welcome** - Explains what the engine does and why it's unique
-- [x] **Step 2: Choose template** - Empty, Brookline defaults, or import existing
-- [x] **Step 3: Manual term entry** - Form to add terms with categories and aliases
-- [x] **Step 4: Document upload** - UI placeholder for PDF/DOCX/TXT upload (server implementation pending)
-- [x] **Step 5: Web scraping** - UI placeholder for URL-based term extraction (server implementation pending)
-- [x] **Step 6: Test engine** - Real-time correction testing with examples
-- [x] **Step 7: Save & download** - Export engine as JSON, return to dashboard
+#### AI Caption Engine - Interactive Dashboard (January 2026 Redesign)
+- [x] **Dashboard layout** - Replaced 7-step linear wizard with flexible card-based dashboard
+- [x] **Real-time stats** - Live display of total terms, corrections made, engine status
+- [x] **Quick Start card** - Load Brookline template, upload engine, download engine
+- [x] **Manual Term Entry** - Fine-tune engine with individual term additions
+- [x] **AI Document Extraction** - Paste document text, AI extracts names (primary method)
+- [x] **AI Web Scraping** - Enter URLs, AI scrapes and extracts terms (primary method)
+- [x] **Test Engine** - Side-by-side before/after correction testing
+- [x] **Current Terms display** - Shows first 10 terms with categories
+- [x] **Work in any order** - No forced workflow, all tools accessible simultaneously
+- [x] **Auto-refreshing** - Stats update every 2 seconds
 
 #### About Page
 - [x] **Comprehensive documentation** - Project overview, architecture, use cases
@@ -228,12 +239,15 @@ community-captioner/
 - Cloud server not tested recently
 
 ### Technical Improvements
-- index.html: 1,014 → 3,717 lines (major redesign + enhancements)
+- index.html: 3,717 → 3,600 lines (wizard redesign simplified code)
+- Engine Wizard: Reduced from 447 lines to 286 lines (-36% code reduction)
 - All styling controls functional with live updates
 - Improved correction algorithm with overlap detection
 - Better state management with React hooks throughout
 - Unique visual identities for About/FAQ/How-To sections
 - Professional, AI-designed look removed in favor of bold, clean design
+- Translation system with centralized dictionary and prop drilling
+- TypeWriter component with startDelay and cursor animation support
 
 ### Design Philosophy - January 2026
 - **No emojis** - Professional interface for government and media organizations
@@ -245,24 +259,25 @@ community-captioner/
 ## Planned Features (Priority Order)
 
 ### High Priority
-1. **Engine Wizard Redesign** - Convert from 7-step wizard to interactive dashboard
-2. **Engine Upload** - Allow users to upload saved engines to dashboard sessions
-3. **Multilanguage Translation** - Live and post-session caption translation
-4. **Typing Animations** - Character-by-character text animations on page load
+1. ~~**Engine Wizard Redesign**~~ - ✅ COMPLETED (v3.1)
+2. ~~**Engine Upload**~~ - ✅ COMPLETED (v3.1)
+3. ~~**Multilanguage Translation**~~ - ✅ COMPLETED (v3.1 - UI only, caption translation pending)
+4. ~~**Typing Animations**~~ - ✅ COMPLETED (v3.1)
 5. **Audio Recording** - Record session audio for Whisper reprocessing
 6. **Accuracy Pass** - Re-run Whisper on recorded audio for cleaner export
+7. **Caption Translation** - Translate captions in real-time using AI
 
 ### Medium Priority
-5. **Speaker Diarization** - Identify different speakers
-6. **Custom Vocabulary** - Feed Whisper domain-specific words
-7. **Live Corrections UI** - Edit corrections in real-time
-8. **Searchable History** - Search past sessions
+1. **Speaker Diarization** - Identify different speakers
+2. **Custom Vocabulary** - Feed Whisper domain-specific words
+3. **Live Corrections UI** - Edit corrections in real-time
+4. **Searchable History** - Search past sessions
+5. **Remote Control** - Control from phone/tablet
 
 ### Lower Priority
-9. **Multi-language Support** - Spanish, Portuguese for Brookline
-10. **Remote Control** - Control from phone/tablet
-11. **Auto-punctuation** - Better sentence detection
-12. **Confidence Scores** - Show ASR confidence
+1. **Auto-punctuation** - Better sentence detection
+2. **Confidence Scores** - Show ASR confidence
+3. **Dark Mode** - Optional dark theme for operators
 
 ## Development Notes
 
