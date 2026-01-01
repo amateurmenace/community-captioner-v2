@@ -304,15 +304,30 @@ community-captioner/
 
 #### Logo Redesign & Demo Enhancement
 - [x] **Inline CC Icon** - CC now appears inline with "CAPTIONER" text using thin box styling
-  - 17px font size (30% smaller than original 24px)
-  - 1.5px border with 3px border-radius
-  - Inter font at weight 900 for distinction
+  - 17px font size with 1.5px border and 3px border-radius
+  - Inter font at weight 900 for visual distinction
   - Consistent across all pages (landing, dashboard, session analysis)
 - [x] **Demo Simulation Update** - Changed third example to show more realistic correction:
   - Original: "town administrated steven woo presented"
   - Corrected: "Town Administrator Stephen Wu presented"
   - Demonstrates spelling correction + capitalization + name correction
-- [x] **Logo Typography** - Two-line "COMMUNITY CAPTIONER" in uppercase, 28px font size
+- [x] **Logo Typography Enhancement** - Increased from 28px to 36px on landing page
+  - Dashboard/Session Analysis logos: 24px
+  - Two-line "COMMUNITY CAPTIONER" in uppercase
+  - SVG logo file created: `community-captioner-logo.svg`
+
+#### Caption Stats Card Enhancements
+- [x] **AI Corrections Expanded by Default** - Users immediately see corrections as they appear
+- [x] **Real-time Confidence Meter** - Visual progress bar showing caption accuracy (0-100%)
+  - Color-coded: Green (80%+), Yellow (60-79%), Red (<60%)
+  - Dynamic feedback: "High accuracy", "Moderate accuracy", "Low accuracy - check audio"
+  - Updates every 2 seconds with realistic variations
+- [x] **Latency Indicator** - Shows seconds behind real-time with emoji indicators
+  - ⚡ <1s: "Real-time" (Browser mode: 0.1-0.5s typical)
+  - ⏱️ 1-3s: "Near real-time"
+  - 🐌 >3s: "Significant delay" (Whisper mode: 2-4s typical)
+- [x] **Removed AI Suggestions from Live Dashboard** - Moved to post-session analysis only
+- [x] **Bug Fixes** - Fixed undefined variable errors (`whisperListening` → `whisperRunning`)
 
 ### Completed Features - January 2026 Update (v3.1)
 
