@@ -578,6 +578,66 @@ The v4.0 release transforms Community Captioner from a basic pattern-matching sy
 
 **Backend and Core Frontend Complete** - The v4.0 backend is fully implemented with ~50 new API endpoints. The dashboard has been redesigned with real-time stats, 16:9 preview, and post-session analysis. Remaining work is specialized panels for knowledge base, video, and suggestion review.
 
+### Latest Updates - January 2026 (Homepage & Content Refinement)
+
+#### Homepage How It Works Section - 4 Cards Restored
+- [x] **Step 1: Generate Captions** - Renamed from "Start Captioning", detailed ASR explanation
+- [x] **Step 2: Create Custom AI Engine** - RAG, semantic matching, document/video/web ingestion
+- [x] **Step 3: AI Correction** (RESTORED) - Real-time and post-processing corrections
+- [x] **Step 4: Display & Record** - 1920x1080 overlay, customization, export formats
+
+#### New Homepage Sections
+- [x] **Built-In Data Analytics Section** - Comprehensive analytics features showcase
+  - Automatic session analytics explanation
+  - AI-powered video intelligence
+  - Full-text search across video
+  - Unique data richness vs commercial systems
+  - Sample analytics preview with live stats (12,847 words, 2:43:16 duration, 234 corrections, 78 WPM)
+  - Link to demo analytics page
+- [x] **Adding to Your Broadcasts Section** - Technical integration guide
+  - ASR options (Browser vs Whisper detailed comparison)
+  - Broadcast integration methods (OBS, vMix, NDI, RTMP, dynamic key/fill)
+  - Audio sources (mic, mixer, virtual audio cable, live streams, pre-recorded)
+  - Zero additional equipment philosophy
+
+#### About Section Updates
+- [x] **Restructured to 5-card layout** - Removed highlight boxes, integrated into cards
+- [x] **Updated "Why It Exists"** - Stronger messaging about accessibility gatekeeping
+- [x] **New Legal Requirements card** - FCC CVAA, state mandates, 2027 compliance
+- [x] **Enhanced Design Values** - Added 2 new bullets:
+  - "No Catch" - Emphasizes no monetization or hidden costs
+  - "Human AI" - Acknowledges limitations vs human captioners
+
+#### UI/UX Improvements
+- [x] **System Architecture tooltips fixed** - Added overflow: visible, increased z-index to 1000
+- [x] **Demo simulation improved** - Changed to "john vanscoyoc" → "John VanScoyoc" (spelling correction)
+- [x] **Hero description updated** - Removed "Privacy Respecting" per user request
+- [x] **Learn More button moved** - Relocated from Values section to after FAQs
+- [x] **Feature cards removed** - Eliminated redundant Live Overlay/AI Engine/Session cards after demo
+
+#### Legal & Licensing
+- [x] **License changed to CC BY-NC-SA 4.0** - Added Non-Commercial restriction
+  - Updated in 4 files: index.html, terms.html, README.md, CLAUDE.md
+  - Added clear non-commercial messaging throughout
+  - Prohibition of: selling, subscription services, commercial deployment
+  - "No one can profit from this work" emphasized
+- [x] **Terms of Service page created** (terms.html)
+  - Comprehensive 12-section legal document
+  - Strong liability disclaimers
+  - BIG website URL corrected to brooklineinteractive.org
+  - Non-commercial use restrictions clearly explained
+  - Footer link added
+
+#### Navigation & Structure
+- [x] **Removed standalone Engine Wizard page** - Configuration now inline on dashboard
+- [x] **Demo Analytics page created** - Full sample session visualization
+- [x] **Current Terms display added** - Shows first 10 terms in dashboard engine config
+- [x] **Feedback form added** - Mailto button in footer to Stephen@weirdmachine.org
+
+#### Technical Notes
+- [x] **NDI Output** - Reference remains (no "Coming Soon" text was present)
+- [x] **File size optimized** - index.html reduced from 348KB to 335KB despite new features
+
 ## Development Notes
 
 ### Running Locally

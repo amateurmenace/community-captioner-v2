@@ -194,10 +194,24 @@
         .logo-bar-3 { background: var(--sage-muted); width: 50%; }
 
         .logo-text {
-            font-size: 38px;
+            font-size: 28px;
             font-weight: 800;
             color: var(--text-dark);
-            letter-spacing: -0.5px;
+            letter-spacing: 0.5px;
+            line-height: 1.1;
+            text-transform: uppercase;
+        }
+
+        .cc-inline {
+            font-size: 17px;
+            font-weight: 900;
+            color: var(--sage-darker);
+            font-family: 'Inter', -apple-system, sans-serif;
+            letter-spacing: 0.5px;
+            border: 1.5px solid var(--sage-darker);
+            padding: 1px 4px;
+            border-radius: 3px;
+            display: inline-block;
         }
 
         .badge-tag {
@@ -2180,9 +2194,9 @@
                     highlight: "Bernard Greene"
                 },
                 {
-                    original: "Town Administrator john vanscoyoc presented",
-                    corrected: "Town Administrator John VanScoyoc presented",
-                    highlight: "John VanScoyoc"
+                    original: "town administrated steven woo presented",
+                    corrected: "Town Administrator Stephen Wu presented",
+                    highlight: "Stephen Wu"
                 }
             ];
 
@@ -2299,7 +2313,9 @@
                                 <div className="logo-bar logo-bar-3"></div>
                             </div>
                             <div>
-                                <div className="logo-text">Community Captioner</div>
+                                <div className="logo-text">
+                                    COMMUNITY<br/>CAPTIONER <span className="cc-inline">CC</span>
+                                </div>
                                 <span className="badge-tag">Free, Open Source Captions + More</span>
                             </div>
                         </div>
@@ -3342,7 +3358,14 @@
                                     <div className="logo-bar logo-bar-2"></div>
                                     <div className="logo-bar logo-bar-3"></div>
                                 </div>
-                                <div className="logo-text" style={{fontSize: '22px'}}>Community Captioner</div>
+                                <div style={{display: 'flex', alignItems: 'flex-start'}}>
+                                    <div>
+                                        <div className="logo-text">
+                                            COMMUNITY<br/>CAPTIONER
+                                        </div>
+                                    </div>
+                                    <div className="cc-icon">CC</div>
+                                </div>
                             </div>
                             <span style={{color: 'var(--text-medium)', fontSize: '14px'}}>Session Analysis</span>
                         </div>
@@ -4537,7 +4560,14 @@
                                     <div className="logo-bar logo-bar-2"></div>
                                     <div className="logo-bar logo-bar-3"></div>
                                 </div>
-                                <div className="logo-text" style={{fontSize: '22px'}}>Community Captioner</div>
+                                <div style={{display: 'flex', alignItems: 'flex-start'}}>
+                                    <div>
+                                        <div className="logo-text">
+                                            COMMUNITY<br/>CAPTIONER
+                                        </div>
+                                    </div>
+                                    <div className="cc-icon">CC</div>
+                                </div>
                             </div>
                             <span style={{color: 'var(--text-medium)', fontSize: '14px'}}>Control Dashboard</span>
                         </div>
