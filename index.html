@@ -692,7 +692,7 @@
         /* How-To Section - Numbered Steps */
         .howto-section {
             background: linear-gradient(to bottom, transparent 0%, rgba(125,155,118,0.03) 100%);
-            padding: 60px 0;
+            padding: 60px 32px;
             max-width: 100%;
         }
 
@@ -2206,12 +2206,6 @@
                                 </div>
                             )}
                         </div>
-
-                        <div style={{textAlign: 'center', marginTop: '40px'}}>
-                            <button className="cta-btn cta-btn-secondary" onClick={onShowAbout}>
-                                Learn More About the Technology + Design Philosophy
-                            </button>
-                        </div>
                     </section>
 
                     {/* Values Section */}
@@ -2223,46 +2217,52 @@
 
                         <div className="info-grid">
                             <div className="info-card">
-                                <h3>🌍 Accessibility First</h3>
+                                <h3>Accessibility First</h3>
                                 <p>
                                     Everyone deserves access to information. Captioning shouldn't be a luxury for those who can afford expensive equipment. We're democratizing accessibility technology for community organizations worldwide.
                                 </p>
                             </div>
 
                             <div className="info-card">
-                                <h3>🔓 Truly Open Source</h3>
+                                <h3>Truly Open Source</h3>
                                 <p>
                                     No vendor lock-in, no hidden costs, no paywalls. Our code is open (CC BY-SA 4.0), our data stays with you, and you can modify everything to fit your needs. This is your tool, not ours.
                                 </p>
                             </div>
 
                             <div className="info-card">
-                                <h3>🤝 Community-Powered</h3>
+                                <h3>Community-Powered</h3>
                                 <p>
                                     Built by community media for community media. We understand your workflows, budgets, and challenges because we live them. Share your correction engines, help each other, lift all boats together.
                                 </p>
                             </div>
 
                             <div className="info-card">
-                                <h3>🔒 Privacy by Design</h3>
+                                <h3>Privacy by Design</h3>
                                 <p>
                                     Your content, your control. Run everything locally with Whisper mode. Use local AI providers. No telemetry, no tracking, no data mining. Government meetings and sensitive content stay private.
                                 </p>
                             </div>
 
                             <div className="info-card">
-                                <h3>🧠 Human + AI Collaboration</h3>
+                                <h3>Human + AI Collaboration</h3>
                                 <p>
                                     AI isn't magic and it's not perfect. We combine the speed of AI with human knowledge of local communities. You teach the engine your vocabulary - it handles the repetitive corrections.
                                 </p>
                             </div>
 
                             <div className="info-card">
-                                <h3>⚖️ Legal Compliance Made Simple</h3>
+                                <h3>Legal Compliance Made Simple</h3>
                                 <p>
                                     FCC CVAA requirements and state captioning laws apply to you. Commercial solutions cost tens of thousands. We provide the same compliance for free, because accessibility is a right, not a privilege.
                                 </p>
                             </div>
+                        </div>
+
+                        <div style={{textAlign: 'center', marginTop: '48px'}}>
+                            <button className="cta-btn cta-btn-secondary" onClick={onShowAbout}>
+                                Learn More About the Technology + Design Philosophy
+                            </button>
                         </div>
                     </section>
 
@@ -2277,7 +2277,9 @@
 
                             <div className="footer-logos">
                                 <img src="/big-logo.png" alt="Brookline Interactive Group" className="footer-logo" />
-                                <img src="/cc-logo.png" alt="Community Captioner" className="footer-logo" />
+                                <a href="https://weirdmachine.org" target="_blank" rel="noopener noreferrer">
+                                    <img src="/weird-machine-logo.png" alt="Weird Machine" className="footer-logo" style={{height: '50px'}} />
+                                </a>
                             </div>
 
                             <div className="footer-links">
@@ -3465,7 +3467,7 @@
                                 </button>
                                 {aiConfig && aiConfig.active && (
                                     <p style={{fontSize: '12px', color: 'var(--text-medium)', marginTop: '8px'}}>
-                                        {isAILocal ? '🔒 Local processing' : '☁️ Cloud processing'} via {aiConfig.provider.toUpperCase()}
+                                        {isAILocal ? 'Local processing' : 'Cloud processing'} via {aiConfig.provider.toUpperCase()}
                                     </p>
                                 )}
                             </div>
@@ -3523,7 +3525,7 @@
                                 </button>
                                 {aiConfig && aiConfig.active && (
                                     <p style={{fontSize: '12px', color: 'var(--text-medium)', marginTop: '8px'}}>
-                                        {isAILocal ? '🔒 Local processing' : '☁️ Cloud processing'} via {aiConfig.provider.toUpperCase()}
+                                        {isAILocal ? 'Local processing' : 'Cloud processing'} via {aiConfig.provider.toUpperCase()}
                                     </p>
                                 )}
                             </div>
@@ -3685,7 +3687,7 @@
                             </p>
                             {config && config.active && (
                                 <div style={{padding: '12px', background: isLocal ? 'var(--bg-sage-light)' : '#FEF3C7', borderRadius: '8px', marginTop: '12px'}}>
-                                    <strong>{isLocal ? '🔒 Local Processing' : '☁️ Cloud Processing'}</strong>
+                                    <strong>{isLocal ? 'Local Processing' : 'Cloud Processing'}</strong>
                                     <div style={{fontSize: '14px', marginTop: '4px', color: 'var(--text-medium)'}}>
                                         {isLocal
                                             ? 'Your data stays on your machine. No external API calls.'
@@ -3713,7 +3715,7 @@
                         {provider === 'openai' && (
                             <div>
                                 <div className="privacy-warning" style={{padding: '16px', background: '#FEF3C7', border: '2px solid #FCD34D', borderRadius: '8px', marginBottom: '16px'}}>
-                                    <strong>☁️ Cloud Processing Notice</strong>
+                                    <strong>Cloud Processing Notice</strong>
                                     <p style={{fontSize: '14px', marginTop: '8px', color: 'var(--text-dark)'}}>
                                         When using OpenAI, your caption text and documents will be sent to OpenAI's servers for processing.
                                         Make sure this complies with your privacy requirements.
@@ -3752,7 +3754,7 @@
                         {provider === 'ollama' && (
                             <div>
                                 <div className="privacy-ok" style={{padding: '16px', background: 'var(--bg-sage-light)', border: '2px solid var(--sage-primary)', borderRadius: '8px', marginBottom: '16px'}}>
-                                    <strong>🔒 Local Processing</strong>
+                                    <strong>Local Processing</strong>
                                     <p style={{fontSize: '14px', marginTop: '8px', color: 'var(--text-dark)'}}>
                                         Ollama runs entirely on your computer. Your data never leaves your machine.
                                     </p>
@@ -3795,7 +3797,7 @@
                         {provider === 'lmstudio' && (
                             <div>
                                 <div className="privacy-ok" style={{padding: '16px', background: 'var(--bg-sage-light)', border: '2px solid var(--sage-primary)', borderRadius: '8px', marginBottom: '16px'}}>
-                                    <strong>🔒 Local Processing</strong>
+                                    <strong>Local Processing</strong>
                                     <p style={{fontSize: '14px', marginTop: '8px', color: 'var(--text-dark)'}}>
                                         LM Studio runs entirely on your computer. Your data never leaves your machine.
                                     </p>
@@ -3845,8 +3847,8 @@
                                     />
                                     <p style={{fontSize: '14px', color: 'var(--text-medium)', marginTop: '4px'}}>
                                         {customUrl && (customUrl.includes('localhost') || customUrl.includes('127.0.0.1'))
-                                            ? '🔒 Local endpoint detected'
-                                            : '☁️ External endpoint - data will be sent over the network'}
+                                            ? 'Local endpoint detected'
+                                            : 'External endpoint - data will be sent over the network'}
                                     </p>
                                 </div>
 
