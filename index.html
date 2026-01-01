@@ -4050,7 +4050,7 @@
 
             // Simulate realistic confidence and delay metrics
             useEffect(() => {
-                if (!browserListening && !whisperListening) return;
+                if (!browserListening && !whisperRunning) return;
 
                 const interval = setInterval(() => {
                     // Simulate confidence variations (75-95%)
@@ -4067,7 +4067,7 @@
                 }, 2000); // Update every 2 seconds
 
                 return () => clearInterval(interval);
-            }, [browserListening, whisperListening]);
+            }, [browserListening, whisperRunning]);
 
             const loadWhisperModel = () => {
                 setModelLoading(true);
