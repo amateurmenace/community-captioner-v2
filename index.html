@@ -1,0 +1,638 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Community Captioner</title>
+    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <style>
+        :root {
+            --bg-cream: #F5F3EE; --bg-white: #FFFFFF; --green-primary: #3D5A47; --green-light: #4A6B52;
+            --green-bright: #00A676; --text-dark: #3D5A47; --text-medium: #5A6B5E; --text-light: #8A9A8E;
+            --border-light: #D4D2CD; --border-card: #E0DED9; --radius-sm: 8px; --radius-md: 12px; --radius-lg: 16px;
+            --purple-primary: #6366F1; --purple-light: #818CF8; --orange-primary: #EA580C; --orange-light: #FB923C;
+            --red-primary: #DC2626; --blue-primary: #2563EB;
+        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'DM Sans', -apple-system, sans-serif; background: var(--bg-cream); color: var(--text-dark); line-height: 1.5; min-height: 100vh; }
+        body.overlay-mode { background: transparent; overflow: hidden; }
+        .app { max-width: 1100px; margin: 0 auto; padding: 16px; }
+        
+        /* Header */
+        .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; }
+        .logo { display: flex; align-items: center; gap: 12px; }
+        .logo-bars { display: flex; flex-direction: column; gap: 4px; }
+        .logo-bar { height: 7px; border-radius: 3px; width: 48px; }
+        .logo-bar-1 { background: #3D5A47; }
+        .logo-bar-2 { background: #6B9B76; }
+        .logo-text { font-weight: 700; font-size: 20px; line-height: 1.1; }
+        .cc-badge { display: inline-flex; border: 2px solid currentColor; border-radius: 4px; padding: 2px 6px; font-size: 12px; margin-left: 6px; }
+        .header-right { display: flex; align-items: center; gap: 12px; }
+        .big-logo { height: 48px; }
+
+        /* Recording Status */
+        .rec-status { display: flex; align-items: center; gap: 8px; padding: 8px 14px; background: var(--bg-white); border: 1px solid var(--border-card); border-radius: 20px; font-size: 12px; font-weight: 600; }
+        .rec-status.recording { background: #FEE2E2; border-color: #FECACA; color: var(--red-primary); }
+        .rec-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--border-light); }
+        .rec-status.recording .rec-dot { background: var(--red-primary); animation: pulse 1s infinite; }
+        @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
+
+        /* Main Layout */
+        .main-grid { display: grid; grid-template-columns: 1fr 320px; gap: 16px; }
+        @media (max-width: 900px) { .main-grid { grid-template-columns: 1fr; } }
+
+        /* Preview */
+        .preview { background: #2D3748; border-radius: var(--radius-lg); padding: 32px 20px; min-height: 140px; display: flex; align-items: center; justify-content: center; position: relative; margin-bottom: 16px; }
+        .preview-label { position: absolute; top: 8px; left: 12px; font-size: 9px; color: #A0AEC0; text-transform: uppercase; letter-spacing: 0.5px; }
+        .preview-badges { position: absolute; top: 8px; right: 12px; display: flex; gap: 6px; }
+        .preview-badge { font-size: 9px; padding: 3px 8px; border-radius: 8px; font-weight: 600; }
+        .preview-badge.mode { background: #3B82F6; color: white; }
+        .preview-badge.whisper { background: #F97316; }
+        .preview-badge.engine { background: #8B5CF6; color: white; }
+        .preview-badge.fixes { background: #10B981; color: white; }
+        .preview-text { font-size: 22px; font-weight: 500; text-align: center; line-height: 1.3; padding: 10px 20px; border-radius: 8px; max-width: 90%; color: white; }
+        .preview-text.empty { color: #718096; font-size: 16px; background: transparent !important; }
+
+        /* Cards */
+        .card { background: var(--bg-white); border: 1px solid var(--border-card); border-radius: var(--radius-lg); padding: 16px; margin-bottom: 12px; }
+        .card-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
+        .card-title { font-size: 13px; font-weight: 600; display: flex; align-items: center; gap: 6px; }
+        .badge { font-size: 9px; padding: 2px 6px; border-radius: 6px; font-weight: 600; }
+        .badge.purple { background: var(--purple-primary); color: white; }
+        .badge.orange { background: var(--orange-primary); color: white; }
+        .badge.green { background: var(--green-bright); color: white; }
+
+        /* Mode Selector */
+        .mode-tabs { display: flex; gap: 4px; background: var(--bg-cream); padding: 3px; border-radius: var(--radius-sm); margin-bottom: 12px; }
+        .mode-tab { flex: 1; padding: 8px 12px; border: none; background: transparent; border-radius: 6px; font-family: inherit; font-size: 12px; font-weight: 600; color: var(--text-medium); cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px; }
+        .mode-tab:hover { background: var(--bg-white); }
+        .mode-tab.active { background: var(--green-primary); color: white; }
+        .mode-tab.active.whisper { background: var(--orange-primary); }
+
+        /* Controls */
+        .select { width: 100%; padding: 8px 10px; border: 1px solid var(--border-light); border-radius: var(--radius-sm); font-family: inherit; font-size: 11px; background: var(--bg-cream); margin-bottom: 8px; }
+        .btn { padding: 10px 16px; border: none; border-radius: var(--radius-sm); font-family: inherit; font-size: 12px; font-weight: 600; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px; width: 100%; }
+        .btn-primary { background: var(--green-primary); color: white; }
+        .btn-primary:hover { background: var(--green-light); }
+        .btn-danger { background: var(--red-primary); color: white; }
+        .btn-whisper { background: var(--orange-primary); color: white; }
+        .btn-outline { background: transparent; border: 1px solid var(--border-light); color: var(--text-medium); }
+        .btn-outline:hover { border-color: var(--text-medium); }
+        .btn-sm { padding: 6px 10px; font-size: 11px; }
+        .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+        .btn-row { display: flex; gap: 6px; margin-top: 8px; }
+        .btn-row .btn { flex: 1; }
+
+        /* Toggle */
+        .toggle-row { display: flex; align-items: center; justify-content: space-between; padding: 10px 12px; background: var(--bg-cream); border-radius: var(--radius-sm); margin-bottom: 8px; }
+        .toggle-label { font-size: 12px; font-weight: 500; }
+        .toggle-sub { font-size: 10px; color: var(--text-light); }
+        .toggle { width: 36px; height: 20px; background: var(--border-light); border-radius: 10px; position: relative; cursor: pointer; transition: background 0.2s; flex-shrink: 0; }
+        .toggle.on { background: var(--purple-primary); }
+        .toggle::after { content: ''; position: absolute; top: 2px; left: 2px; width: 16px; height: 16px; background: white; border-radius: 50%; transition: transform 0.2s; box-shadow: 0 1px 2px rgba(0,0,0,0.2); }
+        .toggle.on::after { transform: translateX(16px); }
+
+        /* Whisper Setup */
+        .whisper-setup { background: #FFF7ED; border: 1px solid #FDBA74; border-radius: var(--radius-sm); padding: 10px; margin-bottom: 10px; }
+        .whisper-row { display: flex; gap: 6px; align-items: center; margin-bottom: 6px; }
+        .whisper-row:last-child { margin-bottom: 0; }
+        .whisper-row .select { margin-bottom: 0; flex: 1; }
+        .whisper-row .btn { width: auto; padding: 8px 12px; }
+        .whisper-status { font-size: 10px; color: #C2410C; }
+
+        /* Session Panel */
+        .session-panel { background: linear-gradient(135deg, #1E3A5F 0%, #2D5A87 100%); color: white; border-radius: var(--radius-lg); padding: 16px; margin-bottom: 12px; }
+        .session-panel.recording { background: linear-gradient(135deg, #991B1B 0%, #DC2626 100%); }
+        .session-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
+        .session-title { font-size: 13px; font-weight: 600; display: flex; align-items: center; gap: 6px; }
+        .session-stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-bottom: 12px; }
+        .session-stat { text-align: center; }
+        .session-stat-value { font-size: 20px; font-weight: 700; }
+        .session-stat-label { font-size: 9px; opacity: 0.8; }
+        .session-actions { display: flex; gap: 6px; }
+        .session-actions .btn { background: rgba(255,255,255,0.2); border: 1px solid rgba(255,255,255,0.3); }
+        .session-actions .btn:hover { background: rgba(255,255,255,0.3); }
+        .session-actions .btn-record { background: white; color: #1E3A5F; border: none; }
+        .session-panel.recording .session-actions .btn-record { background: white; color: var(--red-primary); }
+
+        /* Corrections Log */
+        .corrections-log { max-height: 200px; overflow-y: auto; background: var(--bg-cream); border-radius: var(--radius-sm); padding: 8px; }
+        .correction-item { display: flex; align-items: center; gap: 8px; padding: 6px 8px; background: white; border-radius: 6px; margin-bottom: 4px; font-size: 11px; }
+        .correction-item:last-child { margin-bottom: 0; }
+        .correction-time { color: var(--text-light); font-size: 10px; min-width: 50px; }
+        .correction-from { color: var(--red-primary); text-decoration: line-through; }
+        .correction-arrow { color: var(--text-light); }
+        .correction-to { color: var(--green-primary); font-weight: 600; }
+        .correction-cat { font-size: 9px; padding: 2px 6px; border-radius: 4px; margin-left: auto; }
+        .correction-cat.person { background: #DBEAFE; color: #1E40AF; }
+        .correction-cat.place { background: #D1FAE5; color: #065F46; }
+        .correction-cat.organization { background: #FEF3C7; color: #92400E; }
+        .empty-log { text-align: center; padding: 20px; color: var(--text-light); font-size: 11px; }
+
+        /* Export Panel */
+        .export-panel { background: var(--bg-white); border: 1px solid var(--border-card); border-radius: var(--radius-lg); padding: 16px; }
+        .export-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; margin-bottom: 12px; }
+        .export-btn { padding: 12px; border: 1px solid var(--border-light); background: var(--bg-cream); border-radius: var(--radius-sm); cursor: pointer; text-align: center; transition: all 0.2s; }
+        .export-btn:hover { border-color: var(--green-primary); background: #F0F7F2; }
+        .export-btn-icon { font-size: 20px; margin-bottom: 4px; }
+        .export-btn-label { font-size: 11px; font-weight: 600; }
+        .export-btn-desc { font-size: 9px; color: var(--text-light); }
+
+        /* Engine Panel */
+        .engine-section { margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--border-light); }
+        .engine-row { display: flex; gap: 6px; }
+        .engine-row .btn { font-size: 10px; padding: 8px; }
+        .engine-info { font-size: 10px; color: var(--text-light); margin-top: 6px; text-align: center; }
+
+        /* OBS Section */
+        .obs-card { margin-top: 12px; }
+        .obs-url { display: flex; gap: 6px; margin-bottom: 8px; }
+        .obs-input { flex: 1; padding: 8px 10px; border: 1px solid var(--border-light); border-radius: var(--radius-sm); font-family: monospace; font-size: 10px; background: var(--bg-cream); }
+        .obs-info { font-size: 10px; color: var(--text-light); }
+
+        /* Tabs */
+        .tabs { display: flex; gap: 2px; margin-bottom: 12px; }
+        .tab { flex: 1; padding: 8px; background: var(--bg-cream); border: none; border-radius: var(--radius-sm) var(--radius-sm) 0 0; font-family: inherit; font-size: 11px; font-weight: 600; color: var(--text-medium); cursor: pointer; }
+        .tab.active { background: var(--bg-white); color: var(--text-dark); }
+
+        /* Footer */
+        .footer { text-align: center; padding: 16px; color: var(--text-light); font-size: 10px; }
+        .footer a { color: var(--green-primary); text-decoration: none; }
+
+        /* Overlay */
+        .overlay-container { width: 1920px; height: 1080px; position: relative; }
+        .caption-display { position: absolute; width: 100%; padding: 20px 60px; display: flex; justify-content: center; z-index: 10000; }
+        .caption-text-overlay { word-wrap: break-word; line-height: 1.4; }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+    <script type="text/babel">
+        const { useState, useEffect, useRef } = React;
+
+        const defaultSettings = { fontSize: 48, fontFamily: 'DM Sans', textColor: '#FFFFFF', backgroundColor: '#000000', backgroundOpacity: 80, textAlign: 'center', position: 'bottom', maxLines: 2, maxWidth: 85, showBackground: true, textShadow: true, paddingH: 28, paddingV: 14 };
+        const isOverlay = () => new URLSearchParams(window.location.search).get('overlay') === 'true';
+
+        function CaptionOverlay() {
+            const [caption, setCaption] = useState('');
+            const [settings, setSettings] = useState(defaultSettings);
+            useEffect(() => {
+                document.body.classList.add('overlay-mode');
+                const poll = setInterval(async () => {
+                    try { const r = await fetch('/api/caption'); const d = await r.json(); setCaption(d.caption || ''); if (d.settings) setSettings(p => ({...p, ...d.settings})); } catch {}
+                }, 100);
+                return () => clearInterval(poll);
+            }, []);
+            const bg = () => { if (!settings.showBackground) return 'transparent'; const h = settings.backgroundColor; return `rgba(${parseInt(h.slice(1,3),16)},${parseInt(h.slice(3,5),16)},${parseInt(h.slice(5,7),16)},${settings.backgroundOpacity/100})`; };
+            const pos = () => settings.position === 'top' ? { top: '40px' } : settings.position === 'middle' ? { top: '50%', transform: 'translateY(-50%)' } : { bottom: '40px' };
+            if (!caption) return null;
+            return <div className="overlay-container"><div className="caption-display" style={pos()}><div className="caption-text-overlay" style={{ fontSize: `${settings.fontSize}px`, fontFamily: settings.fontFamily, color: settings.textColor, backgroundColor: bg(), textAlign: settings.textAlign, padding: settings.showBackground ? `${settings.paddingV}px ${settings.paddingH}px` : '0', borderRadius: '10px', textShadow: settings.textShadow ? '2px 2px 4px rgba(0,0,0,0.8)' : 'none', maxWidth: `${settings.maxWidth}%` }}>{caption}</div></div></div>;
+        }
+
+        function App() {
+            const [mode, setMode] = useState('browser');
+            const [settings, setSettings] = useState(defaultSettings);
+            const [listening, setListening] = useState(false);
+            const [caption, setCaption] = useState('');
+            const [interim, setInterim] = useState('');
+            const [devices, setDevices] = useState([]);
+            const [device, setDevice] = useState('');
+            const [copied, setCopied] = useState(false);
+            const [localIP, setLocalIP] = useState('');
+            const recogRef = useRef(null);
+            
+            // Whisper
+            const [whisperAvailable, setWhisperAvailable] = useState(false);
+            const [whisperModel, setWhisperModel] = useState('base');
+            const [whisperLoaded, setWhisperLoaded] = useState(false);
+            const [whisperDevices, setWhisperDevices] = useState([]);
+            const [whisperDevice, setWhisperDevice] = useState(null);
+            const [whisperRunning, setWhisperRunning] = useState(false);
+            const [whisperLoading, setWhisperLoading] = useState(false);
+            
+            // Engine
+            const [engineEnabled, setEngineEnabled] = useState(false);
+            const [engineStats, setEngineStats] = useState({ terms_count: 0, rules_count: 0 });
+            const [corrections, setCorrections] = useState([]);
+            const [recentCorrections, setRecentCorrections] = useState([]);
+            
+            // Session
+            const [recording, setRecording] = useState(false);
+            const [session, setSession] = useState(null);
+            const [sessionStats, setSessionStats] = useState({ duration: 0, caption_count: 0, correction_count: 0 });
+            
+            // UI
+            const [sideTab, setSideTab] = useState('session');
+
+            const overlayUrl = `http://localhost:8080?overlay=true`;
+            const networkUrl = localIP ? `http://${localIP}:8080?overlay=true` : '';
+
+            // Initialize
+            useEffect(() => {
+                const saved = localStorage.getItem('cc-settings');
+                if (saved) try { setSettings(p => ({...p, ...JSON.parse(saved)})); } catch {}
+                
+                navigator.mediaDevices?.enumerateDevices().then(d => {
+                    const inputs = d.filter(x => x.kind === 'audioinput');
+                    setDevices(inputs);
+                    if (inputs.length) setDevice(inputs[0].deviceId);
+                }).catch(() => {});
+                
+                fetch('/api/info').then(r => r.json()).then(d => {
+                    setLocalIP(d.local_ip || '');
+                    setWhisperAvailable(d.whisper_available);
+                }).catch(() => {});
+                
+                fetch('/api/whisper/status').then(r => r.json()).then(d => {
+                    setWhisperAvailable(d.available);
+                    setWhisperLoaded(d.model_loaded);
+                    setWhisperRunning(d.is_running);
+                }).catch(() => {});
+                
+                fetch('/api/whisper/devices').then(r => r.json()).then(d => {
+                    setWhisperDevices(d.devices || []);
+                    const def = d.devices?.find(x => x.is_default);
+                    if (def) setWhisperDevice(def.id);
+                }).catch(() => {});
+                
+                loadEngine();
+            }, []);
+
+            // Poll for updates
+            useEffect(() => {
+                const poll = setInterval(async () => {
+                    try {
+                        const [capRes, engRes, sessRes] = await Promise.all([
+                            fetch('/api/caption'),
+                            fetch('/api/engine/status'),
+                            fetch('/api/session/status')
+                        ]);
+                        const cap = await capRes.json();
+                        const eng = await engRes.json();
+                        const sess = await sessRes.json();
+                        
+                        if (mode === 'whisper' && cap.caption) {
+                            setCaption(cap.caption);
+                            setCorrections(cap.corrections || []);
+                        }
+                        setWhisperRunning(cap.whisper_running);
+                        setEngineStats(eng);
+                        setRecentCorrections(eng.recent_corrections || []);
+                        
+                        if (sess.recording) {
+                            setRecording(true);
+                            setSession(sess.session);
+                            setSessionStats({
+                                duration: sess.duration || 0,
+                                caption_count: sess.caption_count || 0,
+                                correction_count: sess.correction_count || 0
+                            });
+                        } else {
+                            setRecording(false);
+                        }
+                    } catch {}
+                }, 500);
+                return () => clearInterval(poll);
+            }, [mode]);
+
+            const loadEngine = async () => {
+                const res = await fetch('/api/engine/status');
+                const data = await res.json();
+                setEngineEnabled(data.enabled);
+                setEngineStats(data);
+                setRecentCorrections(data.recent_corrections || []);
+            };
+
+            useEffect(() => {
+                localStorage.setItem('cc-settings', JSON.stringify(settings));
+                fetch('/api/caption', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ settings }) }).catch(() => {});
+            }, [settings]);
+
+            useEffect(() => {
+                if (mode === 'browser') {
+                    const text = interim || caption;
+                    fetch('/api/caption', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ caption: text }) })
+                        .then(r => r.json()).then(d => setCorrections(d.corrections || [])).catch(() => {});
+                }
+            }, [caption, interim, mode]);
+
+            const limit = (text, lines, width) => {
+                const chars = Math.floor(55 * (width || 80) / 80) * lines;
+                if (text.length <= chars) return text;
+                const t = text.slice(-chars), sp = t.indexOf(' ');
+                return sp > 0 && sp < 20 ? t.slice(sp + 1) : t;
+            };
+
+            // Browser speech
+            const startBrowser = async () => {
+                if (!('webkitSpeechRecognition' in window || 'SpeechRecognition' in window)) { alert('Use Chrome or Edge'); return; }
+                try { await navigator.mediaDevices.getUserMedia({ audio: device ? { deviceId: { exact: device } } : true }); } catch { alert('Allow mic'); return; }
+                const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+                const r = new SR(); r.continuous = true; r.interimResults = true; r.lang = 'en-US';
+                r.onresult = e => {
+                    let i = '', f = '';
+                    for (let x = e.resultIndex; x < e.results.length; x++) {
+                        const t = e.results[x][0].transcript;
+                        if (e.results[x].isFinal) f += t; else i += t;
+                    }
+                    if (f) { setCaption(p => limit((p + ' ' + f).trim(), settings.maxLines, settings.maxWidth)); setInterim(''); }
+                    else setInterim(limit(i, settings.maxLines, settings.maxWidth));
+                };
+                r.onend = () => { if (listening && recogRef.current) try { r.start(); } catch {} };
+                recogRef.current = r; r.start(); setListening(true);
+            };
+            const stopBrowser = () => { recogRef.current?.stop(); recogRef.current = null; setListening(false); };
+
+            // Whisper
+            const loadWhisperModel = async () => {
+                setWhisperLoading(true);
+                const r = await fetch('/api/whisper/load', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ model: whisperModel }) });
+                const d = await r.json();
+                if (d.status === 'ok') setWhisperLoaded(true);
+                else alert(d.error);
+                setWhisperLoading(false);
+            };
+            const startWhisper = async () => {
+                const r = await fetch('/api/whisper/start', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ device_id: whisperDevice }) });
+                if ((await r.json()).status === 'started') setWhisperRunning(true);
+            };
+            const stopWhisper = async () => { await fetch('/api/whisper/stop', { method: 'POST' }); setWhisperRunning(false); };
+
+            // Engine
+            const toggleEngine = async () => {
+                await fetch('/api/engine/enable', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ enabled: !engineEnabled }) });
+                setEngineEnabled(!engineEnabled);
+            };
+            const loadDefaults = async () => { await fetch('/api/engine/defaults', { method: 'POST' }); loadEngine(); };
+
+            // Session
+            const startSession = async () => {
+                await fetch('/api/session/start', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: `Session ${new Date().toLocaleString()}` }) });
+                setRecording(true);
+            };
+            const stopSession = async () => {
+                await fetch('/api/session/stop', { method: 'POST' });
+                setRecording(false);
+            };
+
+            // Exports
+            const exportFile = (format) => {
+                const url = `/api/session/export/${format}`;
+                window.open(url, '_blank');
+            };
+            const downloadEngine = () => window.open('/api/engine/export', '_blank');
+            const uploadEngine = () => {
+                const input = document.createElement('input');
+                input.type = 'file';
+                input.accept = '.json';
+                input.onchange = async (e) => {
+                    const file = e.target.files[0];
+                    const text = await file.text();
+                    const data = JSON.parse(text);
+                    await fetch('/api/engine/import', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) });
+                    loadEngine();
+                };
+                input.click();
+            };
+
+            const clear = () => { setCaption(''); setInterim(''); setCorrections([]); fetch('/api/clear', { method: 'POST' }); };
+            const copy = () => { navigator.clipboard.writeText(overlayUrl); setCopied(true); setTimeout(() => setCopied(false), 2000); };
+            
+            const display = interim || caption;
+            const isActive = mode === 'browser' ? listening : whisperRunning;
+            const formatTime = (s) => `${Math.floor(s/60)}:${String(Math.floor(s%60)).padStart(2,'0')}`;
+            const bg = () => { if (!settings.showBackground) return 'transparent'; const h = settings.backgroundColor; return `rgba(${parseInt(h.slice(1,3),16)},${parseInt(h.slice(3,5),16)},${parseInt(h.slice(5,7),16)},${settings.backgroundOpacity/100})`; };
+
+            return (
+                <div className="app">
+                    {/* Header */}
+                    <header className="header">
+                        <div className="logo">
+                            <div className="logo-bars"><div className="logo-bar logo-bar-1"></div><div className="logo-bar logo-bar-2"></div></div>
+                            <div className="logo-text">COMMUNITY<br/>CAPTIONER <span className="cc-badge">CC</span></div>
+                        </div>
+                        <div className="header-right">
+                            <div className={`rec-status ${recording ? 'recording' : ''}`}>
+                                <div className="rec-dot"></div>
+                                {recording ? `REC ${formatTime(sessionStats.duration)}` : 'Ready'}
+                            </div>
+                            <img src="big-logo.png" alt="BIG" className="big-logo" />
+                        </div>
+                    </header>
+
+                    {/* Preview */}
+                    <div className="preview">
+                        <span className="preview-label">Live Preview</span>
+                        <div className="preview-badges">
+                            <span className={`preview-badge mode ${mode === 'whisper' ? 'whisper' : ''}`}>{mode === 'browser' ? '⚡ Web Speech' : '🎯 Whisper'}</span>
+                            {engineEnabled && <span className="preview-badge engine">✨ Engine</span>}
+                            {corrections.length > 0 && <span className="preview-badge fixes">{corrections.length} fixes</span>}
+                        </div>
+                        <div className={`preview-text ${!display ? 'empty' : ''}`} style={display ? { backgroundColor: bg(), padding: settings.showBackground ? `${settings.paddingV*0.6}px ${settings.paddingH*0.6}px` : '0' } : {}}>
+                            {display || 'Captions will appear here...'}
+                        </div>
+                    </div>
+
+                    <div className="main-grid">
+                        {/* Left Column - Controls */}
+                        <div>
+                            {/* Mode & Controls */}
+                            <div className="card">
+                                <div className="mode-tabs">
+                                    <button className={`mode-tab ${mode === 'browser' ? 'active' : ''}`} onClick={() => { if (!listening) setMode('browser'); }}>⚡ Web Speech</button>
+                                    <button className={`mode-tab ${mode === 'whisper' ? 'active whisper' : ''}`} onClick={() => { if (!whisperRunning) setMode('whisper'); }}>🎯 Whisper</button>
+                                </div>
+
+                                {mode === 'browser' ? (
+                                    <>
+                                        <select className="select" value={device} onChange={e => setDevice(e.target.value)}>
+                                            {devices.map(d => <option key={d.deviceId} value={d.deviceId}>{d.label || `Mic ${d.deviceId.slice(0,8)}`}</option>)}
+                                        </select>
+                                        <button className={`btn ${listening ? 'btn-danger' : 'btn-primary'}`} onClick={listening ? stopBrowser : startBrowser}>
+                                            {listening ? '■ Stop' : '● Start Captioning'}
+                                        </button>
+                                    </>
+                                ) : (
+                                    <>
+                                        {!whisperAvailable ? (
+                                            <div className="whisper-setup">
+                                                <div className="whisper-status">⚠️ Install: pip3 install faster-whisper sounddevice numpy</div>
+                                            </div>
+                                        ) : (
+                                            <div className="whisper-setup">
+                                                <div className="whisper-row">
+                                                    <select className="select" value={whisperModel} onChange={e => setWhisperModel(e.target.value)} disabled={whisperLoaded}>
+                                                        <option value="tiny">tiny (75MB, fast)</option>
+                                                        <option value="base">base (150MB, balanced)</option>
+                                                        <option value="small">small (500MB, better)</option>
+                                                    </select>
+                                                    <button className="btn btn-whisper btn-sm" onClick={loadWhisperModel} disabled={whisperLoaded || whisperLoading}>
+                                                        {whisperLoading ? '...' : whisperLoaded ? '✓' : 'Load'}
+                                                    </button>
+                                                </div>
+                                                <div className="whisper-row">
+                                                    <select className="select" value={whisperDevice || ''} onChange={e => setWhisperDevice(parseInt(e.target.value))} disabled={whisperRunning}>
+                                                        {whisperDevices.map(d => <option key={d.id} value={d.id}>{d.name}{d.is_default ? ' ★' : ''}</option>)}
+                                                    </select>
+                                                </div>
+                                            </div>
+                                        )}
+                                        <button className={`btn ${whisperRunning ? 'btn-danger' : 'btn-whisper'}`} onClick={whisperRunning ? stopWhisper : startWhisper} disabled={!whisperLoaded}>
+                                            {whisperRunning ? '■ Stop Whisper' : '● Start Whisper'}
+                                        </button>
+                                    </>
+                                )}
+
+                                <div className="btn-row">
+                                    <button className="btn btn-outline btn-sm" onClick={clear}>Clear</button>
+                                </div>
+                            </div>
+
+                            {/* Caption Engine Toggle */}
+                            <div className="card">
+                                <div className="toggle-row">
+                                    <div>
+                                        <div className="toggle-label">✨ Caption Engine</div>
+                                        <div className="toggle-sub">{engineStats.terms_count} terms • {engineStats.rules_count} rules</div>
+                                    </div>
+                                    <div className={`toggle ${engineEnabled ? 'on' : ''}`} onClick={toggleEngine}></div>
+                                </div>
+                                {engineStats.terms_count === 0 && (
+                                    <button className="btn btn-outline btn-sm" onClick={loadDefaults}>Load Brookline Defaults</button>
+                                )}
+                            </div>
+
+                            {/* Session Recording */}
+                            <div className={`session-panel ${recording ? 'recording' : ''}`}>
+                                <div className="session-header">
+                                    <div className="session-title">📝 Session Recording</div>
+                                </div>
+                                <div className="session-stats">
+                                    <div className="session-stat">
+                                        <div className="session-stat-value">{formatTime(sessionStats.duration)}</div>
+                                        <div className="session-stat-label">Duration</div>
+                                    </div>
+                                    <div className="session-stat">
+                                        <div className="session-stat-value">{sessionStats.caption_count}</div>
+                                        <div className="session-stat-label">Captions</div>
+                                    </div>
+                                    <div className="session-stat">
+                                        <div className="session-stat-value">{sessionStats.correction_count}</div>
+                                        <div className="session-stat-label">Corrections</div>
+                                    </div>
+                                </div>
+                                <div className="session-actions">
+                                    <button className="btn btn-record" onClick={recording ? stopSession : startSession}>
+                                        {recording ? '■ Stop Recording' : '● Start Recording'}
+                                    </button>
+                                </div>
+                            </div>
+
+                            {/* OBS */}
+                            <div className="card obs-card">
+                                <div className="card-title">📺 OBS Browser Source</div>
+                                <div className="obs-url">
+                                    <input className="obs-input" value={overlayUrl} readOnly />
+                                    <button className="btn btn-primary btn-sm" onClick={copy} style={{width:'60px'}}>{copied ? '✓' : 'Copy'}</button>
+                                </div>
+                                <div className="obs-info">Add as Browser Source • 1920×1080</div>
+                            </div>
+                        </div>
+
+                        {/* Right Column - Dashboard */}
+                        <div>
+                            <div className="tabs">
+                                <button className={`tab ${sideTab === 'session' ? 'active' : ''}`} onClick={() => setSideTab('session')}>Session</button>
+                                <button className={`tab ${sideTab === 'corrections' ? 'active' : ''}`} onClick={() => setSideTab('corrections')}>Corrections</button>
+                                <button className={`tab ${sideTab === 'engine' ? 'active' : ''}`} onClick={() => setSideTab('engine')}>Engine</button>
+                            </div>
+
+                            {sideTab === 'session' && (
+                                <div className="export-panel">
+                                    <div className="card-title" style={{marginBottom:'12px'}}>📤 Export Session</div>
+                                    <div className="export-grid">
+                                        <div className="export-btn" onClick={() => exportFile('srt')}>
+                                            <div className="export-btn-icon">📄</div>
+                                            <div className="export-btn-label">SRT</div>
+                                            <div className="export-btn-desc">Subtitle file</div>
+                                        </div>
+                                        <div className="export-btn" onClick={() => exportFile('vtt')}>
+                                            <div className="export-btn-icon">🎬</div>
+                                            <div className="export-btn-label">VTT</div>
+                                            <div className="export-btn-desc">Web captions</div>
+                                        </div>
+                                        <div className="export-btn" onClick={() => exportFile('txt')}>
+                                            <div className="export-btn-icon">📝</div>
+                                            <div className="export-btn-label">Transcript</div>
+                                            <div className="export-btn-desc">Plain text</div>
+                                        </div>
+                                        <div className="export-btn" onClick={() => exportFile('json')}>
+                                            <div className="export-btn-icon">📊</div>
+                                            <div className="export-btn-label">JSON</div>
+                                            <div className="export-btn-desc">Full data</div>
+                                        </div>
+                                    </div>
+                                    <button className="btn btn-outline" onClick={async () => {
+                                        const r = await fetch('/api/session/summary');
+                                        const d = await r.json();
+                                        alert(d.summary);
+                                    }}>📋 Generate Summary</button>
+                                </div>
+                            )}
+
+                            {sideTab === 'corrections' && (
+                                <div className="card">
+                                    <div className="card-title">Live Corrections</div>
+                                    <div className="corrections-log">
+                                        {recentCorrections.length === 0 ? (
+                                            <div className="empty-log">Corrections will appear here as they're made</div>
+                                        ) : (
+                                            recentCorrections.slice().reverse().map((c, i) => (
+                                                <div key={i} className="correction-item">
+                                                    <span className="correction-time">{c.timestamp?.slice(11,19) || ''}</span>
+                                                    <span className="correction-from">{c.from}</span>
+                                                    <span className="correction-arrow">→</span>
+                                                    <span className="correction-to">{c.to}</span>
+                                                    <span className={`correction-cat ${c.category}`}>{c.category}</span>
+                                                </div>
+                                            ))
+                                        )}
+                                    </div>
+                                </div>
+                            )}
+
+                            {sideTab === 'engine' && (
+                                <div className="card">
+                                    <div className="card-title">Caption Engine <span className="badge purple">Portable</span></div>
+                                    <p style={{fontSize:'11px',color:'var(--text-light)',marginBottom:'12px'}}>
+                                        Download your engine to share or backup. Upload an engine to use its correction rules.
+                                    </p>
+                                    <div className="engine-row">
+                                        <button className="btn btn-primary" onClick={downloadEngine}>⬇️ Download</button>
+                                        <button className="btn btn-outline" onClick={uploadEngine}>⬆️ Upload</button>
+                                    </div>
+                                    <div className="engine-info">
+                                        {engineStats.terms_count} terms • {engineStats.rules_count} rules • {engineStats.stats?.corrections_applied || 0} total corrections
+                                    </div>
+                                    <div className="engine-section">
+                                        <button className="btn btn-outline btn-sm" onClick={loadDefaults}>Reset to Brookline Defaults</button>
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+                    </div>
+
+                    <footer className="footer">
+                        Community Captioner v2 • <a href="https://brooklineinteractive.org">Brookline Interactive Group</a> • <a href="https://weirdmachine.org">Stephen Walter</a>
+                    </footer>
+                </div>
+            );
+        }
+
+        ReactDOM.createRoot(document.getElementById('root')).render(isOverlay() ? <CaptionOverlay /> : <App />);
+    </script>
+</body>
+</html>

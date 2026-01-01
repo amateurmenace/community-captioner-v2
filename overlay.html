@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Caption Overlay</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Open+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { background: transparent; overflow: hidden; width: 1920px; height: 1080px; }
+        .overlay-container { width: 1920px; height: 1080px; position: relative; z-index: 9999; }
+        .caption-display { position: absolute; width: 100%; padding: 20px 60px; display: flex; justify-content: center; z-index: 10000; }
+        .caption-display.top { top: 40px; align-items: flex-start; }
+        .caption-display.middle { top: 50%; transform: translateY(-50%); align-items: center; }
+        .caption-display.bottom { bottom: 40px; align-items: flex-end; }
+        .caption-text { word-wrap: break-word; overflow-wrap: break-word; line-height: 1.4; display: block; white-space: pre-wrap; }
+        .caption-text:empty { display: none; }
+        .status-indicator { position: absolute; top: 10px; left: 10px; background: rgba(0,166,118,0.9); color: white; padding: 8px 16px; border-radius: 8px; font-family: 'DM Sans', sans-serif; font-size: 14px; z-index: 10001; }
+        .status-indicator.error { background: rgba(220,38,38,0.9); }
+        .logo-overlay { position: absolute; z-index: 10000; display: none; }
+        .logo-overlay.top-left { top: 40px; left: 40px; }
+        .logo-overlay.top-right { top: 40px; right: 40px; }
+        .logo-overlay.bottom-left { bottom: 40px; left: 40px; }
+        .logo-overlay.bottom-right { bottom: 40px; right: 40px; }
+        .logo-overlay img { max-width: 100%; max-height: 100%; object-fit: contain; }
+    </style>
+</head>
+<body>
+    <div class="overlay-container">
+        <div id="statusIndicator" class="status-indicator">Loading...</div>
+        <div id="logoOverlay" class="logo-overlay bottom-right"><img id="logoImage" src="" alt="Logo"></div>
+        <div id="captionWrapper" class="caption-display bottom">
+            <div id="captionText" class="caption-text"></div>
+        </div>
+    </div>
+    <div id="textMeasure" style="position:absolute;visibility:hidden;white-space:nowrap;"></div>
+
+    <script>
+        var captionText = document.getElementById('captionText');
+        var captionWrapper = document.getElementById('captionWrapper');
+        var statusIndicator = document.getElementById('statusIndicator');
+        var logoOverlay = document.getElementById('logoOverlay');
+        var logoImage = document.getElementById('logoImage');
+        var textMeasure = document.getElementById('textMeasure');
+        var connectionOk = false;
+
+        var currentSettings = {
+            fontSize: 48, fontFamily: 'DM Sans', textColor: '#FFFFFF', backgroundColor: '#000000',
+            backgroundOpacity: 75, textAlign: 'center', position: 'bottom', maxLines: 2, maxWidth: 80,
+            showBackground: true, textShadow: true, paddingH: 32, paddingV: 16,
+            logoUrl: '', logoPosition: 'bottom-right', logoSize: 100, logoOpacity: 100
+        };
+
+        function getCharsPerLine() {
+            textMeasure.style.fontSize = currentSettings.fontSize + 'px';
+            textMeasure.style.fontFamily = currentSettings.fontFamily + ', sans-serif';
+            textMeasure.textContent = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz ';
+            var avgCharWidth = textMeasure.offsetWidth / 53;
+            var containerWidth = 1920;
+            var padding = 120 + (currentSettings.paddingH || 32) * 2;
+            var maxWidthPx = (containerWidth * (currentSettings.maxWidth / 100)) - padding;
+            return Math.floor(maxWidthPx / avgCharWidth);
+        }
+
+        function limitTextToLines(text, maxLines) {
+            if (!text || maxLines < 1) return '';
+            var charsPerLine = getCharsPerLine();
+            var maxChars = charsPerLine * maxLines;
+            if (text.length <= maxChars) return text;
+            var trimmed = text.slice(-maxChars);
+            var firstSpace = trimmed.indexOf(' ');
+            if (firstSpace > 0 && firstSpace < trimmed.length * 0.25) {
+                return trimmed.slice(firstSpace + 1);
+            }
+            return trimmed;
+        }
+
+        function applySettings(settings) {
+            if (!settings) return;
+            for (var key in settings) {
+                if (settings.hasOwnProperty(key)) currentSettings[key] = settings[key];
+            }
+            captionText.style.fontSize = currentSettings.fontSize + 'px';
+            captionText.style.fontFamily = currentSettings.fontFamily + ', sans-serif';
+            captionText.style.color = currentSettings.textColor;
+            captionText.style.textAlign = currentSettings.textAlign;
+            captionText.style.maxWidth = currentSettings.maxWidth + '%';
+
+            if (currentSettings.showBackground) {
+                var hex = currentSettings.backgroundColor;
+                var r = parseInt(hex.slice(1,3),16), g = parseInt(hex.slice(3,5),16), b = parseInt(hex.slice(5,7),16);
+                var opacity = currentSettings.backgroundOpacity / 100;
+                captionText.style.backgroundColor = 'rgba('+r+','+g+','+b+','+opacity+')';
+                captionText.style.padding = (currentSettings.paddingV || 16) + 'px ' + (currentSettings.paddingH || 32) + 'px';
+                captionText.style.borderRadius = '12px';
+            } else {
+                captionText.style.backgroundColor = 'transparent';
+                captionText.style.padding = '0';
+            }
+
+            captionText.style.textShadow = currentSettings.textShadow ? '2px 2px 4px rgba(0,0,0,0.8)' : 'none';
+            captionWrapper.className = 'caption-display ' + currentSettings.position;
+
+            if (currentSettings.logoUrl && currentSettings.logoUrl.trim() !== '') {
+                logoImage.src = currentSettings.logoUrl;
+                logoOverlay.style.display = 'block';
+                logoOverlay.className = 'logo-overlay ' + currentSettings.logoPosition;
+                logoOverlay.style.width = currentSettings.logoSize + 'px';
+                logoOverlay.style.height = currentSettings.logoSize + 'px';
+                logoOverlay.style.opacity = currentSettings.logoOpacity / 100;
+            } else {
+                logoOverlay.style.display = 'none';
+            }
+        }
+
+        function updateStatus(message, isError) {
+            statusIndicator.textContent = message;
+            statusIndicator.className = 'status-indicator ' + (isError ? 'error' : '');
+        }
+
+        function fetchCaption() {
+            var xhr = new XMLHttpRequest();
+            xhr.open('GET', '/api/caption', true);
+            xhr.timeout = 5000;
+            xhr.onreadystatechange = function() {
+                if (xhr.readyState === 4) {
+                    if (xhr.status === 200) {
+                        try {
+                            var data = JSON.parse(xhr.responseText);
+                            if (!connectionOk) {
+                                connectionOk = true;
+                                updateStatus('Connected', false);
+                                setTimeout(function() { statusIndicator.style.display = 'none'; }, 3000);
+                            }
+                            if (data.settings) applySettings(data.settings);
+                            if (data.caption) {
+                                var limited = limitTextToLines(data.caption, currentSettings.maxLines || 2);
+                                captionText.textContent = limited;
+                                captionText.style.display = 'block';
+                            } else {
+                                captionText.textContent = '';
+                                captionText.style.display = 'none';
+                            }
+                        } catch (e) {
+                            updateStatus('Parse error', true);
+                        }
+                    } else if (xhr.status !== 0) {
+                        updateStatus('Server error: ' + xhr.status, true);
+                        connectionOk = false;
+                    }
+                }
+            };
+            xhr.onerror = function() { updateStatus('Connection failed', true); connectionOk = false; };
+            xhr.ontimeout = function() { updateStatus('Timeout', true); connectionOk = false; };
+            xhr.send();
+        }
+
+        setInterval(fetchCaption, 100);
+        updateStatus('Connecting...', false);
+        fetchCaption();
+    </script>
+</body>
+</html>

@@ -1,0 +1,91 @@
+{
+  "version": "1.0",
+  "name": "Brookline MA",
+  "description": "Caption corrections for Brookline, MA community media. Includes Town officials, landmarks, and organizations.",
+  "created": "2024-01-01T00:00:00",
+  "terms": {
+    "bernard greene": {
+      "term": "Bernard Greene",
+      "category": "person",
+      "aliases": ["bernard green", "bernie greene"],
+      "source": "default"
+    },
+    "heather hamilton": {
+      "term": "Heather Hamilton",
+      "category": "person",
+      "aliases": [],
+      "source": "default"
+    },
+    "john vanscoyoc": {
+      "term": "John VanScoyoc",
+      "category": "person",
+      "aliases": ["van scoyoc"],
+      "source": "default"
+    },
+    "todd kirrane": {
+      "term": "Todd Kirrane",
+      "category": "person",
+      "aliases": ["tod kirrane"],
+      "source": "default"
+    },
+    "mark zarrillo": {
+      "term": "Mark Zarrillo",
+      "category": "person",
+      "aliases": ["zarrillo"],
+      "source": "default"
+    },
+    "brookline": {
+      "term": "Brookline",
+      "category": "place",
+      "aliases": [],
+      "source": "default"
+    },
+    "coolidge corner": {
+      "term": "Coolidge Corner",
+      "category": "place",
+      "aliases": ["coolidge"],
+      "source": "default"
+    },
+    "brookline village": {
+      "term": "Brookline Village",
+      "category": "place",
+      "aliases": [],
+      "source": "default"
+    },
+    "larz anderson park": {
+      "term": "Larz Anderson Park",
+      "category": "place",
+      "aliases": ["larz anderson"],
+      "source": "default"
+    },
+    "select board": {
+      "term": "Select Board",
+      "category": "organization",
+      "aliases": ["selectboard", "board of selectmen"],
+      "source": "default"
+    },
+    "town meeting": {
+      "term": "Town Meeting",
+      "category": "organization",
+      "aliases": [],
+      "source": "default"
+    },
+    "brookline interactive group": {
+      "term": "Brookline Interactive Group",
+      "category": "organization",
+      "aliases": [],
+      "source": "default"
+    },
+    "big": {
+      "term": "BIG",
+      "category": "organization",
+      "aliases": [],
+      "source": "default"
+    }
+  },
+  "custom_rules": [],
+  "stats": {
+    "terms_count": 13,
+    "rules_count": 20
+  }
+}
