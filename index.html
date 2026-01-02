@@ -3929,7 +3929,7 @@
                 <div class="stat-label" style="color: var(--text-medium)">Duration</div>
             </div>
             <div class="stat-card">
-                <div class="stat-value" style="color: var(--purple-accent)">${allCorrections.length}</div>
+                <div class="stat-value" style="color: var(--purple-accent)">${editedCorrections.length}</div>
                 <div class="stat-label" style="color: var(--text-medium)">AI Corrections</div>
             </div>
             <div class="stat-card">
@@ -3949,11 +3949,11 @@
             </div>
         </div>
 
-        ${allCorrections.length > 0 ? `
+        ${editedCorrections.length > 0 ? `
         <div class="chart-card">
-            <h3>AI Corrections Made (${allCorrections.length})</h3>
+            <h3>AI Corrections Made (${editedCorrections.length})</h3>
             <div style="max-height: 300px; overflow-y: auto;">
-                ${allCorrections.slice(0, 50).map(c => `
+                ${editedCorrections.slice(0, 50).map(c => `
                     <div style="margin-bottom: 8px; padding: 8px; background: var(--bg-warm); border-radius: 4px;">
                         <div style="text-decoration: line-through; color: var(--text-light); font-size: 13px;">${c.from}</div>
                         <div style="font-weight: 600; font-size: 14px;">→ ${c.to}</div>
@@ -4370,7 +4370,7 @@
                             border: '1px solid var(--border-light)'
                         }}>
                             <h3 style={{margin: '0 0 16px 0', fontSize: '15px', fontWeight: '600'}}>AI Engine Efficiency</h3>
-                            {allCorrections.length > 0 ? (
+                            {editedCorrections.length > 0 ? (
                                 <>
                                     <div style={{display: 'flex', justifyContent: 'center', alignItems: 'center', height: '80px', position: 'relative'}}>
                                         {/* Donut chart */}
