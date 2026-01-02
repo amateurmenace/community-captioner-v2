@@ -4383,7 +4383,7 @@
                                                 fill="none"
                                                 stroke="var(--purple-accent)"
                                                 strokeWidth="12"
-                                                strokeDasharray={`${(allCorrections.length / (totalWords || 1)) * 188.5} 188.5`}
+                                                strokeDasharray={`${(editedCorrections.length / (totalWords || 1)) * 188.5} 188.5`}
                                                 strokeDashoffset="0"
                                                 transform="rotate(-90 40 40)"
                                                 strokeLinecap="round"
@@ -4394,13 +4394,13 @@
                                             textAlign: 'center'
                                         }}>
                                             <div style={{fontSize: '18px', fontWeight: '700', color: 'var(--purple-accent)'}}>
-                                                {Math.round((allCorrections.length / (totalWords || 1)) * 100)}%
+                                                {Math.round((editedCorrections.length / (totalWords || 1)) * 100)}%
                                             </div>
                                             <div style={{fontSize: '9px', color: 'var(--text-light)'}}>Corrected</div>
                                         </div>
                                     </div>
                                     <div style={{marginTop: '12px', fontSize: '12px', color: 'var(--text-medium)', textAlign: 'center'}}>
-                                        <div><strong>{allCorrections.length}</strong> corrections on <strong>{totalWords}</strong> words</div>
+                                        <div><strong>{editedCorrections.length}</strong> corrections on <strong>{totalWords}</strong> words</div>
                                     </div>
                                 </>
                             ) : (
@@ -4500,11 +4500,11 @@
                                 <div>
                                     <div style={{display: 'flex', justifyContent: 'space-between', marginBottom: '6px', fontSize: '12px'}}>
                                         <span style={{color: 'var(--text-medium)'}}>Correction Rate</span>
-                                        <span style={{fontWeight: '600'}}>{Math.round((allCorrections.length / Math.max(1, totalWords)) * 100)}%</span>
+                                        <span style={{fontWeight: '600'}}>{Math.round((editedCorrections.length / Math.max(1, totalWords)) * 100)}%</span>
                                     </div>
                                     <div style={{width: '100%', height: '6px', background: '#f0f0f0', borderRadius: '3px', overflow: 'hidden'}}>
                                         <div style={{
-                                            width: `${Math.min(100, (allCorrections.length / Math.max(1, totalWords)) * 100)}%`,
+                                            width: `${Math.min(100, (editedCorrections.length / Math.max(1, totalWords)) * 100)}%`,
                                             height: '100%',
                                             background: 'var(--purple-accent)',
                                             borderRadius: '3px'
