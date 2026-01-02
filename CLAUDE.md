@@ -321,9 +321,108 @@ community-captioner/
 - [x] **Clip Extraction** - ffmpeg-based clip generation
 - [x] **Highlight Reel** - Automated compilation of clips
 
+### Latest Updates - January 2, 2026
+
+#### Caption Reliability & Intelligence (v4.2 - Current Session)
+- [x] **Extended Health Monitoring Thresholds** - More time before auto-recovery
+  - Warning threshold: 10 seconds of silence (was 5s)
+  - Critical threshold: 15 seconds of silence (was 10s)
+  - Reduces false alarms during natural pauses in speech
+- [x] **Analysis Page Backup Button** - Ensures access to session results
+  - Purple "Open Last Analysis" card always visible in Caption Stats
+  - Opens analysis page in new tab if automatic loading fails
+  - Helpful message: "Backup: Opens analysis if it didn't load automatically"
+- [x] **Improved Error Handling** - Better logging and user feedback
+  - Console logging throughout stopAndAnalyze() function
+  - Alert shows specific error message if analysis fails
+  - Analysis button still shown on error (allows manual retry)
+  - All steps logged: stopping engines, fetching data, saving to localStorage
+- [x] **Multi-Engine Failover System** - Automatic backup when primary fails
+  - Browser Speech API as primary (fastest, lowest latency)
+  - Speechmatics as automatic backup (works when tab backgrounded)
+  - `activateBackupMode()` function switches seamlessly
+  - Tracks failover count and displays status in dashboard
+  - Alert prompts user when tab loses focus
+- [x] **Tab Focus Detection** - Visibility API integration
+  - Detects when browser tab is backgrounded using `visibilitychange` event
+  - Warns user that Browser Speech API may stop
+  - Offers automatic switch to Speechmatics backup mode
+  - Prevents caption interruption during live broadcasts
+- [x] **Caption Health Monitoring** - Real-time system status dashboard
+  - Color-coded health card: 🟢 Green (healthy), 🟡 Yellow (warning), 🔴 Red (critical)
+  - Tracks time since last caption (auto-detects stalls)
+  - Automatic recovery: restarts engine after 10s of silence
+  - Shows backup mode status and failover count
+  - Displays "Tab Backgrounded" warning when applicable
+- [x] **Automatic Recovery System** - Self-healing caption engine
+  - Monitors caption stream every 2 seconds
+  - Warning threshold: 5 seconds of silence
+  - Critical threshold: 10 seconds of silence
+  - Auto-restart Browser Speech API on stall
+  - Auto-switch to Speechmatics if restart fails
+  - Prevents manual intervention during live events
+- [x] **Session Vocabulary Learning** - AI auto-learns from context
+  - Detects capitalized multi-word phrases (proper nouns)
+  - Tracks mention frequency per term
+  - Auto-adds to engine after 3 mentions
+  - Smart categorization: person (2 words), place (Street/Avenue), organization (default)
+  - Purple "AUTO-LEARNING" indicator in Caption Stats
+  - Shows learned terms count and preview (top 3)
+  - Console notifications every 5 minutes
+  - Terms persist for entire session duration
+- [x] **Smart Pattern Recognition** - Context-aware term detection
+  - Filters common false positives (The, This, That, These, Those)
+  - Only processes during active recording
+  - Integrates with existing RAG engine
+  - Source tagged as 'session_learned' for easy identification
+- [x] **Super Backup Mode UI** - One-click failover configuration
+  - Red "Super Backup Mode" button next to captioning mode selector
+  - Shows "Enable Super Backup Mode" when not configured
+  - Changes to "Super Backup Mode Ready" when Speechmatics configured
+  - Comprehensive modal explaining feature:
+    - What it does: Automatic failover protection for uninterrupted captioning
+    - How it works: 4-step process (monitor tab, auto-switch, keep running, show health)
+    - Why needed: Browser Speech API stops when tab loses focus
+  - Speechmatics API key input field with pricing info
+  - Shield icon for visual reinforcement
+  - One-click enable button saves configuration and closes modal
+
+#### UX Improvements & Performance Analytics (v4.1.6 - Previous Session)
+- [x] **Session Title Field** - Expandable field in Caption Stats card
+  - Inline editor with expandable panel
+  - Title displayed prominently, saved with session
+  - Syncs to session history and analytics pages
+- [x] **About Page Scroll Fix** - All page views now scroll to top on navigation
+  - Added useEffect hook to scroll window to (0,0) on view change
+  - Fixes issue where About page opened at bottom (licensing section)
+- [x] **Redesigned Speaking Pace & Accuracy Graph** - Dual-axis visualization
+  - WPM displayed as gradient bars (sage green)
+  - Confidence shown as area chart with gradient fill (green)
+  - Y-axis labels and grid lines for better readability
+  - Increased height to 180px for better detail
+  - Hover effects on bars show timestamp, WPM, and confidence
+  - Legend updated with visual indicators
+- [x] **New Performance Graphs in Analytics** - 4 additional data visualizations
+  - **Caption Quality Score** - Color-coded bars (green/yellow/red) based on combined accuracy + pace metrics
+  - **AI Engine Efficiency** - Donut chart showing correction rate percentage
+  - **Speaking Pace Distribution** - Histogram showing WPM distribution across 5 buckets
+  - **Session Performance Summary** - 3 progress bars: Avg Confidence, Correction Rate, Pace Consistency
+- [x] **Export Analytics HTML** - Standalone exportable analytics page
+  - Purple button in Session Analysis header
+  - Generates self-contained HTML file with all stats and graphs
+  - Includes full transcript and AI corrections list
+  - Styled with Community Captioner branding
+- [x] **Document Upload Progress Indicator** - Visual feedback during upload
+  - Spinner animation with status messages ("Reading file...", "Uploading to server...", "Extracting entities...")
+  - Animated progress bar with pulse effect
+  - Clear messaging about next steps (sync to engine)
+- [x] **CSS Animations Added** - Smooth visual feedback
+  - `spin` keyframe for loading spinner
+  - `progressPulse` keyframe for progress bar animation
+
 ### Latest Updates - January 1, 2026
 
-#### Rolling Caption Buffer & Session Analysis Fixes (v4.1.5 - Current Session)
+#### Rolling Caption Buffer & Session Analysis Fixes (v4.1.5 - Previous Session)
 - [x] **Rolling Caption Buffer** - All caption modes now show 2 lines of text
   - Text stays visible longer for better readability
   - Buffer trimmed to ~100 chars, breaking at word boundaries

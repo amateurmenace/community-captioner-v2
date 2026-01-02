@@ -162,6 +162,16 @@
             50% { transform: translateX(0); opacity: 0.4; }
         }
 
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        @keyframes progressPulse {
+            0%, 100% { opacity: 1; transform: scaleX(1); }
+            50% { opacity: 0.7; transform: scaleX(0.98); }
+        }
+
         .landing-header {
             padding: 24px 32px;
             display: flex;
@@ -2146,6 +2156,11 @@
             const showDemoAnalytics = () => setView('demo-analytics');
             const showSessionHistory = () => setView('session-history');
 
+            // Scroll to top whenever view changes
+            useEffect(() => {
+                window.scrollTo(0, 0);
+            }, [view]);
+
             if (view === 'landing') {
                 return <LandingPage
                     onStartDashboard={startDashboard}
@@ -3848,6 +3863,142 @@
                                 {data.name || 'Untitled Session'}
                             </span>
                         </div>
+                        <button
+                            onClick={() => {
+                                // Create standalone HTML export
+                                const htmlContent = `<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Session Analysis - ${data.name || 'Untitled Session'}</title>
+    <style>
+                        :root {
+            --bg-warm: #F5F3EE;
+            --sage-primary: #7D9B76;
+            --sage-darker: #3D5A47;
+            --text-dark: #2D3A2E;
+            --text-medium: #5A6B5E;
+            --text-light: #8A9A8E;
+            --border-light: #D4D2CD;
+            --purple-accent: #8B7FC7;
+        }
+        body {
+            font-family: 'Inter', -apple-system, sans-serif;
+            background: var(--bg-warm);
+            color: var(--text-dark);
+            margin: 0;
+            padding: 40px;
+            line-height: 1.6;
+        }
+        .container { max-width: 1400px; margin: 0 auto; }
+        h1 { font-size: 28px; margin-bottom: 8px; }
+        .subtitle { color: var(--text-medium); font-size: 14px; margin-bottom: 32px; }
+        .stats-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 16px; margin-bottom: 32px; }
+        .stat-card {
+            padding: 24px;
+            borderRadius: 12px;
+            border: 1px solid var(--border-light);
+            background: white;
+        }
+        .stat-card.primary {
+            background: linear-gradient(135deg, var(--sage-primary), var(--sage-darker));
+            color: white;
+            border: none;
+        }
+        .stat-value { font-size: 32px; font-weight: 700; margin-bottom: 4px; }
+        .stat-label { font-size: 13px; opacity: 0.8; }
+        .chart-grid { display: grid; grid-template-columns: 2fr 1fr; gap: 16px; margin-bottom: 24px; }
+        .chart-card { background: white; padding: 20px; border-radius: 12px; border: 1px solid var(--border-light); }
+        h3 { margin: 0 0 16px 0; font-size: 15px; font-weight: 600; }
+        .bar { display: inline-block; background: var(--sage-primary); height: 20px; margin: 2px; border-radius: 3px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Session Analysis</h1>
+        <div class="subtitle">${data.name || 'Untitled Session'}</div>
+
+        <div class="stats-grid">
+            <div class="stat-card primary">
+                <div class="stat-value">${totalWords.toLocaleString()}</div>
+                <div class="stat-label">Total Words</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value" style="color: var(--sage-darker)">${formatTime(sessionDuration || data.duration || 0)}</div>
+                <div class="stat-label" style="color: var(--text-medium)">Duration</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value" style="color: var(--purple-accent)">${allCorrections.length}</div>
+                <div class="stat-label" style="color: var(--text-medium)">AI Corrections</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value" style="color: var(--sage-darker)">${editedCaptions.length}</div>
+                <div class="stat-label" style="color: var(--text-medium)">Segments</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value" style="color: var(--sage-darker)">${totalWords > 0 && sessionDuration > 0 ? Math.round((totalWords / sessionDuration) * 60) : 0}</div>
+                <div class="stat-label" style="color: var(--text-medium)">Words/Minute</div>
+            </div>
+        </div>
+
+        <div class="chart-card">
+            <h3>Full Transcript</h3>
+            <div style="max-height: 400px; overflow-y: auto; line-height: 1.8;">
+                ${editedCaptions.map(c => (c.corrected || c.text || '')).join(' ')}
+            </div>
+        </div>
+
+        ${allCorrections.length > 0 ? `
+        <div class="chart-card">
+            <h3>AI Corrections Made (${allCorrections.length})</h3>
+            <div style="max-height: 300px; overflow-y: auto;">
+                ${allCorrections.slice(0, 50).map(c => `
+                    <div style="margin-bottom: 8px; padding: 8px; background: var(--bg-warm); border-radius: 4px;">
+                        <div style="text-decoration: line-through; color: var(--text-light); font-size: 13px;">${c.from}</div>
+                        <div style="font-weight: 600; font-size: 14px;">→ ${c.to}</div>
+                    </div>
+                `).join('')}
+            </div>
+        </div>
+        ` : ''}
+
+        <div style="margin-top: 40px; padding: 20px; background: white; border-radius: 12px; border: 1px solid var(--border-light); text-align: center; color: var(--text-light); font-size: 13px;">
+            Generated by Community Captioner • ${new Date().toLocaleString()}
+        </div>
+    </div>
+</body>
+</html>`;
+
+                                const blob = new Blob([htmlContent], { type: 'text/html' });
+                                const url = URL.createObjectURL(blob);
+                                const a = document.createElement('a');
+                                a.href = url;
+                                a.download = `session-analysis-${data.name || 'untitled'}.html`;
+                                a.click();
+                                URL.revokeObjectURL(url);
+                            }}
+                            style={{
+                                background: 'linear-gradient(135deg, var(--purple-accent), var(--purple-light))',
+                                color: 'white',
+                                border: 'none',
+                                padding: '10px 20px',
+                                borderRadius: '10px',
+                                fontSize: '14px',
+                                fontWeight: '600',
+                                cursor: 'pointer',
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '8px'
+                            }}
+                        >
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                                <polyline points="7 10 12 15 17 10"/>
+                                <line x1="12" y1="15" x2="12" y2="3"/>
+                            </svg>
+                            Export Analytics HTML
+                        </button>
                     </div>
 
                     {/* Session Stats - Always visible, no accordion */}
@@ -3987,7 +4138,7 @@
                         gap: '16px',
                         marginBottom: '24px'
                     }}>
-                        {/* Pace + Accuracy Chart */}
+                        {/* Pace + Accuracy Chart - Redesigned */}
                         <div style={{
                             background: 'white',
                             padding: '20px',
@@ -3998,16 +4149,20 @@
                                 <h3 style={{margin: 0, fontSize: '15px', fontWeight: '600'}}>Speaking Pace & Accuracy Over Time</h3>
                                 <div style={{display: 'flex', gap: '16px', fontSize: '12px'}}>
                                     <span style={{display: 'flex', alignItems: 'center', gap: '6px'}}>
-                                        <span style={{width: '12px', height: '12px', background: 'var(--sage-primary)', borderRadius: '2px'}}/>
-                                        Pace (WPM)
+                                        <svg width="14" height="14" viewBox="0 0 14 14">
+                                            <path d="M2,12 L12,12 L12,4 L2,4 Z" fill="var(--sage-primary)" opacity="0.7"/>
+                                        </svg>
+                                        WPM
                                     </span>
                                     <span style={{display: 'flex', alignItems: 'center', gap: '6px'}}>
-                                        <span style={{width: '12px', height: '3px', background: '#00A676', borderRadius: '2px'}}/>
-                                        Accuracy
+                                        <svg width="14" height="3">
+                                            <line x1="0" y1="1.5" x2="14" y2="1.5" stroke="#00A676" strokeWidth="3" strokeLinecap="round"/>
+                                        </svg>
+                                        Confidence
                                     </span>
                                 </div>
                             </div>
-                            <div style={{height: '140px', position: 'relative'}}>
+                            <div style={{height: '180px', position: 'relative'}}>
                                 {paceData.length === 0 ? (
                                     <div style={{
                                         display: 'flex',
@@ -4020,46 +4175,98 @@
                                         gap: '8px'
                                     }}>
                                         <span>No pace data available</span>
-                                        <span style={{fontSize: '12px'}}>({editedCaptions.length} captions)</span>
+                                        <span style={{fontSize: '12px'}}>({editedCaptions.length} captions, duration: {formatTime(sessionDuration || data.duration || 0)})</span>
                                     </div>
                                 ) : (
                                     <>
-                                        {/* Bars for pace */}
-                                        <div style={{height: '100%', display: 'flex', alignItems: 'flex-end', gap: '2px', position: 'absolute', width: '100%'}}>
-                                            {paceData.slice(0, 40).map((p, i) => (
-                                                <div key={i} style={{
-                                                    flex: 1,
-                                                    background: 'linear-gradient(to top, var(--sage-primary), var(--sage-light))',
-                                                    height: `${Math.max(4, (p.wpm / maxPace) * 80)}%`,
-                                                    borderRadius: '3px 3px 0 0',
-                                                    transition: 'height 0.3s',
-                                                    cursor: 'pointer',
-                                                    opacity: 0.8
-                                                }} title={`${Math.floor(p.time / 60)}:${(p.time % 60).toString().padStart(2, '0')} - ${p.wpm} WPM, ${p.accuracy}% accuracy`}/>
-                                            ))}
+                                        {/* Y-axis labels */}
+                                        <div style={{position: 'absolute', left: '-5px', top: '0', bottom: '0', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', fontSize: '10px', color: 'var(--text-light)'}}>
+                                            <span>{Math.round(maxPace)}</span>
+                                            <span style={{marginBottom: '-8px'}}>{Math.round(maxPace / 2)}</span>
+                                            <span>0</span>
                                         </div>
-                                        {/* Line for accuracy */}
-                                        <svg style={{position: 'absolute', width: '100%', height: '100%', pointerEvents: 'none'}} viewBox="0 0 100 100" preserveAspectRatio="none">
-                                            <polyline
-                                                fill="none"
-                                                stroke="#00A676"
-                                                strokeWidth="2"
-                                                strokeLinecap="round"
-                                                strokeLinejoin="round"
-                                                vectorEffect="non-scaling-stroke"
-                                                points={paceData.slice(0, 40).map((p, i) => {
-                                                    const x = paceData.length > 1 ? (i / (Math.min(40, paceData.length) - 1)) * 100 : 50;
-                                                    const y = 100 - ((p.accuracy - 70) / 30) * 80;
-                                                    return `${x},${y}`;
-                                                }).join(' ')}
-                                            />
-                                        </svg>
+
+                                        {/* Chart area */}
+                                        <div style={{height: '100%', marginLeft: '30px', position: 'relative'}}>
+                                            {/* Grid lines */}
+                                            <div style={{position: 'absolute', width: '100%', height: '100%'}}>
+                                                {[0, 25, 50, 75, 100].map(pct => (
+                                                    <div key={pct} style={{
+                                                        position: 'absolute',
+                                                        bottom: `${pct}%`,
+                                                        width: '100%',
+                                                        height: '1px',
+                                                        background: '#e5e5e5',
+                                                        opacity: pct === 0 ? 0.5 : 0.3
+                                                    }}/>
+                                                ))}
+                                            </div>
+
+                                            {/* WPM bars */}
+                                            <div style={{height: '100%', display: 'flex', alignItems: 'flex-end', gap: '2px', position: 'absolute', width: '100%', paddingTop: '10px'}}>
+                                                {paceData.slice(0, 50).map((p, i) => (
+                                                    <div key={i} style={{
+                                                        flex: 1,
+                                                        background: 'linear-gradient(to top, var(--sage-primary), var(--sage-light))',
+                                                        height: `${Math.max(2, (p.wpm / maxPace) * 100)}%`,
+                                                        borderRadius: '2px 2px 0 0',
+                                                        cursor: 'pointer',
+                                                        opacity: 0.7,
+                                                        transition: 'opacity 0.2s'
+                                                    }}
+                                                    title={`${Math.floor(p.time / 60)}:${(p.time % 60).toString().padStart(2, '0')} - ${p.wpm} WPM, ${p.accuracy}% confidence`}
+                                                    onMouseEnter={(e) => e.currentTarget.style.opacity = '1'}
+                                                    onMouseLeave={(e) => e.currentTarget.style.opacity = '0.7'}
+                                                    />
+                                                ))}
+                                            </div>
+
+                                            {/* Accuracy/Confidence line chart */}
+                                            <svg style={{position: 'absolute', width: '100%', height: '100%', pointerEvents: 'none', top: 0, left: 0}} viewBox="0 0 100 100" preserveAspectRatio="none">
+                                                {/* Filled area under the line */}
+                                                <defs>
+                                                    <linearGradient id="confidenceGradient" x1="0%" y1="0%" x2="0%" y2="100%">
+                                                        <stop offset="0%" stopColor="#00A676" stopOpacity="0.3"/>
+                                                        <stop offset="100%" stopColor="#00A676" stopOpacity="0.05"/>
+                                                    </linearGradient>
+                                                </defs>
+                                                <polygon
+                                                    fill="url(#confidenceGradient)"
+                                                    points={
+                                                        `0,100 ` +
+                                                        paceData.slice(0, 50).map((p, i) => {
+                                                            const x = paceData.length > 1 ? (i / (Math.min(50, paceData.length) - 1)) * 100 : 50;
+                                                            const y = 100 - (p.accuracy);
+                                                            return `${x},${y}`;
+                                                        }).join(' ') +
+                                                        ` 100,100`
+                                                    }
+                                                />
+                                                {/* Confidence line */}
+                                                <polyline
+                                                    fill="none"
+                                                    stroke="#00A676"
+                                                    strokeWidth="2.5"
+                                                    strokeLinecap="round"
+                                                    strokeLinejoin="round"
+                                                    vectorEffect="non-scaling-stroke"
+                                                    points={paceData.slice(0, 50).map((p, i) => {
+                                                        const x = paceData.length > 1 ? (i / (Math.min(50, paceData.length) - 1)) * 100 : 50;
+                                                        const y = 100 - (p.accuracy);
+                                                        return `${x},${y}`;
+                                                    }).join(' ')}
+                                                />
+                                            </svg>
+                                        </div>
                                     </>
                                 )}
                             </div>
-                            <div style={{display: 'flex', justifyContent: 'space-between', marginTop: '8px', fontSize: '11px', color: 'var(--text-light)'}}>
+                            <div style={{display: 'flex', justifyContent: 'space-between', marginTop: '12px', fontSize: '11px', color: 'var(--text-light)', marginLeft: '30px'}}>
                                 <span>0:00</span>
-                                <span style={{textAlign: 'center'}}>Avg: {Math.round(paceData.reduce((a, p) => a + p.wpm, 0) / Math.max(1, paceData.length))} WPM, {Math.round(paceData.reduce((a, p) => a + p.accuracy, 0) / Math.max(1, paceData.length))}% accuracy</span>
+                                <span style={{textAlign: 'center', fontWeight: '600'}}>
+                                    Avg: {Math.round(paceData.reduce((a, p) => a + p.wpm, 0) / Math.max(1, paceData.length))} WPM
+                                    • {Math.round(paceData.reduce((a, p) => a + p.accuracy, 0) / Math.max(1, paceData.length))}% confidence
+                                </span>
                                 <span>{formatTime(sessionDuration || data.duration || 0)}</span>
                             </div>
                         </div>
@@ -4098,6 +4305,244 @@
                             ) : (
                                 <div style={{color: 'var(--text-light)', fontSize: '13px', padding: '20px', textAlign: 'center'}}>No corrections made in this session</div>
                             )}
+                        </div>
+                    </div>
+
+                    {/* Additional Performance Graphs */}
+                    <div style={{
+                        display: 'grid',
+                        gridTemplateColumns: 'repeat(2, 1fr)',
+                        gap: '16px',
+                        marginBottom: '24px'
+                    }}>
+                        {/* Correction Latency Over Time */}
+                        <div style={{
+                            background: 'white',
+                            padding: '20px',
+                            borderRadius: '12px',
+                            border: '1px solid var(--border-light)'
+                        }}>
+                            <h3 style={{margin: '0 0 16px 0', fontSize: '15px', fontWeight: '600'}}>Caption Quality Score</h3>
+                            <div style={{height: '120px', display: 'flex', alignItems: 'flex-end', gap: '4px'}}>
+                                {paceData.length > 0 ? (
+                                    paceData.slice(0, 30).map((p, i) => {
+                                        const quality = Math.min(100, (p.accuracy * 0.6) + ((p.wpm > 100 && p.wpm < 180) ? 40 : 20));
+                                        return (
+                                            <div key={i} style={{
+                                                flex: 1,
+                                                background: quality >= 80 ? 'linear-gradient(to top, #10B981, #34D399)' :
+                                                           quality >= 60 ? 'linear-gradient(to top, #F59E0B, #FBBF24)' :
+                                                           'linear-gradient(to top, #EF4444, #F87171)',
+                                                height: `${Math.max(5, quality)}%`,
+                                                borderRadius: '3px 3px 0 0',
+                                                cursor: 'pointer',
+                                                opacity: 0.8
+                                            }} title={`Quality: ${Math.round(quality)}%`}/>
+                                        );
+                                    })
+                                ) : (
+                                    <div style={{width: '100%', textAlign: 'center', color: 'var(--text-light)', fontSize: '13px'}}>
+                                        No quality data available
+                                    </div>
+                                )}
+                            </div>
+                            <div style={{display: 'flex', justifyContent: 'space-between', marginTop: '12px', fontSize: '11px', color: 'var(--text-light)'}}>
+                                <span style={{display: 'flex', alignItems: 'center', gap: '4px'}}>
+                                    <div style={{width: '10px', height: '10px', background: '#10B981', borderRadius: '2px'}}/>
+                                    Good
+                                </span>
+                                <span style={{display: 'flex', alignItems: 'center', gap: '4px'}}>
+                                    <div style={{width: '10px', height: '10px', background: '#F59E0B', borderRadius: '2px'}}/>
+                                    Fair
+                                </span>
+                                <span style={{display: 'flex', alignItems: 'center', gap: '4px'}}>
+                                    <div style={{width: '10px', height: '10px', background: '#EF4444', borderRadius: '2px'}}/>
+                                    Poor
+                                </span>
+                            </div>
+                        </div>
+
+                        {/* Engine Efficiency */}
+                        <div style={{
+                            background: 'white',
+                            padding: '20px',
+                            borderRadius: '12px',
+                            border: '1px solid var(--border-light)'
+                        }}>
+                            <h3 style={{margin: '0 0 16px 0', fontSize: '15px', fontWeight: '600'}}>AI Engine Efficiency</h3>
+                            {allCorrections.length > 0 ? (
+                                <>
+                                    <div style={{display: 'flex', justifyContent: 'center', alignItems: 'center', height: '80px', position: 'relative'}}>
+                                        {/* Donut chart */}
+                                        <svg width="80" height="80" viewBox="0 0 80 80">
+                                            <circle cx="40" cy="40" r="30" fill="none" stroke="#f0f0f0" strokeWidth="12"/>
+                                            <circle
+                                                cx="40"
+                                                cy="40"
+                                                r="30"
+                                                fill="none"
+                                                stroke="var(--purple-accent)"
+                                                strokeWidth="12"
+                                                strokeDasharray={`${(allCorrections.length / (totalWords || 1)) * 188.5} 188.5`}
+                                                strokeDashoffset="0"
+                                                transform="rotate(-90 40 40)"
+                                                strokeLinecap="round"
+                                            />
+                                        </svg>
+                                        <div style={{
+                                            position: 'absolute',
+                                            textAlign: 'center'
+                                        }}>
+                                            <div style={{fontSize: '18px', fontWeight: '700', color: 'var(--purple-accent)'}}>
+                                                {Math.round((allCorrections.length / (totalWords || 1)) * 100)}%
+                                            </div>
+                                            <div style={{fontSize: '9px', color: 'var(--text-light)'}}>Corrected</div>
+                                        </div>
+                                    </div>
+                                    <div style={{marginTop: '12px', fontSize: '12px', color: 'var(--text-medium)', textAlign: 'center'}}>
+                                        <div><strong>{allCorrections.length}</strong> corrections on <strong>{totalWords}</strong> words</div>
+                                    </div>
+                                </>
+                            ) : (
+                                <div style={{display: 'flex', alignItems: 'center', justifyContent: 'center', height: '120px', color: 'var(--text-light)', fontSize: '13px'}}>
+                                    No correction data
+                                </div>
+                            )}
+                        </div>
+
+                        {/* Words Per Minute Distribution */}
+                        <div style={{
+                            background: 'white',
+                            padding: '20px',
+                            borderRadius: '12px',
+                            border: '1px solid var(--border-light)'
+                        }}>
+                            <h3 style={{margin: '0 0 16px 0', fontSize: '15px', fontWeight: '600'}}>Speaking Pace Distribution</h3>
+                            {paceData.length > 0 ? (
+                                <>
+                                    <div style={{display: 'flex', alignItems: 'flex-end', gap: '8px', height: '100px'}}>
+                                        {(() => {
+                                            // Create WPM buckets
+                                            const buckets = [
+                                                { label: '<100', min: 0, max: 100, count: 0 },
+                                                { label: '100-130', min: 100, max: 130, count: 0 },
+                                                { label: '130-160', min: 130, max: 160, count: 0 },
+                                                { label: '160-180', min: 160, max: 180, count: 0 },
+                                                { label: '>180', min: 180, max: 999, count: 0 }
+                                            ];
+                                            paceData.forEach(p => {
+                                                buckets.forEach(b => {
+                                                    if (p.wpm >= b.min && p.wpm < b.max) b.count++;
+                                                });
+                                            });
+                                            const maxCount = Math.max(...buckets.map(b => b.count), 1);
+                                            return buckets.map((bucket, i) => (
+                                                <div key={i} style={{flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px'}}>
+                                                    <div style={{
+                                                        width: '100%',
+                                                        height: `${Math.max(10, (bucket.count / maxCount) * 100)}px`,
+                                                        background: 'linear-gradient(to top, var(--sage-darker), var(--sage-primary))',
+                                                        borderRadius: '4px 4px 0 0',
+                                                        display: 'flex',
+                                                        alignItems: 'flex-start',
+                                                        justifyContent: 'center',
+                                                        paddingTop: '4px',
+                                                        fontSize: '10px',
+                                                        fontWeight: '600',
+                                                        color: 'white'
+                                                    }}>
+                                                        {bucket.count > 0 && bucket.count}
+                                                    </div>
+                                                    <div style={{fontSize: '10px', color: 'var(--text-medium)', fontWeight: '500'}}>
+                                                        {bucket.label}
+                                                    </div>
+                                                </div>
+                                            ));
+                                        })()}
+                                    </div>
+                                    <div style={{marginTop: '12px', fontSize: '11px', color: 'var(--text-light)', textAlign: 'center'}}>
+                                        Ideal: 130-160 WPM
+                                    </div>
+                                </>
+                            ) : (
+                                <div style={{display: 'flex', alignItems: 'center', justifyContent: 'center', height: '120px', color: 'var(--text-light)', fontSize: '13px'}}>
+                                    No pace distribution data
+                                </div>
+                            )}
+                        </div>
+
+                        {/* Caption Readability Score */}
+                        <div style={{
+                            background: 'white',
+                            padding: '20px',
+                            borderRadius: '12px',
+                            border: '1px solid var(--border-light)'
+                        }}>
+                            <h3 style={{margin: '0 0 16px 0', fontSize: '15px', fontWeight: '600'}}>Session Performance Summary</h3>
+                            <div style={{display: 'flex', flexDirection: 'column', gap: '12px'}}>
+                                {/* Average Confidence */}
+                                <div>
+                                    <div style={{display: 'flex', justifyContent: 'space-between', marginBottom: '6px', fontSize: '12px'}}>
+                                        <span style={{color: 'var(--text-medium)'}}>Avg Confidence</span>
+                                        <span style={{fontWeight: '600'}}>{Math.round(paceData.reduce((a, p) => a + p.accuracy, 0) / Math.max(1, paceData.length))}%</span>
+                                    </div>
+                                    <div style={{width: '100%', height: '6px', background: '#f0f0f0', borderRadius: '3px', overflow: 'hidden'}}>
+                                        <div style={{
+                                            width: `${Math.round(paceData.reduce((a, p) => a + p.accuracy, 0) / Math.max(1, paceData.length))}%`,
+                                            height: '100%',
+                                            background: '#00A676',
+                                            borderRadius: '3px'
+                                        }}/>
+                                    </div>
+                                </div>
+
+                                {/* Correction Rate */}
+                                <div>
+                                    <div style={{display: 'flex', justifyContent: 'space-between', marginBottom: '6px', fontSize: '12px'}}>
+                                        <span style={{color: 'var(--text-medium)'}}>Correction Rate</span>
+                                        <span style={{fontWeight: '600'}}>{Math.round((allCorrections.length / Math.max(1, totalWords)) * 100)}%</span>
+                                    </div>
+                                    <div style={{width: '100%', height: '6px', background: '#f0f0f0', borderRadius: '3px', overflow: 'hidden'}}>
+                                        <div style={{
+                                            width: `${Math.min(100, (allCorrections.length / Math.max(1, totalWords)) * 100)}%`,
+                                            height: '100%',
+                                            background: 'var(--purple-accent)',
+                                            borderRadius: '3px'
+                                        }}/>
+                                    </div>
+                                </div>
+
+                                {/* Speaking Pace Stability */}
+                                <div>
+                                    <div style={{display: 'flex', justifyContent: 'space-between', marginBottom: '6px', fontSize: '12px'}}>
+                                        <span style={{color: 'var(--text-medium)'}}>Pace Consistency</span>
+                                        <span style={{fontWeight: '600'}}>
+                                            {paceData.length > 0 ? (() => {
+                                                const wpmValues = paceData.map(p => p.wpm);
+                                                const avg = wpmValues.reduce((a, b) => a + b, 0) / wpmValues.length;
+                                                const variance = wpmValues.reduce((a, b) => a + Math.pow(b - avg, 2), 0) / wpmValues.length;
+                                                const stdDev = Math.sqrt(variance);
+                                                const consistency = Math.max(0, Math.min(100, 100 - (stdDev / avg) * 100));
+                                                return Math.round(consistency);
+                                            })() : 0}%
+                                        </span>
+                                    </div>
+                                    <div style={{width: '100%', height: '6px', background: '#f0f0f0', borderRadius: '3px', overflow: 'hidden'}}>
+                                        <div style={{
+                                            width: `${paceData.length > 0 ? (() => {
+                                                const wpmValues = paceData.map(p => p.wpm);
+                                                const avg = wpmValues.reduce((a, b) => a + b, 0) / wpmValues.length;
+                                                const variance = wpmValues.reduce((a, b) => a + Math.pow(b - avg, 2), 0) / wpmValues.length;
+                                                const stdDev = Math.sqrt(variance);
+                                                return Math.max(0, Math.min(100, 100 - (stdDev / avg) * 100));
+                                            })() : 0}%`,
+                                            height: '100%',
+                                            background: 'var(--sage-primary)',
+                                            borderRadius: '3px'
+                                        }}/>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
                     </div>
 
@@ -4849,8 +5294,18 @@
             const [speechmaticsApiKey, setSpeechmaticsApiKey] = useState('');
             const [speechmaticsConfigured, setSpeechmaticsConfigured] = useState(false);
             const [showSpeechmaticsConfig, setShowSpeechmaticsConfig] = useState(false);
+            const [showSuperBackupModal, setShowSuperBackupModal] = useState(false);
             const [latencyStats, setLatencyStats] = useState(null);
             const [maxLatency, setMaxLatency] = useState(2000); // ms
+
+            // Failover & Health Monitoring state
+            const [backupModeActive, setBackupModeActive] = useState(false);
+            const [tabHasFocus, setTabHasFocus] = useState(true);
+            const [lastCaptionTime, setLastCaptionTime] = useState(Date.now());
+            const [captionHealthStatus, setCaptionHealthStatus] = useState('healthy'); // healthy, warning, critical
+            const [failoverCount, setFailoverCount] = useState(0);
+            const [sessionLearnedTerms, setSessionLearnedTerms] = useState(new Map());
+            const lastCaptionTimeRef = useRef(Date.now());
 
             // Local Whisper API state
             const [localWhisperRunning, setLocalWhisperRunning] = useState(false);
@@ -4865,6 +5320,7 @@
             const [sessionDuration, setSessionDuration] = useState(0);
             const [sessionStartTime, setSessionStartTime] = useState(null);
             const [showCorrectionsPanel, setShowCorrectionsPanel] = useState(true);
+            const [showSessionTitleEditor, setShowSessionTitleEditor] = useState(false);
             const [captionConfidence, setCaptionConfidence] = useState(85); // 0-100 confidence score
             const [captionDelay, setCaptionDelay] = useState(0.2); // seconds behind real-time
 
@@ -4891,6 +5347,7 @@
             const [knowledgeEntities, setKnowledgeEntities] = useState([]);
             const [knowledgeUploadText, setKnowledgeUploadText] = useState('');
             const [knowledgeUploading, setKnowledgeUploading] = useState(false);
+            const [knowledgeUploadProgress, setKnowledgeUploadProgress] = useState('');
             const [knowledgeUrlInput, setKnowledgeUrlInput] = useState('');
             const [knowledgeUrlLoading, setKnowledgeUrlLoading] = useState(false);
             const [knowledgeYoutubeInput, setKnowledgeYoutubeInput] = useState('');
@@ -5290,6 +5747,181 @@
                 return () => clearInterval(interval);
             }, [browserListening, whisperRunning]);
 
+            // Tab Focus Detection & Auto-Failover
+            useEffect(() => {
+                const handleVisibilityChange = () => {
+                    const isVisible = !document.hidden;
+                    setTabHasFocus(isVisible);
+
+                    if (!isVisible && browserListening && !backupModeActive) {
+                        // Tab lost focus while browser mode active
+                        console.warn('⚠️ Tab backgrounded - Browser Speech API may stop');
+
+                        // If Speechmatics is configured, offer to switch
+                        if (speechmaticsConfigured) {
+                            const shouldSwitch = confirm(
+                                'Tab is backgrounded. Browser Speech API may stop working.\n\n' +
+                                'Switch to Speechmatics backup mode to continue captioning?'
+                            );
+                            if (shouldSwitch) {
+                                activateBackupMode();
+                            }
+                        }
+                    }
+                };
+
+                document.addEventListener('visibilitychange', handleVisibilityChange);
+                return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
+            }, [browserListening, speechmaticsConfigured, backupModeActive]);
+
+            // Caption Health Monitoring & Auto-Recovery
+            useEffect(() => {
+                if (!browserListening && !whisperRunning && !speechmaticsRunning) return;
+
+                const healthCheckInterval = setInterval(() => {
+                    const now = Date.now();
+                    const silenceDuration = now - lastCaptionTimeRef.current;
+
+                    // Update health status (extended thresholds: +5s each)
+                    if (silenceDuration > 15000) {
+                        setCaptionHealthStatus('critical');
+                        console.error('🔴 CRITICAL: No captions for 15+ seconds');
+
+                        // Auto-recovery: Try to restart
+                        if (browserListening && !backupModeActive) {
+                            console.log('Attempting auto-recovery: restarting browser mode');
+                            if (recognitionRef.current) {
+                                try {
+                                    recognitionRef.current.stop();
+                                    setTimeout(() => {
+                                        recognitionRef.current.start();
+                                    }, 1000);
+                                } catch (err) {
+                                    console.error('Auto-restart failed:', err);
+                                    // If restart fails and backup available, switch automatically
+                                    if (speechmaticsConfigured) {
+                                        activateBackupMode();
+                                    }
+                                }
+                            }
+                        }
+                    } else if (silenceDuration > 10000) {
+                        setCaptionHealthStatus('warning');
+                        console.warn('⚠️ WARNING: No captions for 10+ seconds');
+                    } else {
+                        setCaptionHealthStatus('healthy');
+                    }
+                }, 2000); // Check every 2 seconds
+
+                return () => clearInterval(healthCheckInterval);
+            }, [browserListening, whisperRunning, speechmaticsRunning, backupModeActive, speechmaticsConfigured]);
+
+            // Activate Speechmatics Backup Mode
+            const activateBackupMode = () => {
+                console.log('🔄 Activating backup mode (Speechmatics)');
+
+                // Stop browser mode
+                if (recognitionRef.current) {
+                    recognitionRef.current.stop();
+                    recognitionRef.current = null;
+                }
+                setBrowserListening(false);
+
+                // Start Speechmatics
+                fetch('/api/speechmatics/start', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ device_id: selectedDevice })
+                })
+                .then(r => r.json())
+                .then(data => {
+                    if (data.status === 'ok') {
+                        setSpeechmaticsRunning(true);
+                        setBackupModeActive(true);
+                        setFailoverCount(prev => prev + 1);
+                        alert('✅ Switched to Speechmatics backup mode.\nCaptions will continue even if tab is backgrounded.');
+                    } else {
+                        alert('Failed to activate backup mode: ' + (data.error || 'Unknown error'));
+                    }
+                })
+                .catch(err => {
+                    console.error('Backup activation error:', err);
+                    alert('Failed to activate backup mode. Check Speechmatics configuration.');
+                });
+            };
+
+            // Update last caption time whenever caption changes
+            useEffect(() => {
+                if (caption) {
+                    lastCaptionTimeRef.current = Date.now();
+                    setLastCaptionTime(Date.now());
+                }
+            }, [caption]);
+
+            // Session Vocabulary Learning - Auto-detect frequent proper nouns
+            useEffect(() => {
+                if (!caption || !recording) return;
+
+                // Extract capitalized multi-word phrases (potential proper nouns)
+                const properNounPattern = /\b[A-Z][a-z]+(?:\s+[A-Z][a-z]+)+\b/g;
+                const matches = caption.match(properNounPattern) || [];
+
+                matches.forEach(term => {
+                    // Skip if already in engine or common false positives
+                    const commonWords = ['The', 'This', 'That', 'These', 'Those'];
+                    if (commonWords.some(w => term.startsWith(w))) return;
+
+                    // Track frequency
+                    const currentCount = sessionLearnedTerms.get(term) || 0;
+                    const newCount = currentCount + 1;
+
+                    setSessionLearnedTerms(prev => new Map(prev).set(term, newCount));
+
+                    // Auto-add to engine after 3 mentions
+                    if (newCount === 3) {
+                        console.log(`📚 Learned new term from session: "${term}" (mentioned ${newCount} times)`);
+
+                        // Guess category based on context
+                        const category = term.includes(' ') && term.split(' ').length === 2 ? 'person' :
+                                       term.includes('Street') || term.includes('Avenue') ? 'place' :
+                                       'organization';
+
+                        // Add to engine temporarily
+                        fetch('/api/engine/term', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                term: term,
+                                category: category,
+                                source: 'session_learned',
+                                context: `Auto-learned during session (${newCount} mentions)`
+                            })
+                        })
+                        .then(r => r.json())
+                        .then(data => {
+                            if (data.status === 'ok') {
+                                console.log(`✅ Added "${term}" to caption engine`);
+                            }
+                        })
+                        .catch(err => console.error('Error adding learned term:', err));
+                    }
+                });
+            }, [caption, recording]);
+
+            // Show learned terms notification every 5 minutes
+            useEffect(() => {
+                if (!recording) return;
+
+                const notificationInterval = setInterval(() => {
+                    const learnedCount = Array.from(sessionLearnedTerms.values()).filter(count => count >= 3).length;
+                    if (learnedCount > 0) {
+                        console.log(`📚 Session has learned ${learnedCount} new terms automatically`);
+                    }
+                }, 5 * 60 * 1000); // Every 5 minutes
+
+                return () => clearInterval(notificationInterval);
+            }, [recording, sessionLearnedTerms]);
+
             const loadWhisperModel = (autoStart = false) => {
                 setModelLoading(true);
                 fetch('/api/whisper/load', {
@@ -5480,6 +6112,8 @@
             };
 
             const stopAndAnalyze = async () => {
+                console.log('🛑 stopAndAnalyze() called');
+
                 // Show loading state
                 setAnalysisLoading(true);
                 setAnalysisProgress(10);
@@ -5487,6 +6121,7 @@
 
                 // Stop speech recognition
                 if (recognitionRef.current) {
+                    console.log('Stopping browser speech recognition');
                     recognitionRef.current.stop();
                     recognitionRef.current = null;
                 }
@@ -5494,13 +6129,16 @@
 
                 // Stop all ASR engines
                 if (whisperRunning) {
+                    console.log('Stopping Whisper');
                     fetch('/api/whisper/stop', { method: 'POST' }).catch(() => {});
                 }
                 if (speechmaticsRunning) {
+                    console.log('Stopping Speechmatics');
                     fetch('/api/speechmatics/stop', { method: 'POST' }).catch(() => {});
                     setSpeechmaticsRunning(false);
                 }
                 if (localWhisperRunning) {
+                    console.log('Stopping Local Whisper');
                     fetch('/api/localwhisper/stop', { method: 'POST' }).catch(() => {});
                     setLocalWhisperRunning(false);
                 }
@@ -5509,8 +6147,11 @@
                 setAnalysisProgress(30);
 
                 try {
+                    console.log('📊 Fetching session data...');
+
                     // Stop session on backend - returns session with duration
                     const stopResult = await fetch('/api/session/stop', { method: 'POST' }).then(r => r.json());
+                    console.log('Session stop result:', stopResult);
                     setAnalysisProgress(50);
 
                     // Fetch session data
@@ -5518,6 +6159,8 @@
                         fetch('/api/session/captions').then(r => r.json()),
                         fetch('/api/session/analytics').then(r => r.json()).catch(() => ({}))
                     ]);
+                    console.log('Captions count:', captionsData.captions?.length || 0);
+                    console.log('Analytics:', analytics);
                     setAnalysisProgress(80);
 
                     // Get duration from stop result (most reliable), or calculate from captions
@@ -5531,13 +6174,14 @@
                         });
                         actualDuration = Math.max(...timestamps) + 5; // Add 5 second buffer
                     }
+                    console.log('Session duration:', actualDuration);
 
                     // Build and store analysis data
                     const data = {
                         name: sessionName || 'Untitled Session',
                         start_time: sessionStartTime,
                         duration: actualDuration,
-                        wordCount: stopResult.session?.caption_count ? wordCount : wordCount,
+                        wordCount: stopResult.session?.caption_count || wordCount,
                         corrections: allCorrections,
                         captions: captionsData.captions || [],
                         highlights: analytics.highlights || [],
@@ -5547,19 +6191,23 @@
                         qualityScore: analytics.quality_score || 85
                     };
 
+                    console.log('💾 Saving to localStorage:', data);
                     localStorage.setItem('sessionAnalysis', JSON.stringify(data));
                     setSessionStats(stopResult.session || {});
                     setAnalysisProgress(100);
 
                     // Show ready button
                     setTimeout(() => {
+                        console.log('✅ Analysis ready - showing button');
                         setAnalysisLoading(false);
                         setAnalysisReady(true);
                     }, 300);
 
                 } catch (err) {
-                    console.error('Error stopping session:', err);
+                    console.error('❌ Error stopping session:', err);
+                    alert('Error preparing analysis:\n\n' + err.message + '\n\nUse the "Open Last Analysis" button to try opening it manually.');
                     setAnalysisLoading(false);
+                    // Still set ready so user can try backup button
                     setAnalysisReady(true);
                 }
             };
@@ -5714,9 +6362,11 @@
                 const file = event.target.files[0];
                 if (!file) return;
                 setKnowledgeUploading(true);
+                setKnowledgeUploadProgress('Reading file...');
 
                 const reader = new FileReader();
                 reader.onload = (e) => {
+                    setKnowledgeUploadProgress('Uploading to server...');
                     const base64 = e.target.result.split(',')[1];
                     fetch('/api/knowledge/upload', {
                         method: 'POST',
@@ -5729,12 +6379,17 @@
                     .then(r => r.json())
                     .then(data => {
                         setKnowledgeUploading(false);
+                        setKnowledgeUploadProgress('');
                         if (data.status === 'ok' || data.doc_id) {
+                            setKnowledgeUploadProgress('Extracting entities...');
                             loadKnowledgeStatus();
                             const entityInfo = data.entities ?
                                 `People: ${data.entities.people || 0}, Places: ${data.entities.places || 0}, Orgs: ${data.entities.organizations || 0}` :
                                 '';
-                            alert(`Document uploaded successfully!\n\nWords: ${data.word_count || 0}\nChunks: ${data.chunks || 0}\n${entityInfo}`);
+                            setTimeout(() => {
+                                setKnowledgeUploadProgress('');
+                                alert(`Document uploaded successfully!\n\n${entityInfo ? entityInfo + '\n\n' : ''}Words: ${data.word_count || 0}\nChunks: ${data.chunks || 0}\n\nClick "Sync to Engine" to add these entities to your caption engine.`);
+                            }, 500);
                         } else {
                             // Provide helpful installation instructions
                             let errorMsg = data.error || 'Unknown error';
@@ -5748,6 +6403,7 @@
                     })
                     .catch(err => {
                         setKnowledgeUploading(false);
+                        setKnowledgeUploadProgress('');
                         console.error('Error uploading:', err);
                         alert('Upload failed. Please try copying the text and pasting it directly.');
                     });
@@ -6675,6 +7331,31 @@
                                                 Local API
                                             </button>
                                         </div>
+
+                                        {/* Super Backup Mode Button */}
+                                        <button
+                                            onClick={() => setShowSuperBackupModal(true)}
+                                            style={{
+                                                marginTop: '8px',
+                                                padding: '8px 16px',
+                                                background: 'linear-gradient(135deg, #DC2626, #EF4444)',
+                                                color: 'white',
+                                                border: 'none',
+                                                borderRadius: '8px',
+                                                fontSize: '12px',
+                                                fontWeight: '600',
+                                                cursor: 'pointer',
+                                                display: 'flex',
+                                                alignItems: 'center',
+                                                gap: '6px',
+                                                boxShadow: '0 2px 8px rgba(220, 38, 38, 0.3)'
+                                            }}
+                                        >
+                                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                                                <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+                                            </svg>
+                                            {speechmaticsConfigured ? '🛡️ Super Backup Mode Ready' : '⚠️ Enable Super Backup Mode'}
+                                        </button>
                                     </div>
 
                                     <div style={{display: 'flex', alignItems: 'center', gap: '12px'}}>
@@ -7006,6 +7687,133 @@
                                     </div>
                                 )}
 
+                                {/* Super Backup Mode Modal */}
+                                {showSuperBackupModal && (
+                                    <div style={{
+                                        position: 'fixed',
+                                        top: 0, left: 0, right: 0, bottom: 0,
+                                        background: 'rgba(0,0,0,0.5)',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'center',
+                                        zIndex: 1000
+                                    }} onClick={() => setShowSuperBackupModal(false)}>
+                                        <div style={{
+                                            background: 'white',
+                                            padding: '32px',
+                                            borderRadius: '16px',
+                                            maxWidth: '550px',
+                                            width: '90%'
+                                        }} onClick={e => e.stopPropagation()}>
+                                            <div style={{display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '16px'}}>
+                                                <div style={{
+                                                    width: '48px',
+                                                    height: '48px',
+                                                    borderRadius: '50%',
+                                                    background: 'linear-gradient(135deg, #DC2626, #EF4444)',
+                                                    display: 'flex',
+                                                    alignItems: 'center',
+                                                    justifyContent: 'center'
+                                                }}>
+                                                    <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5">
+                                                        <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+                                                    </svg>
+                                                </div>
+                                                <h3 style={{margin: 0, fontSize: '20px', fontWeight: '600'}}>
+                                                    Super Backup Mode
+                                                </h3>
+                                            </div>
+
+                                            <div style={{
+                                                background: 'linear-gradient(135deg, #FEE2E2, #FECACA)',
+                                                padding: '16px',
+                                                borderRadius: '12px',
+                                                marginBottom: '20px',
+                                                border: '1px solid #FCA5A5'
+                                            }}>
+                                                <div style={{fontSize: '14px', fontWeight: '600', marginBottom: '8px', color: '#991B1B'}}>
+                                                    🛡️ What is Super Backup Mode?
+                                                </div>
+                                                <p style={{margin: 0, fontSize: '13px', color: '#7F1D1D', lineHeight: '1.6'}}>
+                                                    Automatic failover protection that ensures your captions <strong>never stop</strong> during live broadcasts.
+                                                </p>
+                                            </div>
+
+                                            <div style={{
+                                                background: 'var(--bg-sage-light)',
+                                                padding: '16px',
+                                                borderRadius: '12px',
+                                                marginBottom: '20px'
+                                            }}>
+                                                <div style={{fontSize: '14px', fontWeight: '600', marginBottom: '12px', color: 'var(--sage-darker)'}}>
+                                                    How it works:
+                                                </div>
+                                                <ol style={{margin: 0, paddingLeft: '20px', fontSize: '13px', color: 'var(--text-medium)', lineHeight: '1.8'}}>
+                                                    <li><strong>Monitors browser tab focus</strong> - Detects when you switch tabs or minimize the window</li>
+                                                    <li><strong>Auto-switches to Speechmatics</strong> - Seamlessly activates cloud-based captioning backup</li>
+                                                    <li><strong>Keeps captions running</strong> - No interruption even if browser tab is backgrounded</li>
+                                                    <li><strong>Shows health status</strong> - Real-time monitoring with visual indicators</li>
+                                                </ol>
+                                            </div>
+
+                                            <div style={{
+                                                background: '#FEF3C7',
+                                                padding: '12px 16px',
+                                                borderRadius: '8px',
+                                                marginBottom: '20px',
+                                                fontSize: '13px',
+                                                color: '#92400E',
+                                                display: 'flex',
+                                                alignItems: 'center',
+                                                gap: '8px'
+                                            }}>
+                                                <span style={{fontSize: '16px'}}>⚡</span>
+                                                <div>
+                                                    <strong>Why you need this:</strong> Browser Speech API stops when the tab loses focus.
+                                                    Super Backup Mode prevents caption failures during live events.
+                                                </div>
+                                            </div>
+
+                                            <label style={{display: 'block', marginBottom: '8px', fontSize: '14px', fontWeight: '500'}}>
+                                                Speechmatics API Key
+                                            </label>
+                                            <p style={{margin: '0 0 12px', fontSize: '12px', color: 'var(--text-medium)'}}>
+                                                Get your API key at <a href="https://portal.speechmatics.com" target="_blank" rel="noopener" style={{color: '#059669'}}>portal.speechmatics.com</a>
+                                                <br/>
+                                                <span style={{opacity: 0.8}}>Pricing: ~$0.012-0.024/min (pay-as-you-go)</span>
+                                            </p>
+                                            <input
+                                                type="password"
+                                                className="setting-input"
+                                                style={{width: '100%', padding: '12px', marginBottom: '20px'}}
+                                                placeholder="Enter your Speechmatics API key"
+                                                value={speechmaticsApiKey}
+                                                onChange={e => setSpeechmaticsApiKey(e.target.value)}
+                                            />
+
+                                            <div style={{display: 'flex', gap: '12px', justifyContent: 'flex-end'}}>
+                                                <button
+                                                    className="btn-large btn-outline"
+                                                    onClick={() => setShowSuperBackupModal(false)}
+                                                >
+                                                    Cancel
+                                                </button>
+                                                <button
+                                                    className="btn-large"
+                                                    style={{background: 'linear-gradient(135deg, #DC2626, #EF4444)', color: 'white'}}
+                                                    onClick={() => {
+                                                        configureSpeechmatics();
+                                                        setShowSuperBackupModal(false);
+                                                    }}
+                                                    disabled={!speechmaticsApiKey.trim()}
+                                                >
+                                                    🛡️ Enable Super Backup Mode
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                )}
+
                             </div>
 
                             {/* Live Preview - 1920x1080 aspect ratio simulation */}
@@ -7233,7 +8041,160 @@
                                         {captionDelay < 1 ? 'Real-time' : captionDelay < 3 ? 'Near real-time' : 'Significant delay'}
                                     </div>
                                 </div>
+
+                                {/* Session Learning Stats */}
+                                {recording && sessionLearnedTerms.size > 0 && (
+                                    <div style={{background: 'rgba(138, 127, 199, 0.2)', padding: '12px', borderRadius: '8px', marginTop: '12px', border: '1px solid rgba(138, 127, 199, 0.3)'}}>
+                                        <div style={{fontSize: '12px', opacity: 0.9, marginBottom: '6px'}}>
+                                            📚 AUTO-LEARNING
+                                        </div>
+                                        <div style={{fontSize: '14px', fontWeight: '600'}}>
+                                            {Array.from(sessionLearnedTerms.values()).filter(count => count >= 3).length} terms learned
+                                        </div>
+                                        <div style={{fontSize: '10px', opacity: 0.7, marginTop: '4px'}}>
+                                            {Array.from(sessionLearnedTerms.entries())
+                                                .filter(([_, count]) => count >= 3)
+                                                .slice(0, 3)
+                                                .map(([term]) => term)
+                                                .join(', ')}
+                                            {Array.from(sessionLearnedTerms.values()).filter(count => count >= 3).length > 3 && '...'}
+                                        </div>
+                                    </div>
+                                )}
+
+                                {/* Session Title Editor */}
+                                <div
+                                    style={{background: 'rgba(255,255,255,0.1)', padding: '12px', borderRadius: '8px', marginTop: '12px', cursor: 'pointer'}}
+                                    onClick={() => setShowSessionTitleEditor(!showSessionTitleEditor)}
+                                >
+                                    <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center'}}>
+                                        <div style={{flex: 1}}>
+                                            <div style={{fontSize: '12px', opacity: 0.8}}>SESSION TITLE</div>
+                                            <div style={{fontSize: '14px', fontWeight: '600', marginTop: '4px'}}>
+                                                {sessionName || 'Untitled Session'}
+                                            </div>
+                                        </div>
+                                        <span style={{fontSize: '18px'}}>{showSessionTitleEditor ? '▼' : '▶'}</span>
+                                    </div>
+                                </div>
+
+                                {showSessionTitleEditor && (
+                                    <div style={{marginTop: '12px', background: 'rgba(0,0,0,0.2)', borderRadius: '8px', padding: '12px'}}>
+                                        <input
+                                            type="text"
+                                            value={sessionName}
+                                            onChange={(e) => setSessionName(e.target.value)}
+                                            placeholder="Enter session title..."
+                                            style={{
+                                                width: '100%',
+                                                padding: '10px',
+                                                fontSize: '14px',
+                                                borderRadius: '6px',
+                                                border: '1px solid rgba(255,255,255,0.3)',
+                                                background: 'rgba(255,255,255,0.15)',
+                                                color: 'white',
+                                                marginBottom: '8px'
+                                            }}
+                                            onClick={(e) => e.stopPropagation()}
+                                        />
+                                        <div style={{fontSize: '11px', opacity: 0.7}}>
+                                            💡 Title will be saved when session stops
+                                        </div>
+                                    </div>
+                                )}
                             </div>
+
+                            {/* Backup: Open Last Analysis Button */}
+                            {localStorage.getItem('sessionAnalysis') && (
+                                <div className="card" style={{marginTop: '16px', background: 'linear-gradient(135deg, var(--purple-accent), var(--purple-light))', color: 'white', border: 'none'}}>
+                                    <div style={{fontSize: '12px', opacity: 0.9, marginBottom: '8px'}}>
+                                        📊 LAST SESSION ANALYSIS
+                                    </div>
+                                    <button
+                                        onClick={openAnalysisPage}
+                                        style={{
+                                            width: '100%',
+                                            background: 'white',
+                                            color: 'var(--purple-accent)',
+                                            border: 'none',
+                                            padding: '12px',
+                                            borderRadius: '8px',
+                                            fontSize: '14px',
+                                            fontWeight: '600',
+                                            cursor: 'pointer',
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            justifyContent: 'center',
+                                            gap: '8px'
+                                        }}
+                                    >
+                                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                            <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/>
+                                            <polyline points="15,3 21,3 21,9"/>
+                                            <line x1="10" y1="14" x2="21" y2="3"/>
+                                        </svg>
+                                        Open Analysis in New Tab
+                                    </button>
+                                    <div style={{fontSize: '10px', opacity: 0.7, marginTop: '8px', textAlign: 'center'}}>
+                                        Backup: Opens analysis if it didn't load automatically
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* Caption Health Monitor */}
+                            {(browserListening || whisperRunning || speechmaticsRunning) && (
+                                <div className="card" style={{
+                                    background: captionHealthStatus === 'healthy' ? 'linear-gradient(135deg, #059669, #10B981)' :
+                                               captionHealthStatus === 'warning' ? 'linear-gradient(135deg, #D97706, #F59E0B)' :
+                                               'linear-gradient(135deg, #DC2626, #EF4444)',
+                                    color: 'white',
+                                    border: 'none'
+                                }}>
+                                    <h2 className="card-title" style={{color: 'white', borderColor: 'rgba(255,255,255,0.3)', display: 'flex', alignItems: 'center', gap: '8px'}}>
+                                        {captionHealthStatus === 'healthy' && '🟢'}
+                                        {captionHealthStatus === 'warning' && '🟡'}
+                                        {captionHealthStatus === 'critical' && '🔴'}
+                                        System Health
+                                    </h2>
+
+                                    <div style={{fontSize: '13px', marginBottom: '12px'}}>
+                                        <div style={{marginBottom: '8px'}}>
+                                            <strong>Status:</strong> {
+                                                captionHealthStatus === 'healthy' ? 'All systems operational' :
+                                                captionHealthStatus === 'warning' ? 'Minor delays detected' :
+                                                'Caption engine stalled - attempting recovery'
+                                            }
+                                        </div>
+                                        {backupModeActive && (
+                                            <div style={{
+                                                padding: '8px',
+                                                background: 'rgba(255,255,255,0.2)',
+                                                borderRadius: '6px',
+                                                fontSize: '12px',
+                                                marginBottom: '8px'
+                                            }}>
+                                                🔄 <strong>Backup Mode Active</strong><br/>
+                                                Using Speechmatics (failovers: {failoverCount})
+                                            </div>
+                                        )}
+                                        {!tabHasFocus && browserListening && (
+                                            <div style={{
+                                                padding: '8px',
+                                                background: 'rgba(255,255,255,0.2)',
+                                                borderRadius: '6px',
+                                                fontSize: '12px'
+                                            }}>
+                                                ⚠️ <strong>Tab Backgrounded</strong><br/>
+                                                Captions may stop. Consider switching to backup mode.
+                                            </div>
+                                        )}
+                                    </div>
+
+                                    <div style={{fontSize: '11px', opacity: 0.8}}>
+                                        Last caption: {Math.round((Date.now() - lastCaptionTime) / 1000)}s ago
+                                    </div>
+                                </div>
+                            )}
 
                             {/* Live Overlay Card */}
                             <div className="card">
@@ -7501,6 +8462,33 @@
                                             {(!systemInfo.pdf_available || !systemInfo.docx_available) && (
                                                 <div style={{fontSize: '10px', color: '#B45309', marginTop: '8px'}}>
                                                     Missing libraries? Run: pip3 install PyPDF2 python-docx
+                                                </div>
+                                            )}
+
+                                            {/* Upload Progress Indicator */}
+                                            {knowledgeUploading && (
+                                                <div style={{marginTop: '16px', padding: '12px', background: 'var(--bg-sage-light)', borderRadius: '8px', border: '1px solid var(--sage-primary)'}}>
+                                                    <div style={{display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '8px'}}>
+                                                        <div style={{
+                                                            width: '24px',
+                                                            height: '24px',
+                                                            border: '3px solid var(--sage-primary)',
+                                                            borderTop: '3px solid transparent',
+                                                            borderRadius: '50%',
+                                                            animation: 'spin 1s linear infinite'
+                                                        }}/>
+                                                        <span style={{fontSize: '13px', fontWeight: '600', color: 'var(--sage-darker)'}}>
+                                                            {knowledgeUploadProgress || 'Processing...'}
+                                                        </span>
+                                                    </div>
+                                                    <div style={{width: '100%', height: '4px', background: 'rgba(0,0,0,0.1)', borderRadius: '2px', overflow: 'hidden'}}>
+                                                        <div style={{
+                                                            height: '100%',
+                                                            background: 'var(--sage-primary)',
+                                                            animation: 'progressPulse 1.5s ease-in-out infinite',
+                                                            width: '100%'
+                                                        }}/>
+                                                    </div>
                                                 </div>
                                             )}
                                         </div>
