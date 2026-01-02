@@ -6221,7 +6221,30 @@
                 }
             };
 
-            const openAnalysisPage = () => {
+            const openAnalysisPage = async () => {
+                // Check if currently captioning
+                if (browserListening || whisperRunning || speechmaticsRunning || localWhisperRunning) {
+                    const confirmStop = confirm(
+                        '⚠️ Warning: Opening analytics will stop the current captioning session.\n\n' +
+                        'Are you sure you want to stop and view analytics?'
+                    );
+
+                    if (!confirmStop) {
+                        return; // User cancelled
+                    }
+
+                    // Stop all captioning engines
+                    if (browserListening) await stopBrowserCaptions();
+                    if (whisperRunning) await stopWhisper();
+                    if (speechmaticsRunning) await stopSpeechmatics();
+                    if (localWhisperRunning) await stopLocalWhisper();
+
+                    // Stop recording if active
+                    if (recording) {
+                        await stopAndAnalyze();
+                    }
+                }
+
                 window.open('/?view=analysis', '_blank');
                 setAnalysisReady(false);
             };
@@ -8280,6 +8303,61 @@
 
                         {/* Sidebar Column - Caption Stats, Session, Overlay */}
                         <div className="sidebar-column">
+                            {/* Caption Health Monitor */}
+                            {(browserListening || whisperRunning || speechmaticsRunning) && (
+                                <div className="card" style={{
+                                    background: captionHealthStatus === 'healthy' ? 'linear-gradient(135deg, #059669, #10B981)' :
+                                               captionHealthStatus === 'warning' ? 'linear-gradient(135deg, #D97706, #F59E0B)' :
+                                               'linear-gradient(135deg, #DC2626, #EF4444)',
+                                    color: 'white',
+                                    border: 'none'
+                                }}>
+                                    <h2 className="card-title" style={{color: 'white', borderColor: 'rgba(255,255,255,0.3)', display: 'flex', alignItems: 'center', gap: '8px'}}>
+                                        {captionHealthStatus === 'healthy' && '🟢'}
+                                        {captionHealthStatus === 'warning' && '🟡'}
+                                        {captionHealthStatus === 'critical' && '🔴'}
+                                        System Health
+                                    </h2>
+
+                                    <div style={{fontSize: '13px', marginBottom: '12px'}}>
+                                        <div style={{marginBottom: '8px'}}>
+                                            <strong>Status:</strong> {
+                                                captionHealthStatus === 'healthy' ? 'All systems operational' :
+                                                captionHealthStatus === 'warning' ? 'Minor delays detected' :
+                                                'Caption engine stalled - attempting recovery'
+                                            }
+                                        </div>
+                                        {backupModeActive && (
+                                            <div style={{
+                                                padding: '8px',
+                                                background: 'rgba(255,255,255,0.2)',
+                                                borderRadius: '6px',
+                                                fontSize: '12px',
+                                                marginBottom: '8px'
+                                            }}>
+                                                🔄 <strong>Backup Mode Active</strong><br/>
+                                                Using Speechmatics (failovers: {failoverCount})
+                                            </div>
+                                        )}
+                                        {!tabHasFocus && browserListening && (
+                                            <div style={{
+                                                padding: '8px',
+                                                background: 'rgba(255,255,255,0.2)',
+                                                borderRadius: '6px',
+                                                fontSize: '12px'
+                                            }}>
+                                                ⚠️ <strong>Tab Backgrounded</strong><br/>
+                                                Captions may stop. Consider switching to backup mode.
+                                            </div>
+                                        )}
+                                    </div>
+
+                                    <div style={{fontSize: '11px', opacity: 0.8'}}>
+                                        Last caption: {Math.round((Date.now() - lastCaptionTime) / 1000)}s ago
+                                    </div>
+                                </div>
+                            )}
+
                             {/* Caption Stats Card - NEW */}
                             <div className="card" style={{background: 'linear-gradient(135deg, var(--sage-primary), var(--sage-darker))', color: 'white'}}>
                                 <h2 className="card-title" style={{color: 'white', borderColor: 'rgba(255,255,255,0.3)'}}>Caption Stats</h2>
@@ -8471,60 +8549,6 @@
                                 </div>
                             )}
 
-                            {/* Caption Health Monitor */}
-                            {(browserListening || whisperRunning || speechmaticsRunning) && (
-                                <div className="card" style={{
-                                    background: captionHealthStatus === 'healthy' ? 'linear-gradient(135deg, #059669, #10B981)' :
-                                               captionHealthStatus === 'warning' ? 'linear-gradient(135deg, #D97706, #F59E0B)' :
-                                               'linear-gradient(135deg, #DC2626, #EF4444)',
-                                    color: 'white',
-                                    border: 'none'
-                                }}>
-                                    <h2 className="card-title" style={{color: 'white', borderColor: 'rgba(255,255,255,0.3)', display: 'flex', alignItems: 'center', gap: '8px'}}>
-                                        {captionHealthStatus === 'healthy' && '🟢'}
-                                        {captionHealthStatus === 'warning' && '🟡'}
-                                        {captionHealthStatus === 'critical' && '🔴'}
-                                        System Health
-                                    </h2>
-
-                                    <div style={{fontSize: '13px', marginBottom: '12px'}}>
-                                        <div style={{marginBottom: '8px'}}>
-                                            <strong>Status:</strong> {
-                                                captionHealthStatus === 'healthy' ? 'All systems operational' :
-                                                captionHealthStatus === 'warning' ? 'Minor delays detected' :
-                                                'Caption engine stalled - attempting recovery'
-                                            }
-                                        </div>
-                                        {backupModeActive && (
-                                            <div style={{
-                                                padding: '8px',
-                                                background: 'rgba(255,255,255,0.2)',
-                                                borderRadius: '6px',
-                                                fontSize: '12px',
-                                                marginBottom: '8px'
-                                            }}>
-                                                🔄 <strong>Backup Mode Active</strong><br/>
-                                                Using Speechmatics (failovers: {failoverCount})
-                                            </div>
-                                        )}
-                                        {!tabHasFocus && browserListening && (
-                                            <div style={{
-                                                padding: '8px',
-                                                background: 'rgba(255,255,255,0.2)',
-                                                borderRadius: '6px',
-                                                fontSize: '12px'
-                                            }}>
-                                                ⚠️ <strong>Tab Backgrounded</strong><br/>
-                                                Captions may stop. Consider switching to backup mode.
-                                            </div>
-                                        )}
-                                    </div>
-
-                                    <div style={{fontSize: '11px', opacity: 0.8}}>
-                                        Last caption: {Math.round((Date.now() - lastCaptionTime) / 1000)}s ago
-                                    </div>
-                                </div>
-                            )}
 
                             {/* Live Overlay Card */}
                             <div className="card">
