@@ -5410,17 +5410,28 @@
             useEffect(() => {
                 const params = new URLSearchParams(window.location.search);
                 if (params.get('view') === 'analysis') {
+                    console.log('📊 Analytics view requested');
                     const storedData = localStorage.getItem('sessionAnalysis');
+                    console.log('Stored data exists:', !!storedData);
+
                     if (storedData) {
                         try {
                             const data = JSON.parse(storedData);
+                            console.log('Parsed analysis data:', data);
+                            console.log('Data has captions:', !!data.captions, 'Count:', data.captions?.length);
+
                             setAnalysisData(data);
                             setShowAnalysis(true);
-                            // Clear the stored data
-                            localStorage.removeItem('sessionAnalysis');
+
+                            // DON'T clear immediately - keep for refresh
+                            // localStorage.removeItem('sessionAnalysis');
                         } catch (err) {
-                            console.error('Error loading analysis data:', err);
+                            console.error('❌ Error loading analysis data:', err);
+                            alert('Error loading session analysis. Please try stopping and restarting your session.');
                         }
+                    } else {
+                        console.error('❌ No analysis data found in localStorage');
+                        alert('No session data available. Please record a session first, then click "Stop & Analyze".');
                     }
                 }
             }, []);
@@ -6868,9 +6879,48 @@
                         onBack={() => {
                             setShowAnalysis(false);
                             setAnalysisData(null);
+                            // Clear localStorage when going back
+                            localStorage.removeItem('sessionAnalysis');
                         }}
                         t={t}
                     />
+                );
+            }
+
+            // If view=analysis but no data, show loading/error
+            const params = new URLSearchParams(window.location.search);
+            if (params.get('view') === 'analysis' && !analysisData) {
+                return (
+                    <div style={{
+                        minHeight: '100vh',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        flexDirection: 'column',
+                        gap: '20px',
+                        background: 'var(--bg-warm)',
+                        padding: '40px'
+                    }}>
+                        <div className="spinner" style={{
+                            width: '60px',
+                            height: '60px',
+                            border: '5px solid var(--border-light)',
+                            borderTop: '5px solid var(--sage-primary)',
+                            borderRadius: '50%',
+                            animation: 'spin 1s linear infinite'
+                        }}></div>
+                        <h2 style={{color: 'var(--text-dark)', margin: 0}}>Loading Session Analysis...</h2>
+                        <p style={{color: 'var(--text-medium)', maxWidth: '400px', textAlign: 'center'}}>
+                            If this takes more than 5 seconds, there may not be any session data available.
+                        </p>
+                        <button
+                            className="btn-large btn-outline"
+                            onClick={() => window.location.href = '/'}
+                            style={{marginTop: '20px'}}
+                        >
+                            ← Back to Dashboard
+                        </button>
+                    </div>
                 );
             }
 
