@@ -375,15 +375,17 @@ community-captioner/
   - Only processes during active recording
   - Integrates with existing RAG engine
   - Source tagged as 'session_learned' for easy identification
-- [x] **Super Backup Mode UI** - One-click failover configuration
-  - Red "Super Backup Mode" button next to captioning mode selector
-  - Shows "Enable Super Backup Mode" when not configured
-  - Changes to "Super Backup Mode Ready" when Speechmatics configured
-  - Comprehensive modal explaining feature:
-    - What it does: Automatic failover protection for uninterrupted captioning
-    - How it works: 4-step process (monitor tab, auto-switch, keep running, show health)
-    - Why needed: Browser Speech API stops when tab loses focus
-  - Speechmatics API key input field with pricing info
+- [x] **Super Backup Mode UI** - Three-tier failover configuration
+  - Full-width button below "Start Captioning" in calm sage green (not urgent red)
+  - Shows "Super Backup Mode Not Enabled" when not configured
+  - Changes to "🛡️ Super Backup Mode Enabled" when Speechmatics configured
+  - Comprehensive modal explaining three-tier backup system:
+    - Tier 1 (Primary): Browser Speech API (~200ms latency)
+    - Tier 2 (Backup): Speechmatics Cloud (auto-activates on tab loss/browser failure)
+    - Tier 3 (Final Backup): Whisper AI (auto-activates on internet failure, works offline)
+  - Speechmatics API key input with pricing info
+  - Whisper model selector (tiny/base/small/medium) for offline backup
+  - Sage green theme (less urgent, more professional)
   - Shield icon for visual reinforcement
   - One-click enable button saves configuration and closes modal
 
