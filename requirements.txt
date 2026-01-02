@@ -1,0 +1,52 @@
+# Community Captioner v4.0 - Dependencies
+# Install with: pip3 install -r requirements.txt
+
+# ============================================================
+# REQUIRED - Core functionality
+# ============================================================
+# None! Core captioning works with Python standard library only.
+
+# ============================================================
+# RECOMMENDED - AI Features
+# ============================================================
+
+# Whisper (local speech-to-text)
+faster-whisper>=0.9.0
+sounddevice>=0.4.6
+numpy>=1.24.0
+
+# OpenAI API (AI corrections, entity extraction, analysis)
+openai>=1.0.0
+
+# ============================================================
+# OPTIONAL - Document Processing
+# ============================================================
+
+# PDF processing (choose one or both)
+PyPDF2>=3.0.0
+pdfplumber>=0.9.0
+
+# DOCX processing
+python-docx>=0.8.11
+
+# YouTube transcript extraction
+youtube-transcript-api>=0.6.0
+
+# ============================================================
+# OPTIONAL - Vector Embeddings (semantic matching)
+# ============================================================
+
+# Local embeddings (recommended - no API key needed)
+sentence-transformers>=2.2.0
+
+# ============================================================
+# SYSTEM REQUIREMENTS
+# ============================================================
+# FFmpeg - Required for video processing
+#   Mac: brew install ffmpeg
+#   Linux: sudo apt install ffmpeg
+#   Windows: Download from https://ffmpeg.org/download.html
+
+# PortAudio - Required for Whisper audio capture
+#   Mac: brew install portaudio
+#   Linux: sudo apt install portaudio19-dev

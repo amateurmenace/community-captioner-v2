@@ -1403,7 +1403,12 @@ class KnowledgeBase:
         except Exception as e:
             print(f"YouTube fallback error: {e}")
 
-        return "", "Could not fetch YouTube transcript. Install: pip3 install youtube-transcript-api"
+        # Check if youtube_transcript_api is available for a better error message
+        try:
+            from youtube_transcript_api import YouTubeTranscriptApi
+            return "", f"Could not fetch transcript for this video. The video may not have captions available, or captions may be disabled."
+        except ImportError:
+            return "", "Could not fetch YouTube transcript. Install: pip3 install youtube-transcript-api"
 
     def extract_text_from_docx(self, file_path: Path) -> str:
         """Extract text from DOCX file"""
@@ -1433,36 +1438,86 @@ class KnowledgeBase:
         return chunks
 
     def extract_entities_from_text(self, text: str) -> Dict[str, List[str]]:
-        """Extract entities from text using AI"""
-        if not openai_client:
-            return {"people": [], "places": [], "organizations": []}
+        """Extract entities from text using AI or regex fallback"""
+        import re
 
-        try:
-            response = openai_client.chat.completions.create(
-                model=get_ai_model(),
-                messages=[
-                    {
-                        "role": "system",
-                        "content": "Extract all proper nouns from the text. Categorize them as people, places, or organizations. "
-                                  "Return ONLY a JSON object: {\"people\": [...], \"places\": [...], \"organizations\": [...]}"
-                    },
-                    {
-                        "role": "user",
-                        "content": text[:6000]
-                    }
-                ],
-                temperature=0.1,
-                max_tokens=1000
-            )
-
+        # First try AI extraction if available
+        if openai_client:
             try:
-                return json.loads(response.choices[0].message.content)
-            except:
-                return {"people": [], "places": [], "organizations": []}
+                response = openai_client.chat.completions.create(
+                    model=get_ai_model(),
+                    messages=[
+                        {
+                            "role": "system",
+                            "content": "Extract all proper nouns from the text. Categorize them as people, places, or organizations. "
+                                      "Return ONLY a JSON object: {\"people\": [...], \"places\": [...], \"organizations\": [...]}"
+                        },
+                        {
+                            "role": "user",
+                            "content": text[:6000]
+                        }
+                    ],
+                    temperature=0.1,
+                    max_tokens=1000
+                )
 
-        except Exception as e:
-            print(f"Entity extraction error: {e}")
-            return {"people": [], "places": [], "organizations": []}
+                try:
+                    result = json.loads(response.choices[0].message.content)
+                    # Validate structure
+                    if isinstance(result, dict) and any(result.get(k) for k in ['people', 'places', 'organizations']):
+                        return result
+                except:
+                    pass
+
+            except Exception as e:
+                print(f"AI entity extraction error: {e}")
+
+        # Fallback: Use regex to extract capitalized multi-word phrases
+        entities = {"people": [], "places": [], "organizations": []}
+
+        # Find capitalized phrases (2+ words starting with capitals)
+        capitalized_phrases = re.findall(r'\b([A-Z][a-z]+(?:\s+[A-Z][a-z]+)+)\b', text)
+
+        # Common person name patterns (first last or title first last)
+        person_titles = ['Mr', 'Mrs', 'Ms', 'Dr', 'Prof', 'Representative', 'Senator', 'Mayor', 'Chair', 'Director', 'Commissioner']
+        # Organization keywords
+        org_keywords = ['Committee', 'Board', 'Department', 'Office', 'Council', 'Commission', 'Authority', 'Association', 'Foundation', 'Institute', 'Company', 'Corp', 'Inc', 'LLC', 'Group', 'Agency']
+        # Place keywords
+        place_keywords = ['Street', 'Avenue', 'Road', 'Park', 'Center', 'Building', 'Hall', 'Square', 'Village', 'Town', 'City', 'County', 'State']
+
+        seen = set()
+        for phrase in capitalized_phrases:
+            phrase_clean = phrase.strip()
+            if phrase_clean in seen or len(phrase_clean) < 4:
+                continue
+            seen.add(phrase_clean)
+
+            # Categorize
+            if any(kw in phrase_clean for kw in org_keywords):
+                entities["organizations"].append(phrase_clean)
+            elif any(kw in phrase_clean for kw in place_keywords):
+                entities["places"].append(phrase_clean)
+            elif any(phrase_clean.startswith(title) for title in person_titles):
+                entities["people"].append(phrase_clean)
+            elif len(phrase_clean.split()) == 2:  # Two word phrases are likely names
+                entities["people"].append(phrase_clean)
+
+        # Also extract single capitalized words that look like proper nouns
+        single_caps = re.findall(r'\b([A-Z][a-z]{2,})\b', text)
+        name_like = [w for w in single_caps if w not in ['The', 'This', 'That', 'What', 'When', 'Where', 'Which', 'January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']]
+
+        # Add unique single words as potential entities
+        for name in set(name_like):
+            if name not in seen and len(name) > 3:
+                # Could be a person's name or place
+                entities["people"].append(name)
+
+        # Limit to reasonable numbers
+        entities["people"] = list(set(entities["people"]))[:50]
+        entities["places"] = list(set(entities["places"]))[:30]
+        entities["organizations"] = list(set(entities["organizations"]))[:30]
+
+        return entities
 
     def add_document(self, filename: str, content: bytes = None, text: str = None) -> Dict:
         """Add a document to the knowledge base"""
@@ -1802,7 +1857,56 @@ class SessionManager:
     def get_captions(self):
         """Get all captions from current session"""
         return self.captions
-    
+
+    def list_sessions(self):
+        """List all saved sessions"""
+        sessions = []
+        for session_file in sorted(self.sessions_dir.glob("*.json"), key=lambda x: x.stat().st_mtime, reverse=True):
+            try:
+                with open(session_file) as f:
+                    data = json.load(f)
+                    session = data.get("session", {})
+                    session["id"] = session.get("id", session_file.stem)
+                    session["caption_count"] = len(data.get("captions", []))
+                    session["file"] = session_file.name
+                    # Calculate total words
+                    total_words = sum(
+                        len((c.get("corrected") or c.get("raw", "")).split())
+                        for c in data.get("captions", [])
+                    )
+                    session["word_count"] = total_words
+                    # Count corrections
+                    total_corrections = sum(len(c.get("corrections", [])) for c in data.get("captions", []))
+                    session["correction_count"] = total_corrections
+                    sessions.append(session)
+            except Exception as e:
+                print(f"Error reading session {session_file}: {e}")
+        return sessions
+
+    def load_session(self, session_id: str):
+        """Load a specific saved session"""
+        session_file = self.sessions_dir / f"{session_id}.json"
+        if not session_file.exists():
+            return None
+        try:
+            with open(session_file) as f:
+                return json.load(f)
+        except Exception as e:
+            print(f"Error loading session {session_id}: {e}")
+            return None
+
+    def delete_session(self, session_id: str):
+        """Delete a saved session"""
+        session_file = self.sessions_dir / f"{session_id}.json"
+        if session_file.exists():
+            session_file.unlink()
+            # Also delete audio file if exists
+            audio_file = AUDIO_DIR / f"{session_id}.wav"
+            if audio_file.exists():
+                audio_file.unlink()
+            return True
+        return False
+
     def _format_time(self, seconds):
         """Format seconds as HH:MM:SS,mmm"""
         hours = int(seconds // 3600)
@@ -2610,8 +2714,10 @@ class VideoIntelligence:
         except Exception as e:
             return {"error": str(e)}
 
-    def generate_highlight_reel(self, video_path: str, highlights: List[Dict], output_name: str = None) -> Dict:
-        """Create a highlight reel by concatenating clips"""
+    def generate_highlight_reel(self, video_path: str, highlights: List[Dict], output_name: str = None,
+                                  aspect_ratio: str = '16:9', burn_captions: bool = False,
+                                  target_duration: int = 60) -> Dict:
+        """Create a highlight reel by concatenating clips with optional 9:16 crop and caption burning"""
         if not FFMPEG_AVAILABLE:
             return {"error": "ffmpeg not available"}
 
@@ -2620,13 +2726,28 @@ class VideoIntelligence:
 
         # First extract all clips
         clips = []
+        total_duration = 0
         for i, h in enumerate(highlights):
-            start = h.get("timestamp", "00:00:00")
-            end = h.get("end_timestamp", self._add_seconds(start, 30))
+            # Stop if we've hit target duration
+            if total_duration >= target_duration:
+                break
+
+            start = h.get("timestamp") or h.get("start_time", 0)
+            if isinstance(start, (int, float)):
+                start = f"{int(start // 3600):02d}:{int((start % 3600) // 60):02d}:{int(start % 60):02d}"
+
+            end = h.get("end_timestamp") or h.get("end_time")
+            if end is None:
+                end = self._add_seconds(start, min(30, target_duration - total_duration))
+            elif isinstance(end, (int, float)):
+                end = f"{int(end // 3600):02d}:{int((end % 3600) // 60):02d}:{int(end % 60):02d}"
 
             clip_result = self.extract_clip(video_path, start, end, f"highlight_{i}.mp4")
             if clip_result.get("status") == "ok":
                 clips.append(clip_result["path"])
+                # Estimate clip duration
+                clip_dur = h.get("duration", 30)
+                total_duration += clip_dur if isinstance(clip_dur, (int, float)) else 30
 
         if not clips:
             return {"error": "No clips could be extracted"}
@@ -2639,19 +2760,53 @@ class VideoIntelligence:
 
         # Generate highlight reel
         reel_id = str(uuid.uuid4())[:8]
-        output_name = output_name or f"highlight_reel_{reel_id}.mp4"
+
+        # Build ffmpeg command with optional filters
+        vf_filters = []
+
+        # Handle aspect ratio (9:16 for social media)
+        if aspect_ratio == '9:16':
+            # Crop center for 9:16 portrait mode
+            vf_filters.append("crop=ih*9/16:ih")
+            output_name = output_name or f"highlight_reel_{reel_id}_9x16.mp4"
+        else:
+            output_name = output_name or f"highlight_reel_{reel_id}.mp4"
+
+        # Handle caption burning
+        if burn_captions and self.transcript:
+            # Create SRT file from transcript
+            srt_file = self.clips_dir / f"captions_{reel_id}.srt"
+            try:
+                self._create_srt_for_reel(highlights, srt_file)
+                # Add subtitles filter with styling for social media
+                if aspect_ratio == '9:16':
+                    vf_filters.append(f"subtitles='{srt_file}':force_style='FontSize=24,PrimaryColour=&HFFFFFF,OutlineColour=&H000000,Outline=2,Alignment=2'")
+                else:
+                    vf_filters.append(f"subtitles='{srt_file}':force_style='FontSize=20,PrimaryColour=&HFFFFFF,OutlineColour=&H000000,Outline=2'")
+            except Exception as e:
+                print(f"Warning: Could not create SRT for burning: {e}")
+
         output_path = self.clips_dir / output_name
 
         try:
-            result = subprocess.run([
+            cmd = [
                 'ffmpeg', '-y',
                 '-f', 'concat', '-safe', '0',
-                '-i', str(concat_file),
+                '-i', str(concat_file)
+            ]
+
+            # Add video filter if needed
+            if vf_filters:
+                cmd.extend(['-vf', ','.join(vf_filters)])
+
+            cmd.extend([
                 '-c:v', 'libx264',
                 '-c:a', 'aac',
                 '-preset', 'fast',
                 str(output_path)
-            ], capture_output=True, text=True)
+            ])
+
+            result = subprocess.run(cmd, capture_output=True, text=True)
 
             # Clean up individual clips
             for clip in clips:
@@ -2665,15 +2820,35 @@ class VideoIntelligence:
                 return {
                     "status": "ok",
                     "reel_id": reel_id,
+                    "reel_path": str(output_path),
                     "path": str(output_path),
                     "filename": output_name,
-                    "clips_count": len(clips)
+                    "clips_count": len(clips),
+                    "aspect_ratio": aspect_ratio,
+                    "captions_burned": burn_captions,
+                    "duration": total_duration
                 }
             else:
                 return {"error": result.stderr}
 
         except Exception as e:
             return {"error": str(e)}
+
+    def _create_srt_for_reel(self, highlights: List[Dict], srt_path: Path):
+        """Create SRT file from highlights for caption burning"""
+        with open(srt_path, 'w') as f:
+            for i, h in enumerate(highlights):
+                start_sec = h.get("start_time", i * 10)
+                end_sec = h.get("end_time", start_sec + 10)
+                text = h.get("text", h.get("title", f"Highlight {i + 1}"))
+
+                # Format times as HH:MM:SS,mmm
+                start_str = f"{int(start_sec // 3600):02d}:{int((start_sec % 3600) // 60):02d}:{int(start_sec % 60):02d},000"
+                end_str = f"{int(end_sec // 3600):02d}:{int((end_sec % 3600) // 60):02d}:{int(end_sec % 60):02d},000"
+
+                f.write(f"{i + 1}\n")
+                f.write(f"{start_str} --> {end_str}\n")
+                f.write(f"{text}\n\n")
 
     def _add_seconds(self, timestamp: str, seconds: int) -> str:
         """Add seconds to a timestamp string HH:MM:SS"""
@@ -2763,24 +2938,35 @@ def process_caption(text):
 
 class Handler(http.server.SimpleHTTPRequestHandler):
     def send_json(self, data, status=200):
-        body = json.dumps(data).encode()
-        self.send_response(status)
-        self.send_header('Content-Type', 'application/json')
-        self.send_header('Content-Length', len(body))
-        self.send_header('Access-Control-Allow-Origin', '*')
-        self.send_header('Cache-Control', 'no-cache')
-        self.end_headers()
-        self.wfile.write(body)
+        try:
+            body = json.dumps(data).encode()
+            self.send_response(status)
+            self.send_header('Content-Type', 'application/json')
+            self.send_header('Content-Length', len(body))
+            self.send_header('Access-Control-Allow-Origin', '*')
+            self.send_header('Cache-Control', 'no-cache')
+            self.end_headers()
+            self.wfile.write(body)
+        except (BrokenPipeError, ConnectionResetError, ConnectionAbortedError):
+            # Client disconnected, silently ignore
+            pass
+        except Exception as e:
+            print(f"Error sending JSON response: {e}")
     
     def send_file_download(self, content, filename, content_type='text/plain'):
-        body = content.encode() if isinstance(content, str) else content
-        self.send_response(200)
-        self.send_header('Content-Type', content_type)
-        self.send_header('Content-Disposition', f'attachment; filename="{filename}"')
-        self.send_header('Content-Length', len(body))
-        self.send_header('Access-Control-Allow-Origin', '*')
-        self.end_headers()
-        self.wfile.write(body)
+        try:
+            body = content.encode() if isinstance(content, str) else content
+            self.send_response(200)
+            self.send_header('Content-Type', content_type)
+            self.send_header('Content-Disposition', f'attachment; filename="{filename}"')
+            self.send_header('Content-Length', len(body))
+            self.send_header('Access-Control-Allow-Origin', '*')
+            self.end_headers()
+            self.wfile.write(body)
+        except (BrokenPipeError, ConnectionResetError, ConnectionAbortedError):
+            pass
+        except Exception as e:
+            print(f"Error sending file download: {e}")
     
     def read_json(self):
         try:
@@ -2797,19 +2983,60 @@ class Handler(http.server.SimpleHTTPRequestHandler):
         self.end_headers()
     
     def do_GET(self):
+        try:
+            self._handle_get()
+        except (BrokenPipeError, ConnectionResetError, ConnectionAbortedError):
+            pass  # Client disconnected
+        except Exception as e:
+            print(f"Error in GET {self.path}: {e}")
+            try:
+                self.send_json({"error": str(e)}, 500)
+            except:
+                pass
+
+    def _handle_get(self):
         path = urlparse(self.path).path
         query = parse_qs(urlparse(self.path).query)
-        
+
         # Caption endpoints
         if path == '/api/caption':
             self.send_json({**caption_state, "session": session_manager.get_status()})
         
         elif path == '/api/info':
+            # Check library availability
+            pdf_available = False
+            docx_available = False
+            youtube_transcript_available = False
+            try:
+                import PyPDF2
+                pdf_available = True
+            except ImportError:
+                try:
+                    import pdfplumber
+                    pdf_available = True
+                except ImportError:
+                    pass
+            try:
+                from docx import Document
+                docx_available = True
+            except ImportError:
+                pass
+            try:
+                from youtube_transcript_api import YouTubeTranscriptApi
+                youtube_transcript_available = True
+            except ImportError:
+                pass
+
             self.send_json({
                 "local_ip": LOCAL_IP, "port": PORT,
                 "whisper_available": WHISPER_AVAILABLE and AUDIO_AVAILABLE and NUMPY_AVAILABLE,
                 "embeddings_available": EMBEDDINGS_AVAILABLE,
                 "rag_enabled": caption_engine.rag_enabled,
+                "ffmpeg_available": FFMPEG_AVAILABLE,
+                "pdf_available": pdf_available,
+                "docx_available": docx_available,
+                "youtube_transcript_available": youtube_transcript_available,
+                "ai_available": openai_client is not None,
                 "version": "4.0"
             })
         
@@ -2908,7 +3135,23 @@ class Handler(http.server.SimpleHTTPRequestHandler):
         
         elif path == '/api/session/summary':
             self.send_json(session_manager.generate_summary())
-        
+
+        # Session history endpoints
+        elif path == '/api/sessions/list':
+            self.send_json({"sessions": session_manager.list_sessions()})
+
+        elif path.startswith('/api/sessions/'):
+            # /api/sessions/{session_id}
+            session_id = path.split('/')[-1]
+            if session_id:
+                data = session_manager.load_session(session_id)
+                if data:
+                    self.send_json(data)
+                else:
+                    self.send_json({"error": "Session not found"}, 404)
+            else:
+                self.send_json({"error": "Session ID required"}, 400)
+
         # List saved engines
         elif path == '/api/engines/list':
             engines = []
@@ -2981,10 +3224,24 @@ class Handler(http.server.SimpleHTTPRequestHandler):
             super().do_GET()
     
     def do_POST(self):
-        global whisper_buffer
+        try:
+            self._handle_post()
+        except (BrokenPipeError, ConnectionResetError, ConnectionAbortedError):
+            pass  # Client disconnected
+        except Exception as e:
+            print(f"Error in POST {self.path}: {e}")
+            import traceback
+            traceback.print_exc()
+            try:
+                self.send_json({"error": str(e)}, 500)
+            except:
+                pass
+
+    def _handle_post(self):
+        global whisper_buffer, caption_state
         path = urlparse(self.path).path
         data = self.read_json()
-        
+
         # Caption from browser
         if path == '/api/caption':
             if 'caption' in data:
@@ -3282,6 +3539,11 @@ class Handler(http.server.SimpleHTTPRequestHandler):
         
         # Session controls
         elif path == '/api/session/start':
+            # Clear previous caption state when starting new session
+            caption_state["caption"] = ""
+            caption_state["raw_caption"] = ""
+            caption_state["corrections"] = []
+
             session = session_manager.start_session(
                 name=data.get('name'),
                 record_audio=data.get('record_audio', False),
@@ -3292,7 +3554,17 @@ class Handler(http.server.SimpleHTTPRequestHandler):
         elif path == '/api/session/stop':
             session = session_manager.stop_session()
             self.send_json({"status": "ok", "session": session})
-        
+
+        elif path == '/api/sessions/delete':
+            session_id = data.get('session_id')
+            if session_id:
+                if session_manager.delete_session(session_id):
+                    self.send_json({"status": "ok"})
+                else:
+                    self.send_json({"error": "Session not found"}, 404)
+            else:
+                self.send_json({"error": "Session ID required"}, 400)
+
         elif path == '/api/session/reprocess':
             # Reprocess session with Whisper for higher accuracy
             if not session_manager.has_audio():
@@ -3666,8 +3938,149 @@ class Handler(http.server.SimpleHTTPRequestHandler):
                     self.send_json(hl_result)
                     return
 
-            result = video_intelligence.generate_highlight_reel(video_path, highlights)
+            # Get additional options
+            aspect_ratio = data.get('aspect_ratio', '16:9')
+            burn_captions = data.get('burn_captions', False)
+            target_duration = data.get('duration', 60)
+
+            result = video_intelligence.generate_highlight_reel(
+                video_path, highlights,
+                aspect_ratio=aspect_ratio,
+                burn_captions=burn_captions,
+                target_duration=target_duration
+            )
             self.send_json(result)
+
+        elif path == '/api/video/youtube-transcript':
+            # Fetch YouTube transcript using multiple methods
+            url = data.get('url', '')
+            if not url:
+                self.send_json({"error": "No URL provided"}, 400)
+                return
+
+            import re
+
+            # Extract video ID from URL
+            video_id = None
+            patterns = [
+                r'(?:v=|/)([0-9A-Za-z_-]{11}).*',
+                r'(?:embed/)([0-9A-Za-z_-]{11})',
+                r'(?:youtu\.be/)([0-9A-Za-z_-]{11})'
+            ]
+            for pattern in patterns:
+                match = re.search(pattern, url)
+                if match:
+                    video_id = match.group(1)
+                    break
+
+            if not video_id:
+                self.send_json({"error": "Could not extract video ID from URL"}, 400)
+                return
+
+            transcript_text = None
+            transcript_list = []
+            duration = 0
+            method_used = None
+
+            # Method 1: Try youtube-transcript-api first (handles manual captions)
+            if youtube_transcript_available:
+                try:
+                    from youtube_transcript_api import YouTubeTranscriptApi
+
+                    # Try to get any available transcript (manual first, then auto-generated)
+                    try:
+                        transcript_list = YouTubeTranscriptApi.get_transcript(video_id)
+                        method_used = "youtube-transcript-api"
+                    except:
+                        # Try to list available transcripts and get any one
+                        try:
+                            transcript_list_obj = YouTubeTranscriptApi.list_transcripts(video_id)
+                            # Try manual transcripts first
+                            for transcript in transcript_list_obj:
+                                try:
+                                    transcript_list = transcript.fetch()
+                                    method_used = f"youtube-transcript-api ({transcript.language})"
+                                    break
+                                except:
+                                    continue
+                        except:
+                            pass
+
+                    if transcript_list:
+                        transcript_text = ' '.join([entry.get('text', '') for entry in transcript_list])
+                        if transcript_list:
+                            last_entry = transcript_list[-1]
+                            duration = last_entry.get('start', 0) + last_entry.get('duration', 0)
+
+                except Exception as e:
+                    print(f"youtube-transcript-api failed: {e}")
+
+            # Method 2: Try yt-dlp if available and Method 1 failed
+            if not transcript_text:
+                try:
+                    result = subprocess.run([
+                        'yt-dlp', '--write-auto-sub', '--write-sub', '--skip-download',
+                        '--sub-format', 'vtt', '--sub-lang', 'en',
+                        '-o', f'/tmp/yt_{video_id}',
+                        f'https://www.youtube.com/watch?v={video_id}'
+                    ], capture_output=True, text=True, timeout=60)
+
+                    # Look for downloaded subtitle files
+                    import glob
+                    sub_files = glob.glob(f'/tmp/yt_{video_id}*.vtt')
+                    if sub_files:
+                        with open(sub_files[0], 'r') as f:
+                            vtt_content = f.read()
+                        # Parse VTT to extract text
+                        lines = vtt_content.split('\n')
+                        text_lines = []
+                        for line in lines:
+                            line = line.strip()
+                            if line and not line.startswith('WEBVTT') and '-->' not in line and not line.isdigit():
+                                # Remove VTT tags
+                                clean_line = re.sub(r'<[^>]+>', '', line)
+                                if clean_line:
+                                    text_lines.append(clean_line)
+                        transcript_text = ' '.join(text_lines)
+                        method_used = "yt-dlp"
+                        # Clean up
+                        for f in sub_files:
+                            try:
+                                Path(f).unlink()
+                            except:
+                                pass
+                except Exception as e:
+                    print(f"yt-dlp subtitle extraction failed: {e}")
+
+            # Method 3: Use yt-dlp to get video info for duration
+            if not duration:
+                try:
+                    result = subprocess.run([
+                        'yt-dlp', '--dump-json', '--skip-download',
+                        f'https://www.youtube.com/watch?v={video_id}'
+                    ], capture_output=True, text=True, timeout=30)
+                    if result.returncode == 0:
+                        video_info = json.loads(result.stdout)
+                        duration = video_info.get('duration', 0)
+                except:
+                    pass
+
+            if transcript_text:
+                self.send_json({
+                    "status": "ok",
+                    "transcript": transcript_text,
+                    "segments": transcript_list,
+                    "video_info": {
+                        "video_id": video_id,
+                        "duration": duration,
+                        "title": f"YouTube Video {video_id}"
+                    },
+                    "method": method_used
+                })
+            else:
+                self.send_json({
+                    "error": "Could not fetch transcript. Try: 1) Check if video has captions, 2) Install yt-dlp: pip3 install yt-dlp"
+                }, 400)
 
         elif path == '/api/video/transcribe':
             # Transcribe video using Whisper

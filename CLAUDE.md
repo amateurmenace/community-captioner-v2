@@ -223,7 +223,8 @@ community-captioner/
 - `POST /api/video/upload` - Upload video (base64)
 - `POST /api/video/highlights` - Generate highlight moments
 - `POST /api/video/clip` - Extract single clip
-- `POST /api/video/highlight-reel` - Generate full highlight reel
+- `POST /api/video/highlight-reel` - Generate full highlight reel `{highlights, output_name, aspect_ratio, burn_captions, target_duration}`
+- `POST /api/video/youtube-transcript` - Fetch transcript from YouTube URL (no API key required)
 
 ## Key Technical Decisions
 
@@ -302,6 +303,67 @@ community-captioner/
 - [x] **Highlight Reel** - Automated compilation of clips
 
 ### Latest Updates - January 1, 2026
+
+#### Video Intelligence Enhancements (v4.1.1)
+- [x] **4-Step Workflow Redesign** - Complete overhaul of Video Intelligence panel
+  - Step 1: Upload video (MP4/MOV) or paste YouTube URL
+  - Step 2: View/edit transcript (Whisper transcription or YouTube captions)
+  - Step 3: Select AI-generated highlights with checkboxes
+  - Step 4: Configure and generate highlight reel
+- [x] **YouTube Transcript Fetching** - Multi-method approach that works without API key
+  - Method 1: `youtube-transcript-api` with fallback to list all available transcripts
+  - Method 2: `yt-dlp` for subtitle extraction (auto-generated or manual)
+  - VTT parsing for clean text extraction
+  - New endpoint: `POST /api/video/youtube-transcript`
+- [x] **Social Media Export Options**
+  - 9:16 portrait aspect ratio for TikTok/Reels/Shorts
+  - Caption burn-in option (embeds captions directly in video)
+  - Configurable target duration (30s, 60s, 90s, 120s)
+- [x] **Enhanced Highlight Reel Generation**
+  - Aspect ratio selection (16:9 standard or 9:16 portrait)
+  - Smart cropping for vertical video
+  - VTT subtitle generation and burning
+
+#### Homepage Video Intelligence Section (v4.1.1)
+- [x] **Replaced "Built-In Data Analytics" Section** - New "Video Intelligence" focus
+  - Dark gradient background (#1a1a2e → #16213e → #0f3460)
+  - Animated floating background elements with purple glow
+  - 3 feature cards: Upload & Transcribe, AI Highlights, Export Reels
+  - Animated video preview with timeline and moving playhead
+  - Hover animations on feature cards (lift + glow effect)
+- [x] **Removed Sample Analytics Dashboard Preview** - Simplified homepage layout
+
+#### Whisper & API Fixes (v4.1.1)
+- [x] **Whisper Start Button Fix** - Now properly starts captioning after model loads
+  - Sets `whisperRunning` and `recording` states optimistically
+  - Rollback on error with user feedback via alert
+- [x] **OpenAI API Key Modal Fix** - Changed endpoint from `/api/ai/config` to `/api/ai/config/update`
+- [x] **React Error #31 Fix** - Topics rendering now handles both string and object formats
+  - Prevents "Objects are not valid as a React child" error
+
+#### Entity Extraction Improvements (v4.1.1)
+- [x] **Regex Fallback for PDF Entity Extraction** - Works without AI configured
+  - Extracts capitalized multi-word phrases
+  - Categorizes by keywords (organizations, places, people)
+  - Filters common words and short phrases
+  - Falls back gracefully when OpenAI unavailable
+
+#### Session Management Improvements (v4.1)
+- [x] **Session Persistence Fix** - Clears old caption data when starting new sessions
+  - Backend: Clears `caption_state` on `/api/session/start`
+  - Frontend: Resets local state (captions, corrections, word count) when starting captioning
+  - Both Browser Speech and Whisper modes now properly start fresh sessions
+- [x] **Session History Page** - New page to view and manage past sessions
+  - Accessible via "Session History" button in Dashboard header
+  - Shows total stats: sessions, words, corrections, duration
+  - Searchable session list with name and date filtering
+  - Session cards show duration, word count, corrections, audio indicator
+  - Click to open session in Session Analysis page
+  - Delete sessions with confirmation modal
+- [x] **Session API Endpoints** - New backend endpoints for session management
+  - `GET /api/sessions/list` - List all saved sessions
+  - `GET /api/sessions/{id}` - Load specific session data
+  - `POST /api/sessions/delete` - Delete session and audio file
 
 #### Logo Redesign & Demo Enhancement
 - [x] **Inline CC Icon** - CC now appears inline with "CAPTIONER" text using thin box styling
@@ -584,14 +646,17 @@ community-captioner/
 - Test on iOS Safari and Android Chrome
 - Optimize 16:9 preview for small screens
 
-#### 2. Session History & Management
+#### 2. Session History & Management - COMPLETED
 **Why**: Users need to find and re-analyze past sessions
-**Tasks**:
-- Session list page with search/filter
-- Thumbnail previews with key stats
-- Date range filtering
-- Delete/archive sessions
-- Quick re-analysis from history
+**Implemented**:
+- [x] Session list page with search/filter
+- [x] Stats overview (total sessions, words, corrections, duration)
+- [x] Session cards with name, date, duration, words, corrections
+- [x] Audio recording indicator badge
+- [x] Delete sessions with confirmation modal
+- [x] Quick re-analysis - click to open in Session Analysis page
+- [x] Backend: `/api/sessions/list`, `/api/sessions/{id}`, `/api/sessions/delete`
+- [x] Session History button in Dashboard header
 
 #### 3. Keyboard Shortcuts
 **Why**: Power users need quick control during live sessions
@@ -634,10 +699,56 @@ community-captioner/
 - Multiple simultaneous languages
 - Context-aware translation using full transcript
 
+### Priority: Engine Generation Major Upgrade (v4.2)
+**Why**: The current "Generate Engine" workflow is fragmented and confusing. Entity extraction from PDFs and other sources needs to be more reliable and intuitive.
+
+**Current Issues:**
+- PDF entity extraction fails silently when AI is not configured
+- No clear feedback on what entities were extracted and why
+- Multiple input methods (paste text, upload PDF, scrape URL) are disconnected
+- No preview of what will be added to the engine before committing
+- Regex fallback extracts too many false positives (common capitalized words)
+
+**Proposed Improvements:**
+1. **Unified Source Input Panel**
+   - Single panel with tabs: Paste Text | Upload File | YouTube URL | Web URL
+   - Drag-and-drop file upload with progress indicator
+   - Real-time extraction status with spinner
+
+2. **Entity Preview & Review**
+   - Show extracted entities before adding to engine
+   - Checkbox selection to include/exclude entities
+   - Category editing (person/place/organization)
+   - Confidence scores for each entity
+   - Duplicate detection against existing engine terms
+
+3. **Smart Extraction Pipeline**
+   - AI extraction as primary method (when configured)
+   - Enhanced regex patterns for better fallback
+   - NER (Named Entity Recognition) via spaCy as middle tier
+   - Context-aware categorization using surrounding text
+
+4. **Batch Operations**
+   - Add all selected entities in one click
+   - Generate aliases for all new entities
+   - Import/merge multiple documents at once
+
+5. **Extraction History**
+   - Log of all extraction operations
+   - Undo recent additions
+   - Re-extract from same source with different settings
+
+**New Dependencies (Optional):**
+```bash
+pip3 install spacy
+python3 -m spacy download en_core_web_sm
+```
+
 ### Known Blockers
 - **Whisper real-time latency** - 2-4s delay may be too slow for some live events
 - **Browser Speech API reliability** - Occasional crashes/restarts needed
 - **Mobile browser constraints** - Web Speech API limited on mobile browsers
+- **Entity extraction accuracy** - Regex fallback produces false positives without AI
 
 ## Browser Limitations & Mitigations (v4.1)
 
