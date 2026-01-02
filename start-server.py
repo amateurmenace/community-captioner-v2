@@ -2171,7 +2171,7 @@ class WhisperEngine:
     
     def _transcription_loop(self):
         samples_needed = int(self.sample_rate * self.chunk_duration)
-        
+
         while self.is_running:
             try:
                 time.sleep(0.1)
@@ -2183,12 +2183,17 @@ class WhisperEngine:
                         continue
                     audio = np.concatenate(self.audio_buffer).flatten().astype(np.float32)
                     self.audio_buffer = []
-                
+
+                print(f"🎧 Processing {len(audio)} audio samples...")
                 if self.model and len(audio) > 0:
                     segments, _ = self.model.transcribe(audio, beam_size=5, language="en", vad_filter=True)
                     text = " ".join(seg.text for seg in segments).strip()
+                    print(f"🔤 Transcribed: '{text}'")
                     if text and self.text_callback:
+                        print(f"📞 Calling callback with text...")
                         self.text_callback(text)
+                    elif not text:
+                        print(f"⚠️ Empty transcription result")
             except Exception as e:
                 if self.is_running:
                     print(f"⚠️ Transcription error: {e}")
@@ -2913,12 +2918,13 @@ def on_whisper_text(text):
     caption_state["raw_caption"] = result["raw"]
     caption_state["caption"] = result["corrected"]
     caption_state["corrections"] = result["corrections"]
-    
+
     # Add to session if recording
     if session_manager.is_recording:
         session_manager.add_caption(result["raw"], result["corrected"], result["corrections"])
-    
-    print(f"   📝 {text}")
+
+    print(f"   📝 Whisper: {text}")
+    print(f"   ✅ Caption state updated: {caption_state['caption'][:50]}...")
 
 def limit_lines(text, max_lines=2, max_width=80):
     chars = int(50 * max_width / 80) * max_lines
@@ -3526,7 +3532,14 @@ class Handler(http.server.SimpleHTTPRequestHandler):
         
         elif path == '/api/whisper/start':
             whisper_buffer = ""
-            result = whisper_engine.start(data.get('device_id'), on_whisper_text)
+            # Convert device_id to integer if it's a string
+            device_id = data.get('device_id')
+            if device_id is not None and isinstance(device_id, str):
+                try:
+                    device_id = int(device_id)
+                except (ValueError, TypeError):
+                    device_id = None
+            result = whisper_engine.start(device_id, on_whisper_text)
             if result.get("status") == "started":
                 caption_state["mode"] = "whisper"
                 caption_state["whisper_running"] = True
@@ -3544,10 +3557,18 @@ class Handler(http.server.SimpleHTTPRequestHandler):
             caption_state["raw_caption"] = ""
             caption_state["corrections"] = []
 
+            # Convert audio_device to integer if it's a string
+            audio_device = data.get('audio_device')
+            if audio_device is not None and isinstance(audio_device, str):
+                try:
+                    audio_device = int(audio_device)
+                except (ValueError, TypeError):
+                    audio_device = None
+
             session = session_manager.start_session(
                 name=data.get('name'),
-                record_audio=data.get('record_audio', False),
-                audio_device=data.get('audio_device')
+                record_audio=data.get('record_audio', True),  # Default to True
+                audio_device=audio_device
             )
             self.send_json({"status": "ok", "session": session})
 

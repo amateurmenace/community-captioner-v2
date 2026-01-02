@@ -157,6 +157,11 @@
             66% { transform: translate(-25px, 45px) scale(1.08); }
         }
 
+        @keyframes slideIn {
+            0%, 100% { transform: translateX(-20px); opacity: 0.2; }
+            50% { transform: translateX(0); opacity: 0.4; }
+        }
+
         .landing-header {
             padding: 24px 32px;
             display: flex;
@@ -2382,7 +2387,7 @@
 
                         <p className="hero-subtitle">
                             <TypeWriter
-                                text={t('Live captioning and analysis tools for community media. Zero cost. Open Source. Powered by AI + Human intelligence for the public good.')}
+                                text={t('Live captioning and analysis tools for community media. Zero cost. Easy Setup. Open Source. Powered by AI + Human intelligence for the public good.')}
                                 delay={30}
                                 startDelay={1600}
                                 key={language + '-subtitle'}
@@ -2393,14 +2398,85 @@
                             <button className="cta-btn cta-btn-primary" onClick={onStartDashboard}>
                                 {t('Open Control Dashboard')}
                             </button>
-                            <button className="cta-btn cta-btn-secondary" onClick={() => {
-                                document.getElementById('about-section')?.scrollIntoView({ behavior: 'smooth' });
-                            }}>
-                                {t('Learn More')}
-                            </button>
                         </div>
 
                         <CaptionDemo />
+                    </section>
+
+                    {/* Our Story Section - Two Column Left-Aligned */}
+                    <section style={{
+                        background: 'linear-gradient(135deg, var(--bg-sage-light) 0%, #F5F3EE 100%)',
+                        padding: '100px 60px',
+                        marginTop: '60px',
+                        position: 'relative',
+                        overflow: 'hidden'
+                    }}>
+                        {/* Bold vertical accent bar */}
+                        <div style={{
+                            position: 'absolute',
+                            left: '0',
+                            top: '0',
+                            bottom: '0',
+                            width: '8px',
+                            background: 'linear-gradient(to bottom, var(--sage-primary) 0%, var(--sage-dark) 100%)',
+                            animation: 'slideIn 3s ease-in-out infinite'
+                        }}></div>
+
+                        {/* Animated caption bars in background */}
+                        <div style={{
+                            position: 'absolute',
+                            top: '30%',
+                            right: '10%',
+                            width: '300px',
+                            height: '3px',
+                            background: 'linear-gradient(90deg, var(--sage-primary), transparent)',
+                            opacity: 0.2,
+                            animation: 'slideIn 6s ease-in-out infinite',
+                            transform: 'rotate(-5deg)'
+                        }}></div>
+
+                        <div style={{
+                            maxWidth: '1200px',
+                            margin: '0 auto',
+                            position: 'relative',
+                            zIndex: 1
+                        }}>
+                            {/* WHO WE ARE - Two Columns */}
+                            <div style={{
+                                display: 'grid',
+                                gridTemplateColumns: '1fr 1fr',
+                                gap: '60px',
+                                alignItems: 'start'
+                            }}>
+                                <div>
+                                    <h2 style={{
+                                        fontSize: '56px',
+                                        fontWeight: '900',
+                                        color: 'var(--sage-darker)',
+                                        marginBottom: '30px',
+                                        lineHeight: '1.1',
+                                        letterSpacing: '-1px'
+                                    }}>WHO WE<br/>ARE</h2>
+                                    <div style={{
+                                        width: '80px',
+                                        height: '6px',
+                                        background: 'var(--sage-primary)'
+                                    }}></div>
+                                </div>
+
+                                <div>
+                                    <p style={{
+                                        fontSize: '24px',
+                                        lineHeight: '1.8',
+                                        color: 'var(--text-dark)',
+                                        margin: 0,
+                                        fontWeight: '400'
+                                    }}>
+                                        Community Captioner was created at <strong>Brookline Interactive Group (BIG)</strong> in 2026. BIG is a nonprofit community media center in Brookline, MA, and the Town's public access TV provider. It needed live captions for town meetings and local programming but really struggled to afford commercial AI or live human solutions. After being quoted <strong style={{fontSize: '28px', color: 'var(--sage-primary)'}}>$30k</strong> for one such automated solution, we decided to make our own and make it free for everyone. <strong>We don't believe anyone should gatekeep accessibility.</strong>
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
                     </section>
 
                     {/* How It Works Section */}
@@ -2495,82 +2571,60 @@
                         </div>
                     </section>
 
-                    {/* About Section */}
-                    <section id="about-section" className="info-section about-section" style={{marginTop: '60px'}}>
-                        <h2 className="section-title">About Community Captioner</h2>
-                        <p className="section-subtitle">
-                            Free, open-source live captioning built for community media organizations
-                        </p>
+                    {/* Decorative Wave Transition */}
+                    <div style={{
+                        height: '80px',
+                        background: 'linear-gradient(to bottom, var(--bg-warm) 0%, transparent 100%)',
+                        marginTop: '40px'
+                    }}></div>
 
-                        <div className="info-grid">
-                            <div className="info-card">
-                                <h3>Why It Exists</h3>
-                                <p>
-                                    Community Captioner was created at Brookline Interactive Group (BIG) in 2026. BIG is a nonprofit community media center in Brookline, MA, and the Town's public access TV provider. It needed live captions for town meetings and local programming but really struggled to afford commercial AI or live human solutions. After being quoted $30k for one such automated solution, we decided to make our own and make it free for everyone. We don't believe anyone should gatekeep accessibility.
-                                </p>
-                                <p>
-                                    This tool provides effective, low-latency, automatic speech-to-text captioning at zero cost, using either browser APIs or open source local libraries (your choice). Bring it into your live stream or broadcast the way you would dynamic graphics.
-                                </p>
-                            </div>
-
-                            <div className="info-card">
-                                <h3>What Makes It Unique + How RAG Works</h3>
-                                <p>
-                                    Generic speech recognition systems fail on local proper nouns. They transcribe "Bernard Greene" as "bernard green" and "Brookline" as "Brooklyn."
-                                </p>
-                                <p>
-                                    The <strong>AI Caption Engine</strong> uses RAG (Retrieval Augmented Generation) to automatically correct these errors. You upload documents (meeting agendas, staff directories), AI extracts proper nouns, and the system builds a correction dictionary that matches and corrects captions in real-time.
-                                </p>
-                            </div>
-
-                            <div className="info-card">
-                                <h3>New Legal Requirements</h3>
-                                <p>
-                                    The FCC's 21st Century Communications and Video Accessibility Act (CVAA) and upcoming state-level legislation increasingly require live captioning for government meetings and public broadcasts.
-                                </p>
-                                <p>
-                                    Massachusetts LD 1937 and similar bills nationwide mandate that all public meetings provide real-time captioning by 2027. Community Captioner offers a compliant, zero-cost solution for municipalities facing these requirements.
-                                </p>
-                            </div>
-
-                            <div className="info-card">
-                                <h3>Design Values</h3>
-                                <ul>
-                                    <li><strong>Zero Dependencies:</strong> Works in any browser, no installation required</li>
-                                    <li><strong>Privacy First:</strong> Can run 100% locally with Whisper AI</li>
-                                    <li><strong>Community Focused:</strong> Built for local governments and community media</li>
-                                    <li><strong>Free Forever:</strong> Open source under CC BY-NC-SA 4.0 license (non-commercial use only)</li>
-                                    <li><strong>No Catch:</strong> For real, we are not monetizing this app in any way, and there is no cost to us when anyone else uses it</li>
-                                    <li><strong>Human AI:</strong> Software like this does not replace the richness of live human-typed captions, but it tries to fill a gap so accessibility is no longer a cost-prohibitive matter for many</li>
-                                </ul>
-                            </div>
-                        </div>
-                    </section>
-
-                    {/* Video Intelligence Section - Redesigned */}
+                    {/* Built-In Data Analytics Section - Vibrant Green */}
                     <section className="info-section" style={{
-                        background: 'linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%)',
+                        background: 'linear-gradient(135deg, #1a3a2e 0%, #16372e 50%, #0f4d3c 100%)',
                         padding: '80px 40px',
-                        borderRadius: 'var(--radius-xl)',
                         marginTop: '60px',
                         position: 'relative',
                         overflow: 'hidden'
                     }}>
-                        {/* Animated background elements */}
+                        {/* Animated Waveform Background */}
+                        <div style={{
+                            position: 'absolute',
+                            top: '20%',
+                            left: '-10%',
+                            width: '120%',
+                            height: '200px',
+                            opacity: 0.15,
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '4px',
+                            justifyContent: 'center'
+                        }}>
+                            {[...Array(60)].map((_, i) => (
+                                <div key={i} style={{
+                                    width: '3px',
+                                    background: 'linear-gradient(to top, var(--sage-primary), #C8E6C9)',
+                                    borderRadius: '2px',
+                                    animation: `waveform 2s ease-in-out infinite ${i * 0.05}s`,
+                                    height: `${30 + Math.sin(i * 0.3) * 50}%`
+                                }}></div>
+                            ))}
+                        </div>
+
+                        {/* Floating Elements */}
                         <div style={{
                             position: 'absolute',
                             top: '10%',
-                            left: '5%',
+                            right: '5%',
                             width: '300px',
                             height: '300px',
-                            background: 'radial-gradient(circle, rgba(139, 127, 199, 0.15) 0%, transparent 70%)',
+                            background: 'radial-gradient(circle, rgba(139, 127, 199, 0.2) 0%, transparent 70%)',
                             borderRadius: '50%',
                             animation: 'float 8s ease-in-out infinite'
                         }}></div>
                         <div style={{
                             position: 'absolute',
-                            bottom: '10%',
-                            right: '10%',
+                            bottom: '5%',
+                            left: '10%',
                             width: '200px',
                             height: '200px',
                             background: 'radial-gradient(circle, rgba(125, 155, 118, 0.15) 0%, transparent 70%)',
@@ -2578,177 +2632,108 @@
                             animation: 'float 6s ease-in-out infinite reverse'
                         }}></div>
 
-                        <div style={{position: 'relative', zIndex: 1}}>
+                        <div style={{position: 'relative', zIndex: 1, maxWidth: '900px', margin: '0 auto'}}>
                             <h2 style={{
                                 fontSize: '36px',
                                 fontWeight: '800',
                                 color: 'white',
                                 textAlign: 'center',
                                 marginBottom: '16px'
-                            }}>Video Intelligence</h2>
+                            }}>Built-In Data Analytics, Summarization, & Video Editing Tools</h2>
                             <p style={{
                                 fontSize: '18px',
-                                color: 'rgba(255,255,255,0.7)',
+                                color: 'rgba(255,255,255,0.85)',
                                 textAlign: 'center',
-                                maxWidth: '600px',
+                                maxWidth: '800px',
                                 margin: '0 auto 50px',
                                 lineHeight: '1.6'
                             }}>
-                                Upload video, generate transcripts, create AI highlight reels for social media
+                                Every captioning session automatically generates rich analytics data that goes far beyond simple transcripts. Upload your associated video to sync it with captions for powerful search capabilities, or let the AI magically cut together a 1-2 minute highlight reel from hours of footage.
                             </p>
 
-                            {/* Main Feature Grid */}
-                            <div style={{
-                                display: 'grid',
-                                gridTemplateColumns: 'repeat(3, 1fr)',
-                                gap: '24px',
-                                maxWidth: '1000px',
-                                margin: '0 auto'
-                            }}>
-                                {/* Feature 1: Upload & Transcribe */}
-                                <div style={{
-                                    background: 'rgba(255,255,255,0.05)',
-                                    backdropFilter: 'blur(10px)',
-                                    borderRadius: '16px',
-                                    padding: '32px 24px',
-                                    border: '1px solid rgba(255,255,255,0.1)',
-                                    textAlign: 'center',
-                                    transition: 'all 0.3s ease',
-                                    cursor: 'default'
-                                }}
-                                onMouseOver={(e) => {
-                                    e.currentTarget.style.transform = 'translateY(-8px)';
-                                    e.currentTarget.style.background = 'rgba(255,255,255,0.1)';
-                                }}
-                                onMouseOut={(e) => {
-                                    e.currentTarget.style.transform = 'translateY(0)';
-                                    e.currentTarget.style.background = 'rgba(255,255,255,0.05)';
-                                }}>
-                                    <div style={{
-                                        width: '64px',
-                                        height: '64px',
-                                        background: 'linear-gradient(135deg, var(--purple-accent) 0%, #7B68A4 100%)',
-                                        borderRadius: '16px',
-                                        display: 'flex',
-                                        alignItems: 'center',
-                                        justifyContent: 'center',
-                                        margin: '0 auto 20px',
-                                        boxShadow: '0 8px 24px rgba(139, 127, 199, 0.3)'
-                                    }}>
-                                        <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2">
-                                            <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/>
-                                            <polyline points="17 8 12 3 7 8"/>
-                                            <line x1="12" y1="3" x2="12" y2="15"/>
-                                        </svg>
-                                    </div>
-                                    <h3 style={{color: 'white', fontSize: '18px', fontWeight: '700', marginBottom: '12px'}}>
-                                        Upload & Transcribe
-                                    </h3>
-                                    <p style={{color: 'rgba(255,255,255,0.6)', fontSize: '14px', lineHeight: '1.5'}}>
-                                        MP4, MOV, or YouTube URL. Whisper AI generates accurate transcripts automatically.
-                                    </p>
-                                </div>
-
-                                {/* Feature 2: AI Highlights */}
-                                <div style={{
-                                    background: 'rgba(255,255,255,0.05)',
-                                    backdropFilter: 'blur(10px)',
-                                    borderRadius: '16px',
-                                    padding: '32px 24px',
-                                    border: '1px solid rgba(255,255,255,0.1)',
-                                    textAlign: 'center',
-                                    transition: 'all 0.3s ease',
-                                    cursor: 'default'
-                                }}
-                                onMouseOver={(e) => {
-                                    e.currentTarget.style.transform = 'translateY(-8px)';
-                                    e.currentTarget.style.background = 'rgba(255,255,255,0.1)';
-                                }}
-                                onMouseOut={(e) => {
-                                    e.currentTarget.style.transform = 'translateY(0)';
-                                    e.currentTarget.style.background = 'rgba(255,255,255,0.05)';
-                                }}>
-                                    <div style={{
-                                        width: '64px',
-                                        height: '64px',
-                                        background: 'linear-gradient(135deg, #F59E0B 0%, #D97706 100%)',
-                                        borderRadius: '16px',
-                                        display: 'flex',
-                                        alignItems: 'center',
-                                        justifyContent: 'center',
-                                        margin: '0 auto 20px',
-                                        boxShadow: '0 8px 24px rgba(245, 158, 11, 0.3)'
-                                    }}>
-                                        <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2">
-                                            <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>
-                                        </svg>
-                                    </div>
-                                    <h3 style={{color: 'white', fontSize: '18px', fontWeight: '700', marginBottom: '12px'}}>
-                                        AI Highlights
-                                    </h3>
-                                    <p style={{color: 'rgba(255,255,255,0.6)', fontSize: '14px', lineHeight: '1.5'}}>
-                                        AI finds key moments: decisions, votes, announcements. Select or let AI choose.
-                                    </p>
-                                </div>
-
-                                {/* Feature 3: Export Reels */}
-                                <div style={{
-                                    background: 'rgba(255,255,255,0.05)',
-                                    backdropFilter: 'blur(10px)',
-                                    borderRadius: '16px',
-                                    padding: '32px 24px',
-                                    border: '1px solid rgba(255,255,255,0.1)',
-                                    textAlign: 'center',
-                                    transition: 'all 0.3s ease',
-                                    cursor: 'default'
-                                }}
-                                onMouseOver={(e) => {
-                                    e.currentTarget.style.transform = 'translateY(-8px)';
-                                    e.currentTarget.style.background = 'rgba(255,255,255,0.1)';
-                                }}
-                                onMouseOut={(e) => {
-                                    e.currentTarget.style.transform = 'translateY(0)';
-                                    e.currentTarget.style.background = 'rgba(255,255,255,0.05)';
-                                }}>
-                                    <div style={{
-                                        width: '64px',
-                                        height: '64px',
-                                        background: 'linear-gradient(135deg, var(--sage-primary) 0%, var(--sage-dark) 100%)',
-                                        borderRadius: '16px',
-                                        display: 'flex',
-                                        alignItems: 'center',
-                                        justifyContent: 'center',
-                                        margin: '0 auto 20px',
-                                        boxShadow: '0 8px 24px rgba(125, 155, 118, 0.3)'
-                                    }}>
-                                        <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2">
-                                            <rect x="2" y="2" width="20" height="20" rx="2.18" ry="2.18"/>
-                                            <line x1="7" y1="2" x2="7" y2="22"/>
-                                            <line x1="17" y1="2" x2="17" y2="22"/>
-                                            <line x1="2" y1="12" x2="22" y2="12"/>
-                                            <line x1="2" y1="7" x2="7" y2="7"/>
-                                            <line x1="2" y1="17" x2="7" y2="17"/>
-                                            <line x1="17" y1="17" x2="22" y2="17"/>
-                                            <line x1="17" y1="7" x2="22" y2="7"/>
-                                        </svg>
-                                    </div>
-                                    <h3 style={{color: 'white', fontSize: '18px', fontWeight: '700', marginBottom: '12px'}}>
-                                        Export Reels
-                                    </h3>
-                                    <p style={{color: 'rgba(255,255,255,0.6)', fontSize: '14px', lineHeight: '1.5'}}>
-                                        16:9 for YouTube or 9:16 for TikTok/Reels. Burn captions directly into video.
-                                    </p>
-                                </div>
-                            </div>
-
-                            {/* Animated Video Preview */}
+                            {/* Feature List */}
                             <div style={{
                                 maxWidth: '700px',
-                                margin: '50px auto 0',
-                                background: 'rgba(0,0,0,0.4)',
+                                margin: '0 auto 50px',
+                                textAlign: 'left'
+                            }}>
+                                <ul style={{
+                                    listStyle: 'none',
+                                    padding: 0,
+                                    margin: 0
+                                }}>
+                                    <li style={{
+                                        fontSize: '18px',
+                                        lineHeight: '1.8',
+                                        color: 'rgba(255,255,255,0.9)',
+                                        marginBottom: '16px',
+                                        paddingLeft: '28px',
+                                        position: 'relative'
+                                    }}>
+                                        <span style={{
+                                            position: 'absolute',
+                                            left: 0,
+                                            top: '8px',
+                                            width: '8px',
+                                            height: '8px',
+                                            background: '#C8E6C9',
+                                            borderRadius: '50%',
+                                            boxShadow: '0 0 10px #C8E6C9'
+                                        }}></span>
+                                        <strong>Automatic Session Analytics</strong> — Word clouds, sentiment timelines, topic analysis, correction frequency heatmaps, and quality metrics for every captioning session.
+                                    </li>
+                                    <li style={{
+                                        fontSize: '18px',
+                                        lineHeight: '1.8',
+                                        color: 'rgba(255,255,255,0.9)',
+                                        marginBottom: '16px',
+                                        paddingLeft: '28px',
+                                        position: 'relative'
+                                    }}>
+                                        <span style={{
+                                            position: 'absolute',
+                                            left: 0,
+                                            top: '8px',
+                                            width: '8px',
+                                            height: '8px',
+                                            background: '#C8E6C9',
+                                            borderRadius: '50%',
+                                            boxShadow: '0 0 10px #C8E6C9'
+                                        }}></span>
+                                        <strong>AI-Powered Video Intelligence</strong> — Upload MP4/MOV or paste YouTube URLs. Our AI generates transcripts, identifies highlight moments (decisions, votes, announcements), and creates 1-2 minute social media reels automatically.
+                                    </li>
+                                    <li style={{
+                                        fontSize: '18px',
+                                        lineHeight: '1.8',
+                                        color: 'rgba(255,255,255,0.9)',
+                                        paddingLeft: '28px',
+                                        position: 'relative'
+                                    }}>
+                                        <span style={{
+                                            position: 'absolute',
+                                            left: 0,
+                                            top: '8px',
+                                            width: '8px',
+                                            height: '8px',
+                                            background: '#C8E6C9',
+                                            borderRadius: '50%',
+                                            boxShadow: '0 0 10px #C8E6C9'
+                                        }}></span>
+                                        <strong>Full-Text Search Across Video</strong> — Sync your video with captions to enable instant search. Jump to any quote or keyword across hours of footage in seconds.
+                                    </li>
+                                </ul>
+                            </div>
+
+                            {/* Video Timeline Preview */}
+                            <div style={{
+                                maxWidth: '700px',
+                                margin: '0 auto',
+                                background: 'rgba(255,255,255,0.08)',
+                                backdropFilter: 'blur(10px)',
                                 borderRadius: '16px',
                                 padding: '20px',
-                                border: '1px solid rgba(255,255,255,0.1)'
+                                border: '1px solid rgba(255,255,255,0.15)',
+                                boxShadow: '0 8px 32px rgba(0,0,0,0.3)'
                             }}>
                                 <div style={{
                                     display: 'flex',
@@ -2785,7 +2770,7 @@
                                         <div style={{color: 'white', fontWeight: '600', fontSize: '14px', marginBottom: '4px'}}>
                                             Town Meeting Recording
                                         </div>
-                                        <div style={{color: 'rgba(255,255,255,0.5)', fontSize: '12px'}}>
+                                        <div style={{color: 'rgba(255,255,255,0.6)', fontSize: '12px'}}>
                                             Uploaded • Transcript ready • 5 highlights detected
                                         </div>
                                     </div>
@@ -2795,7 +2780,8 @@
                                         padding: '8px 16px',
                                         borderRadius: '8px',
                                         fontSize: '12px',
-                                        fontWeight: '600'
+                                        fontWeight: '600',
+                                        boxShadow: '0 4px 12px rgba(139, 127, 199, 0.4)'
                                     }}>
                                         Generate Reel
                                     </div>
@@ -2804,7 +2790,7 @@
                                 {/* Timeline visualization */}
                                 <div style={{
                                     height: '32px',
-                                    background: 'rgba(255,255,255,0.1)',
+                                    background: 'rgba(0,0,0,0.3)',
                                     borderRadius: '6px',
                                     position: 'relative',
                                     overflow: 'hidden'
@@ -2819,7 +2805,8 @@
                                             width: '8%',
                                             background: 'linear-gradient(135deg, var(--purple-accent) 0%, rgba(139, 127, 199, 0.5) 100%)',
                                             borderRadius: '4px',
-                                            animation: `pulse 2s ease-in-out infinite ${i * 0.2}s`
+                                            animation: `pulse 2s ease-in-out infinite ${i * 0.2}s`,
+                                            boxShadow: '0 0 10px rgba(139, 127, 199, 0.5)'
                                         }}></div>
                                     ))}
                                     {/* Playhead */}
@@ -2830,13 +2817,18 @@
                                         bottom: '0',
                                         width: '2px',
                                         background: 'white',
-                                        animation: 'playhead 8s linear infinite'
+                                        animation: 'playhead 8s linear infinite',
+                                        boxShadow: '0 0 8px rgba(255,255,255,0.8)'
                                     }}></div>
                                 </div>
                             </div>
                         </div>
 
                         <style>{`
+                            @keyframes waveform {
+                                0%, 100% { height: 30%; }
+                                50% { height: 80%; }
+                            }
                             @keyframes playhead {
                                 0% { left: 0; }
                                 100% { left: 100%; }
@@ -3724,7 +3716,11 @@
             // Calculate pace and accuracy over time (words per 30-second window)
             const paceData = [];
             const windowSize = 30; // seconds
-            for (let t = 0; t < (data.duration || 0); t += windowSize) {
+            // Calculate duration from captions if not provided
+            const sessionDuration = data.duration || (editedCaptions.length > 0
+                ? Math.max(...editedCaptions.map(c => c.timestamp || 0))
+                : 0);
+            for (let t = 0; t < sessionDuration; t += windowSize) {
                 const windowCaptions = editedCaptions.filter(c => {
                     const ts = c.timestamp || 0;
                     return ts >= t && ts < t + windowSize;
@@ -4813,7 +4809,7 @@
             const [fetchingYoutube, setFetchingYoutube] = useState(false);
 
             // Audio recording for Whisper second pass
-            const [recordAudio, setRecordAudio] = useState(false);
+            const [recordAudio, setRecordAudio] = useState(true);  // Default to true
             const [hasAudioRecording, setHasAudioRecording] = useState(false);
 
             // System info state

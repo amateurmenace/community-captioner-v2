@@ -304,6 +304,60 @@ community-captioner/
 
 ### Latest Updates - January 1, 2026
 
+#### Homepage Redesign (v4.1.3 - Current Session)
+- [x] **Who We Are Section** - Simplified and enlarged
+  - Removed "WHAT MAKES IT UNIQUE" section completely
+  - Changed "OUR STORY" to "WHO WE ARE"
+  - Increased paragraph text from 20px to 24px for better readability
+  - Increased $30k emphasis from 24px to 28px
+  - Two-column layout: Title in left column, content in right
+- [x] **Built-In Data Analytics Section** - Changed to vibrant green gradient
+  - Background changed from dark blue to dark green (#1a3a2e → #16372e → #0f4d3c)
+  - Waveform animation gradient changed from purple to sage green
+  - Bullet points changed from purple to light green (#C8E6C9) with green glow
+  - Maintains all animations: waveform bars, floating orbs, video timeline
+  - Better color harmony with site's sage green theme
+- [x] **Hero Subtitle Update** - Added "Easy Setup" to tagline
+  - Now reads: "Zero cost. Easy Setup. Open Source."
+
+#### Homepage Redesign (v4.1.2 - Previous Session)
+- [x] **Two-Column Hero Section** - Demo and condensed About side-by-side
+  - Left column: Title, subtitle, CTA button, live caption demo
+  - Right column: Condensed "Why Community Captioner?" story in white card
+  - Highlights: $30k quote, community media focus, simple tech, AI Caption Engine
+  - Icon badges: $0 Cost, Community Media, Context-Aware AI
+- [x] **Floating Caption Bar Animations** - Subtle background design elements
+  - Two animated horizontal bars using slideIn keyframe animation
+  - Represents caption text flowing across screen
+  - Muted sage colors with low opacity for subtlety
+- [x] **Video Intelligence Section Redesign** - Changed from dark blue to muted sage/beige
+  - Background: linear-gradient sage greens (#E8EDE7 → #D4DAD3 → #C4D3BE)
+  - Feature cards: White backgrounds with sage borders instead of dark translucent
+  - Text colors: Changed from white to var(--text-dark) and var(--text-medium)
+  - Timeline preview: Changed from black to white with sage-light background
+  - Maintains hover animations with sage green glow effects
+- [x] **Wave Gradient Transition** - Smooth fade between hero and next section
+  - 80px gradient from var(--bg-warm) to transparent
+  - Creates visual flow instead of hard section breaks
+- [x] **Removed Redundant About Section** - Condensed into hero to reduce page length
+  - Core story (30k quote, community media, simple tech) moved to hero right column
+  - Eliminated 4-card grid section that duplicated hero content
+
+#### Critical Bug Fixes (v4.1.2)
+- [x] **Whisper Audio Device Selection Fix** - Device IDs now properly converted to integers
+  - Backend: `/api/whisper/start` and `/api/session/start` convert string device_id to int
+  - Fixes "No input device matching '2'" error - sounddevice requires integer IDs
+  - Frontend select dropdown returns strings, now properly converted server-side
+- [x] **Audio Recording Enabled by Default** - Sessions now record audio by default
+  - `recordAudio` state defaults to `true` instead of `false`
+  - Backend `/api/session/start` defaults `record_audio` to `True`
+  - Ensures Whisper second pass is always available
+  - Users can still disable via checkbox if desired
+- [x] **Speaking Pace & Accuracy Graph Fix** - Graph now displays data correctly
+  - Calculates `sessionDuration` from captions if `data.duration` is 0/undefined
+  - Uses `Math.max(...editedCaptions.map(c => c.timestamp))` as fallback
+  - Prevents empty paceData array when duration not explicitly passed
+
 #### Video Intelligence Enhancements (v4.1.1)
 - [x] **4-Step Workflow Redesign** - Complete overhaul of Video Intelligence panel
   - Step 1: Upload video (MP4/MOV) or paste YouTube URL
@@ -744,9 +798,29 @@ pip3 install spacy
 python3 -m spacy download en_core_web_sm
 ```
 
-### Known Blockers
-- **Whisper real-time latency** - 2-4s delay may be too slow for some live events
-- **Browser Speech API reliability** - Occasional crashes/restarts needed
+### Known Blockers & Critical Issues
+
+#### **CRITICAL: Whisper Live Captioning Not Viable (January 2026)**
+Whisper is **NOT suitable for real-time live captioning** despite working correctly:
+- **Poor Quality**: Transcription quality is terrible in real-time mode (3-second chunks)
+- **Captions Not Being Corrected**: RAG engine corrections not applying properly to Whisper output
+- **High Latency**: 2-4 second delay makes it unsuitable for live events
+- **Resource Intensive**: CPU usage too high for continuous operation
+
+**Current Recommendation**:
+- Keep Whisper **ONLY for post-session reprocessing** (which works excellently)
+- Use Browser Speech API for live captioning (fast, accurate with RAG corrections)
+- May remove live Whisper mode entirely in future release
+
+#### **CRITICAL: Browser Speech API Reliability Issues**
+The Web Speech API has fundamental stability problems:
+- **Tab Focus Loss**: Microphone shuts off when browser tab loses focus or is backgrounded
+- **Random Crashes**: API occasionally crashes and needs restart
+- **Auto-Restart Helps But Not Perfect**: Implemented auto-restart logic, but not foolproof
+
+**URGENT TODO**: Find a way to keep Browser Speech API running reliably without crashes or shutdowns. This is the primary captioning method and must be stable for production use.
+
+#### Other Known Issues
 - **Mobile browser constraints** - Web Speech API limited on mobile browsers
 - **Entity extraction accuracy** - Regex fallback produces false positives without AI
 
