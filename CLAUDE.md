@@ -323,7 +323,27 @@ community-captioner/
 
 ### Latest Updates - January 2, 2026
 
-#### Caption Reliability & Intelligence (v4.2 - Current Session)
+#### Session Analysis & UI Fixes (v4.2.1 - January 2, 2026)
+- [x] **System Health Card Repositioning** - Moved above Caption Stats for better visibility
+  - Health monitoring (green/yellow/red status) now first card in sidebar
+  - Automatic recovery status immediately visible when captioning
+  - Fixed critical syntax error that was breaking homepage
+  - Properly extracted and relocated 54-line card block using Python script
+- [x] **Analytics Page Loading Improvements** - Enhanced debugging and error handling
+  - Added comprehensive console logging throughout analytics loading process
+  - localStorage data now persists during page refresh (only cleared on "Back" click)
+  - Loading spinner with "Loading Session Analysis..." message
+  - Clear error alerts when no session data available
+  - "Back to Dashboard" button when data missing
+  - Fixed `allCorrections is not defined` error (changed to `editedCorrections`)
+- [x] **Open Analytics Button Safety** - Prevents accidental session interruption
+  - Confirmation dialog: "⚠️ Warning: Opening analytics will stop the current captioning session"
+  - Auto-stops all active engines (Browser/Whisper/Speechmatics/Local Whisper)
+  - Auto-stops recording session if active
+  - User can cancel to keep captioning running
+  - Async function properly awaits all stop operations
+
+#### Caption Reliability & Intelligence (v4.2 - Previous Session)
 - [x] **Extended Health Monitoring Thresholds** - More time before auto-recovery
   - Warning threshold: 10 seconds of silence (was 5s)
   - Critical threshold: 15 seconds of silence (was 10s)
