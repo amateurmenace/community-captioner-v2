@@ -5305,6 +5305,7 @@
             const [superQualityMode, setSuperQualityMode] = useState(false);
             const [showSuperQualityModal, setShowSuperQualityModal] = useState(false);
             const [qualityWhisperModel, setQualityWhisperModel] = useState('base');
+            const [showSuperModesAccordion, setShowSuperModesAccordion] = useState(false);
 
             // Failover & Health Monitoring state
             const [backupModeActive, setBackupModeActive] = useState(false);
@@ -7477,100 +7478,119 @@
 
                                     </div>
 
-                                    {/* Advanced Modes - Checkboxes below Start Captioning */}
-                                    <div style={{
-                                        marginTop: '12px',
-                                        padding: '12px',
-                                        background: 'var(--bg-sage-light)',
-                                        borderRadius: '8px',
-                                        border: '1px solid var(--border-sage)',
-                                        display: 'flex',
-                                        flexDirection: 'column',
-                                        gap: '10px'
-                                    }}>
-                                        {/* Super Resilient Mode */}
-                                        <label style={{
-                                            display: 'flex',
-                                            alignItems: 'center',
-                                            gap: '10px',
-                                            cursor: 'pointer',
-                                            fontSize: '13px',
-                                            fontWeight: '500',
-                                            color: 'var(--text-dark)'
-                                        }}>
-                                            <input
-                                                type="checkbox"
-                                                checked={superResilientMode}
-                                                onChange={(e) => {
-                                                    if (!superResilientMode && !speechmaticsConfigured) {
-                                                        // Opening modal to configure
-                                                        setShowSuperResilientModal(true);
-                                                        e.preventDefault();
-                                                    } else {
-                                                        // Already configured, just toggle
-                                                        setSuperResilientMode(e.target.checked);
-                                                    }
-                                                }}
-                                                style={{
-                                                    width: '16px',
-                                                    height: '16px',
-                                                    cursor: 'pointer'
-                                                }}
-                                            />
-                                            <div style={{flex: 1}}>
-                                                <div style={{display: 'flex', alignItems: 'center', gap: '6px'}}>
-                                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                                                        <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
-                                                    </svg>
-                                                    <span>Super Resilient Mode</span>
-                                                </div>
-                                                <div style={{fontSize: '11px', color: 'var(--text-light)', marginTop: '2px', marginLeft: '20px'}}>
-                                                    3-tier automatic backup (Browser → Speechmatics → Whisper)
-                                                </div>
-                                            </div>
-                                        </label>
+                                    {/* Advanced Modes Accordion - Next to Start Captioning */}
+                                    <div style={{marginTop: '12px'}}>
+                                        <button
+                                            onClick={() => setShowSuperModesAccordion(!showSuperModesAccordion)}
+                                            style={{
+                                                width: '100%',
+                                                padding: '10px 12px',
+                                                background: 'var(--bg-sage-light)',
+                                                border: '1px solid var(--border-sage)',
+                                                borderRadius: '8px',
+                                                fontSize: '13px',
+                                                fontWeight: '500',
+                                                color: 'var(--text-dark)',
+                                                cursor: 'pointer',
+                                                display: 'flex',
+                                                alignItems: 'center',
+                                                justifyContent: 'space-between',
+                                                transition: 'all 0.2s'
+                                            }}
+                                        >
+                                            <span>Advanced Modes</span>
+                                            <span style={{fontSize: '16px', transform: showSuperModesAccordion ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 0.2s'}}>▼</span>
+                                        </button>
 
-                                        {/* Super Quality Mode */}
-                                        <label style={{
-                                            display: 'flex',
-                                            alignItems: 'center',
-                                            gap: '10px',
-                                            cursor: 'pointer',
-                                            fontSize: '13px',
-                                            fontWeight: '500',
-                                            color: 'var(--text-dark)'
-                                        }}>
-                                            <input
-                                                type="checkbox"
-                                                checked={superQualityMode}
-                                                onChange={(e) => {
-                                                    if (!superQualityMode) {
-                                                        // Opening modal to configure
-                                                        setShowSuperQualityModal(true);
-                                                        e.preventDefault();
-                                                    } else {
-                                                        // Already configured, just toggle
-                                                        setSuperQualityMode(e.target.checked);
-                                                    }
-                                                }}
-                                                style={{
-                                                    width: '16px',
-                                                    height: '16px',
-                                                    cursor: 'pointer'
-                                                }}
-                                            />
-                                            <div style={{flex: 1}}>
-                                                <div style={{display: 'flex', alignItems: 'center', gap: '6px'}}>
-                                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                                                        <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>
-                                                    </svg>
-                                                    <span>Super Quality Mode</span>
-                                                </div>
-                                                <div style={{fontSize: '11px', color: 'var(--text-light)', marginTop: '2px', marginLeft: '20px'}}>
-                                                    Audio recording + Whisper second pass for maximum accuracy
-                                                </div>
+                                        {showSuperModesAccordion && (
+                                            <div style={{
+                                                marginTop: '8px',
+                                                padding: '12px',
+                                                background: 'var(--bg-sage-light)',
+                                                borderRadius: '8px',
+                                                border: '1px solid var(--border-sage)',
+                                                display: 'flex',
+                                                flexDirection: 'column',
+                                                gap: '10px'
+                                            }}>
+                                                {/* Super Resilient Mode */}
+                                                <label style={{
+                                                    display: 'flex',
+                                                    alignItems: 'center',
+                                                    gap: '10px',
+                                                    cursor: 'pointer',
+                                                    fontSize: '13px',
+                                                    fontWeight: '500',
+                                                    color: 'var(--text-dark)'
+                                                }}>
+                                                    <input
+                                                        type="checkbox"
+                                                        checked={superResilientMode}
+                                                        onChange={(e) => {
+                                                            // Just toggle, never show modal
+                                                            setSuperResilientMode(e.target.checked);
+                                                        }}
+                                                        style={{
+                                                            width: '16px',
+                                                            height: '16px',
+                                                            cursor: 'pointer'
+                                                        }}
+                                                    />
+                                                    <div style={{flex: 1}}>
+                                                        <div style={{display: 'flex', alignItems: 'center', gap: '6px'}}>
+                                                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                                                <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+                                                            </svg>
+                                                            <span>Super Resilient Mode</span>
+                                                        </div>
+                                                        <div style={{fontSize: '11px', color: 'var(--text-light)', marginTop: '2px', marginLeft: '20px'}}>
+                                                            3-tier automatic backup (Browser → Speechmatics → Whisper)
+                                                        </div>
+                                                    </div>
+                                                </label>
+
+                                                {/* Super Quality Mode */}
+                                                <label style={{
+                                                    display: 'flex',
+                                                    alignItems: 'center',
+                                                    gap: '10px',
+                                                    cursor: 'pointer',
+                                                    fontSize: '13px',
+                                                    fontWeight: '500',
+                                                    color: 'var(--text-dark)'
+                                                }}>
+                                                    <input
+                                                        type="checkbox"
+                                                        checked={superQualityMode}
+                                                        onChange={(e) => {
+                                                            if (!superQualityMode) {
+                                                                // Opening modal to configure
+                                                                setShowSuperQualityModal(true);
+                                                            } else {
+                                                                // Already configured, just toggle off
+                                                                setSuperQualityMode(false);
+                                                            }
+                                                        }}
+                                                        style={{
+                                                            width: '16px',
+                                                            height: '16px',
+                                                            cursor: 'pointer'
+                                                        }}
+                                                    />
+                                                    <div style={{flex: 1}}>
+                                                        <div style={{display: 'flex', alignItems: 'center', gap: '6px'}}>
+                                                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                                                <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>
+                                                            </svg>
+                                                            <span>Super Quality Mode</span>
+                                                        </div>
+                                                        <div style={{fontSize: '11px', color: 'var(--text-light)', marginTop: '2px', marginLeft: '20px'}}>
+                                                            Audio recording + Whisper second pass for maximum accuracy
+                                                        </div>
+                                                    </div>
+                                                </label>
                                             </div>
-                                        </label>
+                                        )}
                                     </div>
                                 </div>
 
@@ -7886,7 +7906,7 @@
                                                 background: '#FEF3C7',
                                                 padding: '12px 16px',
                                                 borderRadius: '8px',
-                                                marginBottom: '20px',
+                                                marginBottom: '12px',
                                                 fontSize: '13px',
                                                 color: '#92400E',
                                                 display: 'flex',
@@ -7896,8 +7916,25 @@
                                                 <span style={{fontSize: '16px'}}>⚡</span>
                                                 <div>
                                                     <strong>Why you need this:</strong> Browser Speech API stops when the tab loses focus.
-                                                    Super Backup Mode prevents caption failures during live events.
+                                                    Super Resilient Mode prevents caption failures during live events.
                                                 </div>
+                                            </div>
+
+                                            <div style={{
+                                                background: '#FEE2E2',
+                                                padding: '12px 16px',
+                                                borderRadius: '8px',
+                                                marginBottom: '20px',
+                                                fontSize: '12px',
+                                                color: '#991B1B'
+                                            }}>
+                                                <div style={{fontWeight: '600', marginBottom: '6px'}}>⚠️ Drawbacks (why not enabled by default):</div>
+                                                <ul style={{margin: 0, paddingLeft: '20px', lineHeight: '1.6'}}>
+                                                    <li><strong>Cost:</strong> Requires paid Speechmatics API (~$0.012-0.024/min)</li>
+                                                    <li><strong>Internet dependency:</strong> Tiers 1-2 require internet connection</li>
+                                                    <li><strong>Complexity:</strong> More systems to manage and troubleshoot</li>
+                                                    <li><strong>Resource usage:</strong> Whisper backup uses significant CPU when activated</li>
+                                                </ul>
                                             </div>
 
                                             <div style={{marginBottom: '20px'}}>
@@ -8021,7 +8058,7 @@
                                                 background: 'var(--bg-sage-light)',
                                                 padding: '16px',
                                                 borderRadius: '12px',
-                                                marginBottom: '20px'
+                                                marginBottom: '12px'
                                             }}>
                                                 <div style={{fontSize: '14px', fontWeight: '600', marginBottom: '12px', color: 'var(--sage-darker)'}}>
                                                     How it works:
@@ -8032,6 +8069,24 @@
                                                     <li><strong>Comparison View</strong> - See real-time vs reprocessed captions side-by-side</li>
                                                     <li><strong>Automatic Export</strong> - High-quality captions ready for archival</li>
                                                 </ol>
+                                            </div>
+
+                                            <div style={{
+                                                background: '#FEE2E2',
+                                                padding: '12px 16px',
+                                                borderRadius: '8px',
+                                                marginBottom: '20px',
+                                                fontSize: '12px',
+                                                color: '#991B1B'
+                                            }}>
+                                                <div style={{fontWeight: '600', marginBottom: '6px'}}>⚠️ Drawbacks (why not enabled by default):</div>
+                                                <ul style={{margin: 0, paddingLeft: '20px', lineHeight: '1.6'}}>
+                                                    <li><strong>Storage space:</strong> Records full audio files (can be several hundred MB per hour)</li>
+                                                    <li><strong>Privacy concerns:</strong> Audio is stored locally on disk</li>
+                                                    <li><strong>Processing time:</strong> Whisper second pass takes 5-15 minutes for 1-hour session</li>
+                                                    <li><strong>CPU intensive:</strong> Reprocessing requires significant computer resources</li>
+                                                    <li><strong>Not instant:</strong> High-quality results available only after session ends</li>
+                                                </ul>
                                             </div>
 
                                             <div style={{marginBottom: '20px'}}>
@@ -8059,14 +8114,18 @@
                                             <div style={{display: 'flex', gap: '12px', justifyContent: 'flex-end'}}>
                                                 <button
                                                     className="btn-large btn-outline"
-                                                    onClick={() => setShowSuperQualityModal(false)}
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        setShowSuperQualityModal(false);
+                                                    }}
                                                 >
                                                     Cancel
                                                 </button>
                                                 <button
                                                     className="btn-large"
                                                     style={{background: 'linear-gradient(135deg, #7C3AED, #8B5CF6)', color: 'white'}}
-                                                    onClick={() => {
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
                                                         setSuperQualityMode(true);
                                                         setRecordAudio(true); // Enable audio recording
                                                         setShowSuperQualityModal(false);
