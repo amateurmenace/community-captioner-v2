@@ -323,6 +323,35 @@ community-captioner/
 
 ### Latest Updates - January 2, 2026
 
+#### Video Intelligence & Highlight Reels Enhancements (v4.2.2 - January 2, 2026)
+- [x] **AI API Key Configuration in Video Intelligence Card** - Direct configuration without leaving the panel
+  - Shows "AI Connected" or "OpenAI API Key Required" status inline
+  - Configure button opens AI settings modal
+  - Removed duplicate AI configuration banner from main page
+- [x] **YouTube Video Download with Progress** - Full download tracking with details
+  - Default resolution: 1080p
+  - Shows downloaded size, total size, speed, and ETA during download
+  - Uses yt-dlp with optimized format selection
+- [x] **AI Highlights with Summary** - Enhanced AI analysis
+  - Generates 2-3 sentence summary of video content
+  - Key moments include quotes and timestamps
+  - Summary displayed in purple gradient card above highlights
+- [x] **Completed Reels Download Links** - In-browser downloads for generated reels
+  - Lists all completed reels with filename, aspect ratio, duration
+  - Direct download button for each reel
+  - Works on both Dashboard and Analytics pages
+- [x] **Session Audio Recording Fix** - Audio only records when intended
+  - Audio recording NO LONGER starts on page load
+  - Session starts when user clicks "Start Captioning"
+  - Audio recording only enabled if Super Quality Mode is on
+- [x] **Analytics Page Video Intelligence** - Mirrored functionality from Dashboard
+  - Same highlight reel generation workflow
+  - AI summary display
+  - Completed reels list with download buttons
+- [x] **Downloads Card Moved to Bottom** - Better page organization
+  - Session file exports (TXT, SRT, VTT, JSON) now at very bottom of analytics page
+  - Renamed to "Download Session Files"
+
 #### Session Analysis & UI Fixes (v4.2.1 - January 2, 2026)
 - [x] **System Health Card Repositioning** - Moved above Caption Stats for better visibility
   - Health monitoring (green/yellow/red status) now first card in sidebar

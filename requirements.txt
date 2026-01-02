@@ -39,6 +39,10 @@ python-docx>=0.8.11
 # YouTube transcript extraction
 youtube-transcript-api>=0.6.0
 
+# YouTube video download (for transcript fallback and video clips)
+# Install from GitHub for latest features: pip3 install -U https://github.com/yt-dlp/yt-dlp/archive/master.tar.gz
+yt-dlp>=2023.12.30
+
 # ============================================================
 # OPTIONAL - Vector Embeddings (semantic matching)
 # ============================================================

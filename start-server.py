@@ -90,6 +90,33 @@ try:
 except ImportError:
     pass
 
+# YouTube Transcript API
+YOUTUBE_TRANSCRIPT_AVAILABLE = False
+try:
+    from youtube_transcript_api import YouTubeTranscriptApi
+    YOUTUBE_TRANSCRIPT_AVAILABLE = True
+except ImportError:
+    pass
+
+# PDF and DOCX support
+PDF_AVAILABLE = False
+try:
+    import PyPDF2
+    PDF_AVAILABLE = True
+except ImportError:
+    try:
+        import pdfplumber
+        PDF_AVAILABLE = True
+    except ImportError:
+        pass
+
+DOCX_AVAILABLE = False
+try:
+    import docx
+    DOCX_AVAILABLE = True
+except ImportError:
+    pass
+
 # =============================================================================
 # CONFIGURATION
 # =============================================================================
@@ -1047,6 +1074,19 @@ class CaptionEngine:
 
         return aliases[:10]  # Limit to 10 aliases
 
+    def reset_session_stats(self):
+        """Reset per-session statistics for a fresh session"""
+        self.stats = {
+            "corrections_applied": 0,
+            "captions_processed": 0,
+            "semantic_matches": 0,
+            "fuzzy_matches": 0,
+            "learned_corrections": 0
+        }
+        self.corrections_log.clear()
+        self.pending_suggestions.clear()
+        self.recent_context.clear()
+
     def get_status(self):
         return {
             "enabled": self.enabled,
@@ -1391,47 +1431,79 @@ class KnowledgeBase:
         if not video_id:
             return "", "Could not extract YouTube video ID from URL"
 
-        # Try youtube_transcript_api
+        # Try youtube_transcript_api (v1.x uses .fetch() instead of .get_transcript())
         try:
             from youtube_transcript_api import YouTubeTranscriptApi
-            transcript_list = YouTubeTranscriptApi.get_transcript(video_id)
-            text = ' '.join([t['text'] for t in transcript_list])
+            fetched = YouTubeTranscriptApi().fetch(video_id)
+            # New API returns FetchedTranscript with snippets attribute
+            text = ' '.join([snippet.text for snippet in fetched.snippets])
             return text, None
         except ImportError:
             pass
         except Exception as e:
             print(f"YouTube transcript API error: {e}")
 
-        # Fallback: Try to fetch auto-generated captions via unofficial method
+        # Fallback: Try to fetch captions via direct YouTube API
         try:
             import urllib.request
-            import json
+            import xml.etree.ElementTree as ET
 
             # Fetch video page to get caption tracks
-            url = f"https://www.youtube.com/watch?v={video_id}"
-            req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0'})
-            with urllib.request.urlopen(req, timeout=30) as response:
+            video_url = f"https://www.youtube.com/watch?v={video_id}"
+            req = urllib.request.Request(video_url, headers={
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+                'Accept-Language': 'en-US,en;q=0.9'
+            })
+            with urllib.request.urlopen(req, timeout=15) as response:
                 html = response.read().decode('utf-8', errors='ignore')
 
-            # Look for captions in the page
-            caption_match = re.search(r'"captions":.*?"captionTracks":\[(.*?)\]', html)
+            # Look for captionTracks in ytInitialPlayerResponse
+            caption_match = re.search(r'"captionTracks":\s*\[(.*?)\]', html)
             if caption_match:
-                tracks = caption_match.group(1)
-                url_match = re.search(r'"baseUrl":"(.*?)"', tracks)
-                if url_match:
-                    caption_url = url_match.group(1).replace('\\u0026', '&')
-                    req = urllib.request.Request(caption_url, headers={'User-Agent': 'Mozilla/5.0'})
-                    with urllib.request.urlopen(req, timeout=30) as response:
-                        caption_xml = response.read().decode('utf-8', errors='ignore')
+                caption_tracks = caption_match.group(1)
+                base_url_match = re.search(r'"baseUrl":\s*"([^"]+)"', caption_tracks)
+                if base_url_match:
+                    caption_url = base_url_match.group(1).replace('\\u0026', '&')
 
-                    # Extract text from XML
-                    texts = re.findall(r'<text[^>]*>(.*?)</text>', caption_xml, re.DOTALL)
-                    if texts:
-                        import html as html_lib
-                        text = ' '.join([html_lib.unescape(t) for t in texts])
-                        return text, None
+                    # Fetch the actual caption content
+                    caption_req = urllib.request.Request(caption_url, headers={
+                        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+                    })
+                    with urllib.request.urlopen(caption_req, timeout=15) as caption_response:
+                        caption_content = caption_response.read().decode('utf-8', errors='ignore')
+
+                    # Parse XML format captions
+                    if caption_content.strip().startswith('<?xml') or caption_content.strip().startswith('<transcript'):
+                        root = ET.fromstring(caption_content)
+                        text_parts = []
+                        for text_elem in root.findall('.//text'):
+                            text = text_elem.text
+                            if text:
+                                text = text.replace('&amp;', '&').replace('&lt;', '<').replace('&gt;', '>')
+                                text = text.replace('&#39;', "'").replace('&quot;', '"')
+                                text_parts.append(text)
+                        if text_parts:
+                            print(f"✅ Fetched YouTube transcript via direct API for knowledge base")
+                            return ' '.join(text_parts), None
+                    else:
+                        # Try JSON format
+                        try:
+                            caption_json = json.loads(caption_content)
+                            events = caption_json.get('events', [])
+                            text_parts = []
+                            for event in events:
+                                segs = event.get('segs', [])
+                                for seg in segs:
+                                    text = seg.get('utf8', '')
+                                    if text and text.strip():
+                                        text_parts.append(text)
+                            if text_parts:
+                                print(f"✅ Fetched YouTube transcript via direct API (JSON) for knowledge base")
+                                return ' '.join(text_parts), None
+                        except:
+                            pass
         except Exception as e:
-            print(f"YouTube fallback error: {e}")
+            print(f"YouTube direct API fallback error: {e}")
 
         # Check if youtube_transcript_api is available for a better error message
         try:
@@ -1715,18 +1787,30 @@ class SessionManager:
         self.audio_thread = None
         self.sample_rate = 16000
 
-    def start_session(self, name=None, **kwargs):
-        """Start a new captioning session"""
+    def start_session(self, name=None, record_audio=True, audio_device=None, **kwargs):
+        """Start a new captioning session with audio recording by default"""
         session_id = str(uuid.uuid4())[:8]
         self.current_session = {
             "id": session_id,
             "name": name or f"Session {datetime.now().strftime('%Y-%m-%d %H:%M')}",
             "started": datetime.now().isoformat(),
-            "mode": "browser"
+            "mode": "browser",
+            "has_audio": False
         }
         self.captions = []
         self.start_time = datetime.now()
         self.is_recording = True
+
+        # Start audio recording by default (for Whisper second pass)
+        if record_audio and AUDIO_AVAILABLE and NUMPY_AVAILABLE:
+            try:
+                # Convert device_id to int if provided as string
+                dev_id = int(audio_device) if audio_device is not None else None
+                self._start_audio_recording(session_id, device_id=dev_id)
+                self.current_session["has_audio"] = True
+            except Exception as e:
+                print(f"⚠️ Could not start audio recording: {e}")
+
         return self.current_session
 
     def _start_audio_recording(self, session_id: str, device_id=None):
@@ -3258,10 +3342,12 @@ class VideoIntelligence:
     """
     Handles video processing:
     - Video upload and storage
+    - YouTube video download with progress
     - Transcript-to-video sync
-    - AI-powered highlight detection
-    - Clip generation with ffmpeg
+    - AI-powered highlight detection with quote matching
+    - Clip generation with ffmpeg (with padding)
     - Highlight reel compilation
+    - Caption file generation
     """
 
     def __init__(self, video_dir: Path):
@@ -3270,6 +3356,9 @@ class VideoIntelligence:
         self.clips_dir = video_dir / "clips"
         self.clips_dir.mkdir(exist_ok=True)
         self.current_video = None
+        self.transcript = ""  # Store transcript for caption generation
+        self.transcript_segments = []  # Store timestamped segments
+        self.download_progress = {"status": "idle", "percent": 0, "message": ""}
 
     def upload_video(self, filename: str, content: bytes) -> Dict:
         """Save uploaded video file"""
@@ -3303,6 +3392,348 @@ class VideoIntelligence:
         except Exception as e:
             return {"error": str(e)}
 
+    def download_youtube_video(self, url: str) -> Dict:
+        """Download YouTube video with detailed progress tracking using yt-dlp"""
+        import re
+        import time
+
+        # Extract video ID
+        video_id_match = re.search(r'(?:v=|youtu\.be/)([a-zA-Z0-9_-]{11})', url)
+        if not video_id_match:
+            return {"error": "Invalid YouTube URL"}
+
+        yt_video_id = video_id_match.group(1)
+        video_id = str(uuid.uuid4())[:8]
+        output_path = self.video_dir / f"{video_id}.mp4"
+
+        self.download_progress = {
+            "status": "starting",
+            "percent": 0,
+            "message": "Initializing download...",
+            "downloaded_size": "",
+            "total_size": "",
+            "speed": "",
+            "eta": ""
+        }
+
+        start_time = time.time()
+
+        try:
+            # Use yt-dlp to download - prefer 1080p, fallback to lower
+            cmd = [
+                'yt-dlp',
+                '-f', 'bestvideo[height<=1080][ext=mp4]+bestaudio[ext=m4a]/best[height<=1080]/best',
+                '--merge-output-format', 'mp4',
+                '-o', str(output_path),
+                '--progress',
+                '--newline',
+                url
+            ]
+
+            self.download_progress = {
+                "status": "downloading",
+                "percent": 2,
+                "message": "Connecting to YouTube...",
+                "downloaded_size": "",
+                "total_size": "",
+                "speed": "",
+                "eta": ""
+            }
+
+            process = subprocess.Popen(
+                cmd,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT,
+                text=True,
+                bufsize=1
+            )
+
+            # Parse progress from yt-dlp output with detailed info
+            for line in process.stdout:
+                line = line.strip()
+                if '[download]' in line:
+                    # Parse: [download]  45.2% of  150.00MiB at   5.50MiB/s ETA 00:15
+                    percent_match = re.search(r'(\d+\.?\d*)%', line)
+                    size_match = re.search(r'of\s+([\d.]+\s*\w+)', line)
+                    speed_match = re.search(r'at\s+([\d.]+\s*\w+/s)', line)
+                    eta_match = re.search(r'ETA\s+(\d+:\d+(?::\d+)?)', line)
+                    downloaded_match = re.search(r'(\d+\.?\d*)\s*%\s+of\s+[\d.]+', line)
+
+                    if percent_match:
+                        percent = float(percent_match.group(1))
+                        total_size = size_match.group(1) if size_match else ""
+                        speed = speed_match.group(1) if speed_match else ""
+                        eta = eta_match.group(1) if eta_match else ""
+
+                        # Calculate downloaded size
+                        if total_size and percent > 0:
+                            try:
+                                size_val = float(re.search(r'[\d.]+', total_size).group())
+                                size_unit = re.search(r'[A-Za-z]+', total_size).group()
+                                downloaded_val = size_val * (percent / 100)
+                                downloaded_size = f"{downloaded_val:.1f} {size_unit}"
+                            except:
+                                downloaded_size = ""
+                        else:
+                            downloaded_size = ""
+
+                        self.download_progress = {
+                            "status": "downloading",
+                            "percent": min(90, percent),
+                            "message": f"Downloading video: {percent:.1f}%",
+                            "downloaded_size": downloaded_size,
+                            "total_size": total_size,
+                            "speed": speed,
+                            "eta": eta
+                        }
+                elif 'Merging' in line:
+                    self.download_progress = {
+                        "status": "processing",
+                        "percent": 92,
+                        "message": "Merging video and audio streams...",
+                        "downloaded_size": self.download_progress.get("total_size", ""),
+                        "total_size": self.download_progress.get("total_size", ""),
+                        "speed": "",
+                        "eta": "~30s"
+                    }
+                elif 'Deleting' in line or 'has already been downloaded' in line:
+                    self.download_progress = {
+                        "status": "processing",
+                        "percent": 98,
+                        "message": "Finalizing...",
+                        "downloaded_size": self.download_progress.get("total_size", ""),
+                        "total_size": self.download_progress.get("total_size", ""),
+                        "speed": "",
+                        "eta": "~5s"
+                    }
+
+            process.wait()
+
+            if process.returncode != 0 or not output_path.exists():
+                self.download_progress = {"status": "error", "percent": 0, "message": "Download failed"}
+                return {"error": "Failed to download video. Try uploading directly."}
+
+            # Get video duration and file size
+            duration = self._get_video_duration(output_path)
+            file_size = output_path.stat().st_size
+            file_size_mb = file_size / (1024 * 1024)
+            elapsed = time.time() - start_time
+
+            self.current_video = {
+                "id": video_id,
+                "youtube_id": yt_video_id,
+                "filename": f"youtube_{yt_video_id}.mp4",
+                "path": str(output_path),
+                "duration": duration,
+                "file_size": file_size,
+                "file_size_mb": file_size_mb,
+                "is_youtube": True,
+                "source_url": url,
+                "uploaded": datetime.now().isoformat()
+            }
+
+            self.download_progress = {
+                "status": "complete",
+                "percent": 100,
+                "message": f"Download complete! ({file_size_mb:.1f} MB in {elapsed:.0f}s)",
+                "downloaded_size": f"{file_size_mb:.1f} MB",
+                "total_size": f"{file_size_mb:.1f} MB",
+                "speed": "",
+                "eta": ""
+            }
+
+            return {
+                "status": "ok",
+                "video_id": video_id,
+                "youtube_id": yt_video_id,
+                "filename": f"youtube_{yt_video_id}.mp4",
+                "duration": duration,
+                "file_size_mb": file_size_mb,
+                "path": str(output_path)
+            }
+
+        except FileNotFoundError:
+            self.download_progress = {"status": "error", "percent": 0, "message": "yt-dlp not installed"}
+            return {"error": "yt-dlp not installed. Run: pip install yt-dlp"}
+        except Exception as e:
+            self.download_progress = {"status": "error", "percent": 0, "message": str(e)}
+            return {"error": str(e)}
+
+    def get_download_progress(self) -> Dict:
+        """Get current download progress"""
+        return self.download_progress
+
+    def set_transcript(self, transcript: str, segments: List[Dict] = None):
+        """Store transcript for caption generation and highlight matching"""
+        self.transcript = transcript
+        self.transcript_segments = segments or []
+        # Parse segments from transcript if not provided
+        if not segments and transcript:
+            self._parse_transcript_segments(transcript)
+
+    def _parse_transcript_segments(self, transcript: str):
+        """Parse transcript text into timestamped segments for quote matching"""
+        import re
+        self.transcript_segments = []
+
+        # Try to find timestamped lines like [0:00] or [00:00:00] or (0:00)
+        lines = transcript.split('\n')
+        current_time = 0
+
+        for line in lines:
+            line = line.strip()
+            if not line:
+                continue
+
+            # Look for timestamps at start of line
+            time_match = re.match(r'[\[\(]?(\d{1,2}):(\d{2})(?::(\d{2}))?[\]\)]?\s*(.+)', line)
+            if time_match:
+                hours = int(time_match.group(3)) if time_match.group(3) else 0
+                mins = int(time_match.group(1)) if not time_match.group(3) else int(time_match.group(1)) * 60 + int(time_match.group(2))
+                secs = int(time_match.group(2)) if not time_match.group(3) else int(time_match.group(3))
+                current_time = hours * 3600 + mins * 60 + secs
+                text = time_match.group(4)
+            else:
+                text = line
+
+            if text:
+                self.transcript_segments.append({
+                    "start": current_time,
+                    "text": text,
+                    "duration": 5  # Default duration estimate
+                })
+                current_time += 5  # Increment for non-timestamped lines
+
+    def find_quote_timestamp(self, quote: str, padding: float = 2.0) -> Dict:
+        """Find the timestamp of a quote in the transcript with padding"""
+        if not self.transcript_segments:
+            return None
+
+        quote_lower = quote.lower().strip()
+        best_match = None
+        best_score = 0
+
+        for seg in self.transcript_segments:
+            seg_text = seg.get('text', '').lower()
+
+            # Exact substring match
+            if quote_lower in seg_text:
+                return {
+                    "start": max(0, seg['start'] - padding),
+                    "end": seg['start'] + seg.get('duration', 10) + padding,
+                    "matched_text": seg['text']
+                }
+
+            # Fuzzy matching - check word overlap
+            quote_words = set(quote_lower.split())
+            seg_words = set(seg_text.split())
+            overlap = len(quote_words & seg_words) / max(len(quote_words), 1)
+
+            if overlap > best_score and overlap > 0.5:
+                best_score = overlap
+                best_match = {
+                    "start": max(0, seg['start'] - padding),
+                    "end": seg['start'] + seg.get('duration', 10) + padding,
+                    "matched_text": seg['text'],
+                    "confidence": overlap
+                }
+
+        return best_match
+
+    def generate_caption_file(self, format: str = 'srt') -> Dict:
+        """Generate caption file (SRT, VTT, or TXT) from stored transcript"""
+        if not self.transcript_segments:
+            if self.transcript:
+                self._parse_transcript_segments(self.transcript)
+            else:
+                return {"error": "No transcript available"}
+
+        video_id = self.current_video.get('id', 'captions') if self.current_video else 'captions'
+
+        if format == 'srt':
+            return self._generate_srt(video_id)
+        elif format == 'vtt':
+            return self._generate_vtt(video_id)
+        elif format == 'txt':
+            return self._generate_txt(video_id)
+        else:
+            return {"error": f"Unknown format: {format}"}
+
+    def _generate_srt(self, video_id: str) -> Dict:
+        """Generate SRT caption file"""
+        output_path = self.clips_dir / f"{video_id}_captions.srt"
+
+        try:
+            with open(output_path, 'w', encoding='utf-8') as f:
+                for i, seg in enumerate(self.transcript_segments, 1):
+                    start = seg.get('start', 0)
+                    duration = seg.get('duration', 5)
+                    end = start + duration
+
+                    start_str = f"{int(start//3600):02d}:{int((start%3600)//60):02d}:{int(start%60):02d},{int((start%1)*1000):03d}"
+                    end_str = f"{int(end//3600):02d}:{int((end%3600)//60):02d}:{int(end%60):02d},{int((end%1)*1000):03d}"
+
+                    f.write(f"{i}\n")
+                    f.write(f"{start_str} --> {end_str}\n")
+                    f.write(f"{seg.get('text', '')}\n\n")
+
+            return {
+                "status": "ok",
+                "path": str(output_path),
+                "filename": f"{video_id}_captions.srt",
+                "format": "srt"
+            }
+        except Exception as e:
+            return {"error": str(e)}
+
+    def _generate_vtt(self, video_id: str) -> Dict:
+        """Generate WebVTT caption file"""
+        output_path = self.clips_dir / f"{video_id}_captions.vtt"
+
+        try:
+            with open(output_path, 'w', encoding='utf-8') as f:
+                f.write("WEBVTT\n\n")
+                for i, seg in enumerate(self.transcript_segments, 1):
+                    start = seg.get('start', 0)
+                    duration = seg.get('duration', 5)
+                    end = start + duration
+
+                    start_str = f"{int(start//3600):02d}:{int((start%3600)//60):02d}:{int(start%60):02d}.{int((start%1)*1000):03d}"
+                    end_str = f"{int(end//3600):02d}:{int((end%3600)//60):02d}:{int(end%60):02d}.{int((end%1)*1000):03d}"
+
+                    f.write(f"{i}\n")
+                    f.write(f"{start_str} --> {end_str}\n")
+                    f.write(f"{seg.get('text', '')}\n\n")
+
+            return {
+                "status": "ok",
+                "path": str(output_path),
+                "filename": f"{video_id}_captions.vtt",
+                "format": "vtt"
+            }
+        except Exception as e:
+            return {"error": str(e)}
+
+    def _generate_txt(self, video_id: str) -> Dict:
+        """Generate plain text transcript file"""
+        output_path = self.clips_dir / f"{video_id}_transcript.txt"
+
+        try:
+            with open(output_path, 'w', encoding='utf-8') as f:
+                for seg in self.transcript_segments:
+                    start = seg.get('start', 0)
+                    time_str = f"[{int(start//60):02d}:{int(start%60):02d}]"
+                    f.write(f"{time_str} {seg.get('text', '')}\n")
+
+            return {
+                "status": "ok",
+                "path": str(output_path),
+                "filename": f"{video_id}_transcript.txt",
+                "format": "txt"
+            }
+        except Exception as e:
+            return {"error": str(e)}
+
     def _get_video_duration(self, video_path: Path) -> float:
         """Get video duration in seconds using ffprobe"""
         if not FFMPEG_AVAILABLE:
@@ -3321,19 +3752,20 @@ class VideoIntelligence:
             pass
         return 0
 
-    def generate_highlights(self, captions: List[Dict], video_path: str = None) -> Dict:
-        """Use AI to identify highlight moments from transcript"""
-        if not captions:
-            return {"error": "No captions to analyze"}
+    def generate_highlights_from_transcript(self, transcript: str, clip_padding: float = 2.0) -> Dict:
+        """
+        Use AI to identify highlight moments from transcript text.
+        Uses DIRECT QUOTES to find exact timestamps in the transcript.
+        This allows highlight detection even without a captioning session.
+        """
+        if not transcript or not transcript.strip():
+            return {"error": "No transcript provided"}
 
         if not openai_client:
-            return {"error": "AI not available for highlight detection"}
+            return {"error": "AI not available for highlight detection. Configure OpenAI API key."}
 
-        # Build full transcript with timestamps
-        transcript = "\n".join([
-            f"[{c.get('time_str', '')}] {c.get('corrected', c.get('raw', ''))}"
-            for c in captions
-        ])
+        # Store transcript for quote matching
+        self.set_transcript(transcript)
 
         try:
             response = openai_client.chat.completions.create(
@@ -3342,38 +3774,138 @@ class VideoIntelligence:
                     {
                         "role": "system",
                         "content": (
-                            "Analyze this timestamped transcript and identify 5-10 highlight moments. "
-                            "Look for: key decisions, votes, important announcements, heated discussions, "
-                            "memorable quotes, or significant statements. "
-                            "Return ONLY a JSON array of highlights:\n"
+                            "Analyze this transcript and identify 5-8 highlight moments.\n"
+                            "Look for: key points, interesting statements, memorable quotes, important announcements, "
+                            "conclusions, or engaging content good for a highlight reel.\n\n"
+                            "CRITICAL: For each highlight, you MUST include a DIRECT QUOTE from the transcript. "
+                            "The quote should be 5-15 words that appear EXACTLY in the transcript text. "
+                            "This quote will be used to find the exact timestamp.\n\n"
+                            "Return ONLY a valid JSON array:\n"
                             '[\n'
-                            '  {"timestamp": "HH:MM:SS", "end_timestamp": "HH:MM:SS", "quote": "exact quote", '
-                            '"reason": "why this is a highlight", "importance": 1-10}\n'
-                            ']\n'
-                            "Order by importance, highest first."
+                            '  {\n'
+                            '    "quote": "exact words from the transcript",\n'
+                            '    "title": "short 3-5 word title for this moment",\n'
+                            '    "reason": "why this is a good highlight (10-20 words)",\n'
+                            '    "importance": 8\n'
+                            '  }\n'
+                            ']\n\n'
+                            "Order by importance (10=most important, 1=least). Include 5-8 highlights."
                         )
                     },
                     {
                         "role": "user",
-                        "content": transcript[:10000]
+                        "content": f"Transcript:\n\n{transcript[:12000]}"
                     }
                 ],
                 temperature=0.3,
                 max_tokens=2000
             )
 
+            response_text = response.choices[0].message.content.strip()
+
+            # Try to extract JSON from response
+            import re
+            json_match = re.search(r'\[[\s\S]*\]', response_text)
+            if json_match:
+                response_text = json_match.group(0)
+
             try:
-                highlights = json.loads(response.choices[0].message.content)
-                return {
-                    "status": "ok",
-                    "highlights": highlights,
-                    "count": len(highlights)
-                }
-            except:
-                return {"error": "Failed to parse AI response", "raw": response.choices[0].message.content}
+                highlights = json.loads(response_text)
+            except json.JSONDecodeError:
+                return {"error": "Failed to parse AI response", "raw": response_text}
+
+            # Now match quotes to timestamps
+            matched_highlights = []
+            for h in highlights:
+                quote = h.get('quote', '')
+                if not quote:
+                    continue
+
+                # Find timestamp for this quote
+                match = self.find_quote_timestamp(quote, padding=clip_padding)
+
+                if match:
+                    matched_highlights.append({
+                        "title": h.get('title', 'Highlight'),
+                        "quote": quote,
+                        "reason": h.get('reason', ''),
+                        "importance": h.get('importance', 5),
+                        "start_time": match['start'],
+                        "end_time": match['end'],
+                        "matched_text": match.get('matched_text', ''),
+                        "timestamp": self._seconds_to_timestamp(match['start']),
+                        "end_timestamp": self._seconds_to_timestamp(match['end'])
+                    })
+                else:
+                    # Couldn't find quote - estimate from position in transcript
+                    position_ratio = transcript.lower().find(quote.lower()[:20]) / max(len(transcript), 1)
+                    estimated_time = position_ratio * (self.current_video.get('duration', 300) if self.current_video else 300)
+                    matched_highlights.append({
+                        "title": h.get('title', 'Highlight'),
+                        "quote": quote,
+                        "reason": h.get('reason', ''),
+                        "importance": h.get('importance', 5),
+                        "start_time": max(0, estimated_time - clip_padding),
+                        "end_time": estimated_time + 15 + clip_padding,  # 15 second default clip
+                        "timestamp": self._seconds_to_timestamp(max(0, estimated_time - clip_padding)),
+                        "end_timestamp": self._seconds_to_timestamp(estimated_time + 15 + clip_padding),
+                        "estimated": True
+                    })
+
+            # Generate a brief summary of the content
+            summary = None
+            if matched_highlights:
+                try:
+                    summary_response = openai_client.chat.completions.create(
+                        model=get_ai_model(),
+                        messages=[
+                            {
+                                "role": "system",
+                                "content": "Generate a 2-3 sentence summary of this content, focusing on the main themes and key takeaways. Be concise."
+                            },
+                            {
+                                "role": "user",
+                                "content": f"Transcript:\n\n{transcript[:4000]}"
+                            }
+                        ],
+                        temperature=0.3,
+                        max_tokens=150
+                    )
+                    summary = summary_response.choices[0].message.content.strip()
+                except Exception as e:
+                    print(f"Error generating summary: {e}")
+                    summary = None
+
+            return {
+                "status": "ok",
+                "highlights": matched_highlights,
+                "count": len(matched_highlights),
+                "matched": len([h for h in matched_highlights if not h.get('estimated')]),
+                "summary": summary
+            }
 
         except Exception as e:
             return {"error": str(e)}
+
+    def _seconds_to_timestamp(self, seconds: float) -> str:
+        """Convert seconds to HH:MM:SS format"""
+        hours = int(seconds // 3600)
+        mins = int((seconds % 3600) // 60)
+        secs = int(seconds % 60)
+        return f"{hours:02d}:{mins:02d}:{secs:02d}"
+
+    def generate_highlights(self, captions: List[Dict], video_path: str = None) -> Dict:
+        """Use AI to identify highlight moments from session captions"""
+        if not captions:
+            return {"error": "No captions to analyze"}
+
+        # Build transcript from captions and use the new method
+        transcript = "\n".join([
+            f"[{c.get('time_str', '')}] {c.get('corrected', c.get('raw', ''))}"
+            for c in captions
+        ])
+
+        return self.generate_highlights_from_transcript(transcript)
 
     def extract_clip(self, video_path: str, start_time: str, end_time: str, output_name: str = None) -> Dict:
         """Extract a clip from video using ffmpeg"""
@@ -3832,39 +4364,16 @@ class Handler(http.server.SimpleHTTPRequestHandler):
             self.send_json({**caption_state, "session": session_manager.get_status()})
         
         elif path == '/api/info':
-            # Check library availability
-            pdf_available = False
-            docx_available = False
-            youtube_transcript_available = False
-            try:
-                import PyPDF2
-                pdf_available = True
-            except ImportError:
-                try:
-                    import pdfplumber
-                    pdf_available = True
-                except ImportError:
-                    pass
-            try:
-                from docx import Document
-                docx_available = True
-            except ImportError:
-                pass
-            try:
-                from youtube_transcript_api import YouTubeTranscriptApi
-                youtube_transcript_available = True
-            except ImportError:
-                pass
-
+            # Return system capabilities using global constants
             self.send_json({
                 "local_ip": LOCAL_IP, "port": PORT,
                 "whisper_available": WHISPER_AVAILABLE and AUDIO_AVAILABLE and NUMPY_AVAILABLE,
                 "embeddings_available": EMBEDDINGS_AVAILABLE,
                 "rag_enabled": caption_engine.rag_enabled,
                 "ffmpeg_available": FFMPEG_AVAILABLE,
-                "pdf_available": pdf_available,
-                "docx_available": docx_available,
-                "youtube_transcript_available": youtube_transcript_available,
+                "pdf_available": PDF_AVAILABLE,
+                "docx_available": DOCX_AVAILABLE,
+                "youtube_transcript_available": YOUTUBE_TRANSCRIPT_AVAILABLE,
                 "ai_available": openai_client is not None,
                 "version": "4.0"
             })
@@ -4514,7 +5023,14 @@ class Handler(http.server.SimpleHTTPRequestHandler):
             caption_state["raw_caption"] = ""
             caption_state["corrections"] = []
 
-            session = session_manager.start_session(name=data.get('name'))
+            # Reset engine stats for fresh session
+            caption_engine.reset_session_stats()
+
+            session = session_manager.start_session(
+                name=data.get('name'),
+                record_audio=data.get('record_audio', True),  # Default to True for Whisper second pass
+                audio_device=data.get('audio_device')
+            )
             self.send_json({"status": "ok", "session": session})
 
         elif path == '/api/session/stop':
@@ -4950,40 +5466,96 @@ class Handler(http.server.SimpleHTTPRequestHandler):
             duration = 0
             method_used = None
 
-            # Method 1: Try youtube-transcript-api first (handles manual captions)
-            if youtube_transcript_available:
+            # Method 1: Try youtube-transcript-api first (v1.x API with .fetch())
+            if YOUTUBE_TRANSCRIPT_AVAILABLE:
                 try:
                     from youtube_transcript_api import YouTubeTranscriptApi
 
-                    # Try to get any available transcript (manual first, then auto-generated)
-                    try:
-                        transcript_list = YouTubeTranscriptApi.get_transcript(video_id)
-                        method_used = "youtube-transcript-api"
-                    except:
-                        # Try to list available transcripts and get any one
-                        try:
-                            transcript_list_obj = YouTubeTranscriptApi.list_transcripts(video_id)
-                            # Try manual transcripts first
-                            for transcript in transcript_list_obj:
-                                try:
-                                    transcript_list = transcript.fetch()
-                                    method_used = f"youtube-transcript-api ({transcript.language})"
-                                    break
-                                except:
-                                    continue
-                        except:
-                            pass
+                    # New API: YouTubeTranscriptApi().fetch(video_id) returns FetchedTranscript
+                    fetched = YouTubeTranscriptApi().fetch(video_id)
+                    method_used = "youtube-transcript-api"
 
-                    if transcript_list:
-                        transcript_text = ' '.join([entry.get('text', '') for entry in transcript_list])
-                        if transcript_list:
-                            last_entry = transcript_list[-1]
-                            duration = last_entry.get('start', 0) + last_entry.get('duration', 0)
+                    # Extract text from snippets
+                    transcript_text = ' '.join([snippet.text for snippet in fetched.snippets])
+
+                    # Calculate duration from last snippet
+                    if fetched.snippets:
+                        last_snippet = fetched.snippets[-1]
+                        duration = last_snippet.start + last_snippet.duration
 
                 except Exception as e:
                     print(f"youtube-transcript-api failed: {e}")
 
-            # Method 2: Try yt-dlp if available and Method 1 failed
+            # Method 2: Direct HTTP fetch of YouTube's timedtext API (no dependencies)
+            if not transcript_text:
+                try:
+                    import urllib.request
+                    import xml.etree.ElementTree as ET
+
+                    # First, fetch the video page to get caption track info
+                    video_url = f'https://www.youtube.com/watch?v={video_id}'
+                    req = urllib.request.Request(video_url, headers={
+                        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+                        'Accept-Language': 'en-US,en;q=0.9'
+                    })
+                    with urllib.request.urlopen(req, timeout=15) as response:
+                        html = response.read().decode('utf-8')
+
+                    # Extract timedtext URL from page source
+                    # Look for the captionTracks in the ytInitialPlayerResponse
+                    caption_match = re.search(r'"captionTracks":\s*\[(.*?)\]', html)
+                    if caption_match:
+                        caption_tracks = caption_match.group(1)
+                        # Find the baseUrl for captions
+                        base_url_match = re.search(r'"baseUrl":\s*"([^"]+)"', caption_tracks)
+                        if base_url_match:
+                            caption_url = base_url_match.group(1).replace('\\u0026', '&')
+
+                            # Fetch the actual caption XML/JSON
+                            caption_req = urllib.request.Request(caption_url, headers={
+                                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+                            })
+                            with urllib.request.urlopen(caption_req, timeout=15) as caption_response:
+                                caption_content = caption_response.read().decode('utf-8')
+
+                            # Parse XML format captions
+                            if caption_content.strip().startswith('<?xml') or caption_content.strip().startswith('<transcript'):
+                                root = ET.fromstring(caption_content)
+                                text_parts = []
+                                for text_elem in root.findall('.//text'):
+                                    text = text_elem.text
+                                    if text:
+                                        # Clean up HTML entities
+                                        text = text.replace('&amp;', '&').replace('&lt;', '<').replace('&gt;', '>')
+                                        text = text.replace('&#39;', "'").replace('&quot;', '"')
+                                        text_parts.append(text)
+                                if text_parts:
+                                    transcript_text = ' '.join(text_parts)
+                                    method_used = "youtube-direct-api"
+                                    print(f"✅ Fetched transcript via direct YouTube API")
+                            else:
+                                # Try JSON format
+                                try:
+                                    caption_json = json.loads(caption_content)
+                                    events = caption_json.get('events', [])
+                                    text_parts = []
+                                    for event in events:
+                                        segs = event.get('segs', [])
+                                        for seg in segs:
+                                            text = seg.get('utf8', '')
+                                            if text and text.strip():
+                                                text_parts.append(text)
+                                    if text_parts:
+                                        transcript_text = ' '.join(text_parts)
+                                        method_used = "youtube-direct-api-json"
+                                        print(f"✅ Fetched transcript via direct YouTube API (JSON)")
+                                except:
+                                    pass
+
+                except Exception as e:
+                    print(f"Direct YouTube caption fetch failed: {e}")
+
+            # Method 3: Try yt-dlp if available and previous methods failed
             if not transcript_text:
                 try:
                     result = subprocess.run([
@@ -5020,7 +5592,7 @@ class Handler(http.server.SimpleHTTPRequestHandler):
                 except Exception as e:
                     print(f"yt-dlp subtitle extraction failed: {e}")
 
-            # Method 3: Use yt-dlp to get video info for duration
+            # Method 4: Use yt-dlp to get video info for duration
             if not duration:
                 try:
                     result = subprocess.run([
@@ -5047,7 +5619,7 @@ class Handler(http.server.SimpleHTTPRequestHandler):
                 })
             else:
                 self.send_json({
-                    "error": "Could not fetch transcript. Try: 1) Check if video has captions, 2) Install yt-dlp: pip3 install yt-dlp"
+                    "error": "Could not fetch transcript. This video may not have captions enabled, or the captions are restricted. You can try: 1) Verify the video has CC/subtitles on YouTube, 2) Upload the video file directly and use Whisper transcription instead."
                 }, 400)
 
         elif path == '/api/video/transcribe':
@@ -5141,6 +5713,81 @@ class Handler(http.server.SimpleHTTPRequestHandler):
 
             except Exception as e:
                 self.send_json({"error": f"Transcription failed: {str(e)}"}, 500)
+
+        elif path == '/api/video/download-youtube':
+            # Download YouTube video with progress tracking
+            url = data.get('url', '')
+            if not url:
+                self.send_json({"error": "No URL provided"}, 400)
+                return
+
+            # Start download (this is synchronous but updates progress)
+            result = video_intelligence.download_youtube_video(url)
+            self.send_json(result)
+
+        elif path == '/api/video/download-progress':
+            # Get current download progress
+            progress = video_intelligence.get_download_progress()
+            self.send_json(progress)
+
+        elif path == '/api/video/set-transcript':
+            # Set transcript for standalone video (without captioning session)
+            transcript = data.get('transcript', '')
+            if not transcript:
+                self.send_json({"error": "No transcript provided"}, 400)
+                return
+
+            video_intelligence.set_transcript(transcript)
+            self.send_json({
+                "status": "ok",
+                "segments": len(video_intelligence.transcript_segments)
+            })
+
+        elif path == '/api/video/generate-highlights':
+            # Generate highlights from transcript text (works without captioning session)
+            transcript = data.get('transcript', '')
+            if not transcript:
+                # Try to use stored transcript
+                transcript = video_intelligence.transcript
+            if not transcript:
+                self.send_json({"error": "No transcript provided"}, 400)
+                return
+
+            padding = data.get('padding', 2.0)
+            result = video_intelligence.generate_highlights_from_transcript(transcript, clip_padding=padding)
+            self.send_json(result)
+
+        elif path == '/api/video/generate-captions':
+            # Generate caption file from transcript
+            format = data.get('format', 'srt')
+            result = video_intelligence.generate_caption_file(format)
+
+            if result.get('status') == 'ok':
+                # Return file path for download
+                self.send_json(result)
+            else:
+                self.send_json(result, 400)
+
+        elif path == '/api/video/download-file':
+            # Download a generated file (captions, clips, etc.)
+            filepath = data.get('path', '')
+            if not filepath or not Path(filepath).exists():
+                self.send_json({"error": "File not found"}, 404)
+                return
+
+            try:
+                with open(filepath, 'rb') as f:
+                    content = f.read()
+
+                filename = Path(filepath).name
+                self.send_response(200)
+                self.send_header('Content-Type', 'application/octet-stream')
+                self.send_header('Content-Disposition', f'attachment; filename="{filename}"')
+                self.send_header('Content-Length', len(content))
+                self.end_headers()
+                self.wfile.write(content)
+            except Exception as e:
+                self.send_json({"error": str(e)}, 500)
 
         else:
             self.send_response(404)
