@@ -1711,6 +1711,15 @@ class SessionManager:
     def _start_audio_recording(self, session_id: str, device_id=None):
         """Start recording audio to file"""
         try:
+            # Clean up any existing stream first to prevent bus error
+            if hasattr(self, 'audio_stream') and self.audio_stream is not None:
+                try:
+                    self.audio_stream.stop()
+                    self.audio_stream.close()
+                except:
+                    pass
+                self.audio_stream = None
+
             self.audio_buffer = []
             self.audio_recording = True
 
@@ -1730,6 +1739,8 @@ class SessionManager:
         except Exception as e:
             print(f"⚠️ Audio recording failed: {e}")
             self.audio_recording = False
+            if hasattr(self, 'audio_stream'):
+                self.audio_stream = None
 
     def _stop_audio_recording(self, session_id: str):
         """Stop audio recording and save to file"""
@@ -2206,11 +2217,20 @@ class WhisperEngine:
             return {"error": "No model loaded"}
         if self.is_running:
             return {"error": "Already running"}
-        
+
+        # Clean up any existing stream first to prevent bus error
+        if self.stream is not None:
+            try:
+                self.stream.stop()
+                self.stream.close()
+            except:
+                pass
+            self.stream = None
+
         self.text_callback = callback
         self.is_running = True
         self.audio_buffer = []
-        
+
         try:
             self.stream = sd.InputStream(
                 device=device_id, channels=1, samplerate=self.sample_rate,
@@ -2223,6 +2243,8 @@ class WhisperEngine:
             return {"status": "started"}
         except Exception as e:
             self.is_running = False
+            if self.stream:
+                self.stream = None
             return {"error": str(e)}
     
     def stop(self):

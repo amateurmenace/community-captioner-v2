@@ -2441,14 +2441,16 @@
                             position: 'relative',
                             zIndex: 1
                         }}>
-                            {/* WHO WE ARE - Two Columns */}
+                            {/* WHO WE ARE - Three Columns with Logo */}
                             <div style={{
                                 display: 'grid',
-                                gridTemplateColumns: '1fr 1fr',
-                                gap: '60px',
-                                alignItems: 'start'
+                                gridTemplateColumns: 'auto 1fr auto',
+                                gap: '40px',
+                                alignItems: 'center',
+                                maxWidth: '1100px',
+                                margin: '0 auto'
                             }}>
-                                <div>
+                                <div style={{textAlign: 'right'}}>
                                     <h2 style={{
                                         fontSize: '56px',
                                         fontWeight: '900',
@@ -2460,7 +2462,8 @@
                                     <div style={{
                                         width: '80px',
                                         height: '6px',
-                                        background: 'var(--sage-primary)'
+                                        background: 'var(--sage-primary)',
+                                        marginLeft: 'auto'
                                     }}></div>
                                 </div>
 
@@ -2474,6 +2477,18 @@
                                     }}>
                                         Community Captioner was created at <strong>Brookline Interactive Group (BIG)</strong> in 2026. BIG is a nonprofit community media center in Brookline, MA, and the Town's public access TV provider. It needed live captions for town meetings and local programming but really struggled to afford commercial AI or live human solutions. After being quoted <strong style={{fontSize: '28px', color: 'var(--sage-primary)'}}>$30k</strong> for one such automated solution, we decided to make our own and make it free for everyone. <strong>We don't believe anyone should gatekeep accessibility.</strong>
                                     </p>
+                                </div>
+
+                                <div style={{
+                                    width: '200px',
+                                    display: 'flex',
+                                    justifyContent: 'center',
+                                    alignItems: 'center'
+                                }}>
+                                    <img src="big-logo.png" alt="BIG - Brookline Interactive Group" style={{
+                                        width: '100%',
+                                        height: 'auto'
+                                    }} />
                                 </div>
                             </div>
                         </div>
@@ -2570,13 +2585,6 @@
                             </div>
                         </div>
                     </section>
-
-                    {/* Decorative Wave Transition */}
-                    <div style={{
-                        height: '80px',
-                        background: 'linear-gradient(to bottom, var(--bg-warm) 0%, transparent 100%)',
-                        marginTop: '40px'
-                    }}></div>
 
                     {/* Built-In Data Analytics Section - Vibrant Green */}
                     <section className="info-section" style={{
@@ -2837,7 +2845,7 @@
                     </section>
 
                     {/* Architecture Section */}
-                    <section className="info-section architecture-section" style={{textAlign: 'center'}}>
+                    <section className="info-section architecture-section" style={{textAlign: 'center', marginTop: '60px'}}>
                         <h2 className="section-title">System Architecture</h2>
                         <p className="section-subtitle">
                             How the v4.0 AI-powered captioning pipeline works — hover over each component for details
@@ -5121,6 +5129,7 @@
             };
 
             const stopBrowserCaptions = () => {
+                console.log('stopBrowserCaptions called, recording state:', recording);
                 if (recognitionRef.current) {
                     recognitionRef.current.stop();
                     recognitionRef.current = null;
@@ -5128,7 +5137,11 @@
                 setBrowserListening(false);
                 // If recording is active, stop and analyze
                 if (recording) {
+                    console.log('Recording is true, calling stopAndAnalyze');
                     stopAndAnalyze();
+                } else {
+                    console.log('⚠️ Recording is FALSE, NOT calling stopAndAnalyze!');
+                    alert('⚠️ Recording state is FALSE - session analysis will not open. This is the bug!');
                 }
             };
 
@@ -5261,9 +5274,38 @@
             };
 
             const stopAndAnalyze = () => {
-                // Stop recording and show analysis in new tab
+                alert('🔴 stopAndAnalyze called! Recording state: ' + recording); // DEBUG ALERT
+                console.log('stopAndAnalyze called, recording state:', recording);
+
+                // IMMEDIATELY stop speech recognition to prevent buffered captions
+                if (recognitionRef.current) {
+                    try {
+                        recognitionRef.current.stop();
+                        console.log('Speech recognition stopped');
+                    } catch (e) {
+                        console.warn('Error stopping recognition:', e);
+                    }
+                }
+
+                // IMMEDIATELY stop Whisper if running
+                if (whisperRunning) {
+                    fetch('/api/whisper/stop', { method: 'POST' }).catch(e => console.warn('Error stopping Whisper:', e));
+                }
+
+                // Set flag to prevent any more captions from being processed
+                setRecording(false);
+
+                // Stop session on backend and show analysis in new tab
                 fetch('/api/session/stop', { method: 'POST' })
+                    .then(response => {
+                        console.log('Session stop response:', response);
+                        if (!response.ok) {
+                            throw new Error(`HTTP ${response.status}`);
+                        }
+                        return response.json();
+                    })
                     .then(() => {
+                        console.log('Fetching session data...');
                         // Fetch session data for analysis
                         return Promise.all([
                             fetch('/api/session/status').then(r => r.json()),
@@ -5272,6 +5314,7 @@
                         ]);
                     })
                     .then(([status, captionsData, analytics]) => {
+                        console.log('Session data:', status, captionsData, analytics);
                         // Build analysis data
                         const analysisData = {
                             name: sessionName || 'Untitled Session',
@@ -5287,19 +5330,39 @@
                             qualityScore: analytics.quality_score || 85
                         };
 
+                        console.log('Storing analysis data and opening new tab...');
                         // Store analysis data in localStorage for new tab to access
                         localStorage.setItem('sessionAnalysis', JSON.stringify(analysisData));
 
                         // Open dashboard in new tab with analysis flag
-                        window.open('/?view=analysis', '_blank');
+                        const newTab = window.open('/?view=analysis', '_blank');
+                        if (!newTab) {
+                            alert('Pop-up blocked! Please allow pop-ups and try again, or manually open a new tab to /?view=analysis');
+                        }
 
                         // Reset recording state
-                        setRecording(false);
                         setSessionStats(status);
+                        console.log('Analysis tab opened successfully');
                     })
                     .catch(err => {
                         console.error('Error stopping session:', err);
-                        alert('Failed to stop session and generate analysis');
+                        // Backup: Store current data and open tab anyway
+                        const backupData = {
+                            name: sessionName || 'Untitled Session',
+                            start_time: sessionStartTime,
+                            duration: sessionDuration,
+                            wordCount: wordCount,
+                            corrections: allCorrections,
+                            captions: [],
+                            highlights: [],
+                            wordCloud: [],
+                            sentimentTimeline: [],
+                            topics: [],
+                            qualityScore: 0
+                        };
+                        localStorage.setItem('sessionAnalysis', JSON.stringify(backupData));
+                        window.open('/?view=analysis', '_blank');
+                        alert(`Session data fetch failed: ${err.message}. Opening analysis with available data.`);
                     });
             };
 
@@ -6352,6 +6415,33 @@
                                                 }}
                                             >
                                                 {(browserListening || whisperRunning) ? 'Stop Captioning' : 'Start Captioning'}
+                                            </button>
+                                        )}
+
+                                        {/* DEBUG: Force Stop & Analyze Button */}
+                                        {(browserListening || whisperRunning) && (
+                                            <button
+                                                className="btn-large"
+                                                style={{
+                                                    padding: '10px 24px',
+                                                    minWidth: '200px',
+                                                    background: '#9333EA',
+                                                    color: 'white',
+                                                    border: 'none'
+                                                }}
+                                                onClick={() => {
+                                                    alert('🔍 DEBUG: Force button clicked!');
+                                                    console.log('DEBUG BUTTON - Current states:', {
+                                                        browserListening,
+                                                        whisperRunning,
+                                                        recording,
+                                                        sessionName,
+                                                        wordCount
+                                                    });
+                                                    stopAndAnalyze();
+                                                }}
+                                            >
+                                                🔍 FORCE STOP & ANALYZE
                                             </button>
                                         )}
 

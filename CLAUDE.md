@@ -305,12 +305,14 @@ community-captioner/
 ### Latest Updates - January 1, 2026
 
 #### Homepage Redesign (v4.1.3 - Current Session)
-- [x] **Who We Are Section** - Simplified and enlarged
+- [x] **Who We Are Section** - Redesigned with 3-column grid layout
   - Removed "WHAT MAKES IT UNIQUE" section completely
   - Changed "OUR STORY" to "WHO WE ARE"
   - Increased paragraph text from 20px to 24px for better readability
   - Increased $30k emphasis from 24px to 28px
-  - Two-column layout: Title in left column, content in right
+  - Three-column layout: "WHO WE ARE" title (right-aligned) | paragraph content | BIG logo
+  - Added BIG logo (big-logo.png) as third column
+  - Grid: `auto 1fr auto` with 40px gap
 - [x] **Built-In Data Analytics Section** - Changed to vibrant green gradient
   - Background changed from dark blue to dark green (#1a3a2e → #16372e → #0f4d3c)
   - Waveform animation gradient changed from purple to sage green
@@ -319,6 +321,20 @@ community-captioner/
   - Better color harmony with site's sage green theme
 - [x] **Hero Subtitle Update** - Added "Easy Setup" to tagline
   - Now reads: "Zero cost. Easy Setup. Open Source."
+
+#### Critical Bugs (v4.1.3 - IN PROGRESS)
+- [ ] **URGENT: Session Stop & Analyze Not Working** - Clicking stop after >1min session does nothing
+  - Symptom: Captions continue buffering after stop clicked, results page doesn't open, no errors
+  - Investigation: Added extensive debugging to identify root cause
+  - Debug logging added to `stopBrowserCaptions()` and `stopAndAnalyze()`
+  - Alert added to `stopAndAnalyze()` to confirm function execution
+  - Purple "FORCE STOP & ANALYZE" button added for direct testing
+  - Hypothesis: `recording` state variable may be false when it should be true
+  - Next step: User testing with debug alerts to identify where flow breaks
+- [x] **Python Server Bus Error Fix** - sounddevice double-initialization crash resolved
+  - Added cleanup logic to stop/close existing streams before creating new ones
+  - Fixed in both `SessionManager._start_audio_recording()` and `WhisperEngine.start()`
+  - Prevents "zsh: bus error" and leaked semaphore objects on macOS
 
 #### Homepage Redesign (v4.1.2 - Previous Session)
 - [x] **Two-Column Hero Section** - Demo and condensed About side-by-side
