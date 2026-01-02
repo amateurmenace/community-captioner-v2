@@ -7527,8 +7527,14 @@
                                                         type="checkbox"
                                                         checked={superResilientMode}
                                                         onChange={(e) => {
-                                                            // Just toggle, never show modal
-                                                            setSuperResilientMode(e.target.checked);
+                                                            if (!superResilientMode) {
+                                                                // Show modal when enabling
+                                                                setShowSuperResilientModal(true);
+                                                                e.preventDefault();
+                                                            } else {
+                                                                // Just toggle off when disabling
+                                                                setSuperResilientMode(false);
+                                                            }
                                                         }}
                                                         style={{
                                                             width: '16px',
