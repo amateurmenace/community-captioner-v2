@@ -1,4 +1,4 @@
-# Community Captioner v4.0 - Dependencies
+# Community Captioner v4.1 - Dependencies
 # Install with: pip3 install -r requirements.txt
 
 # ============================================================
@@ -17,6 +17,13 @@ numpy>=1.24.0
 
 # OpenAI API (AI corrections, entity extraction, analysis)
 openai>=1.0.0
+
+# ============================================================
+# OPTIONAL - Cloud ASR (Speechmatics)
+# ============================================================
+
+# Speechmatics real-time streaming (~300ms latency, ~$0.012/min)
+websockets>=11.0.0
 
 # ============================================================
 # OPTIONAL - Document Processing

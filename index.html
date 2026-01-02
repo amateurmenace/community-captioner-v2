@@ -3724,28 +3724,85 @@
             // Calculate pace and accuracy over time (words per 30-second window)
             const paceData = [];
             const windowSize = 30; // seconds
-            // Calculate duration from captions if not provided
-            const sessionDuration = data.duration || (editedCaptions.length > 0
-                ? Math.max(...editedCaptions.map(c => c.timestamp || 0))
-                : 0);
-            for (let t = 0; t < sessionDuration; t += windowSize) {
-                const windowCaptions = editedCaptions.filter(c => {
-                    const ts = c.timestamp || 0;
-                    return ts >= t && ts < t + windowSize;
-                });
-                const words = windowCaptions.reduce((acc, c) => {
+
+            // Helper to extract timestamp from caption
+            const getCaptionTimestamp = (c) => {
+                if (typeof c.timestamp === 'number') return c.timestamp;
+                if (typeof c.timestamp === 'string') {
+                    const parsed = parseFloat(c.timestamp);
+                    if (!isNaN(parsed)) return parsed;
+                }
+                return 0;
+            };
+
+            // Debug: log caption data
+            console.log('SessionAnalysis - editedCaptions:', editedCaptions.length, 'data.duration:', data.duration);
+            if (editedCaptions.length > 0) {
+                console.log('First caption:', editedCaptions[0]);
+                console.log('Last caption:', editedCaptions[editedCaptions.length - 1]);
+            }
+
+            // Calculate duration - try multiple sources
+            let sessionDuration = data.duration || 0;
+
+            // If no duration, calculate from caption timestamps
+            if (!sessionDuration && editedCaptions.length > 0) {
+                const timestamps = editedCaptions.map(getCaptionTimestamp).filter(t => t > 0);
+                if (timestamps.length > 0) {
+                    sessionDuration = Math.max(...timestamps) + 5; // Add 5 seconds buffer
+                }
+            }
+
+            // If still no duration, estimate from caption count and word density
+            if (!sessionDuration && editedCaptions.length > 0) {
+                const totalWordsForDuration = editedCaptions.reduce((acc, c) => {
                     const text = c.corrected || c.text || '';
                     return acc + text.split(/\s+/).filter(w => w.length > 0).length;
                 }, 0);
-                // Calculate corrections in this window
-                const windowCorrections = editedCorrections.filter(c => {
-                    const ts = parseFloat(c.timestamp?.split('T')[1]?.split(':').reduce((acc, t, i) => acc + parseFloat(t) * [3600, 60, 1][i], 0) || 0);
-                    return ts >= t && ts < t + windowSize;
-                }).length;
-                // Accuracy: 100% minus correction rate (approximate)
-                const accuracy = words > 0 ? Math.max(70, Math.min(100, 100 - (windowCorrections / Math.max(1, words)) * 100)) : 85;
-                paceData.push({ time: t, wpm: Math.round(words * 2), accuracy: Math.round(accuracy) }); // *2 to get per minute
+                // Assume ~150 WPM average speaking rate
+                sessionDuration = Math.max(30, Math.ceil((totalWordsForDuration / 150) * 60));
             }
+
+            console.log('Calculated sessionDuration:', sessionDuration);
+
+            // Build pace data for each time window
+            if (sessionDuration > 0) {
+                for (let t = 0; t < sessionDuration; t += windowSize) {
+                    const windowCaptions = editedCaptions.filter(c => {
+                        const ts = getCaptionTimestamp(c);
+                        return ts >= t && ts < t + windowSize;
+                    });
+                    const words = windowCaptions.reduce((acc, c) => {
+                        const text = c.corrected || c.text || '';
+                        return acc + text.split(/\s+/).filter(w => w.length > 0).length;
+                    }, 0);
+                    // Calculate corrections in this window (use session-relative time)
+                    const windowCorrections = editedCorrections.filter(c => {
+                        // Try to get a numeric timestamp for the correction
+                        if (c.timestamp) {
+                            const tsNum = parseFloat(c.timestamp);
+                            if (!isNaN(tsNum) && tsNum >= t && tsNum < t + windowSize) return true;
+                        }
+                        return false;
+                    }).length;
+                    // Accuracy: 100% minus correction rate (approximate)
+                    const accuracy = words > 0 ? Math.max(70, Math.min(100, 100 - (windowCorrections / Math.max(1, words)) * 100)) : 85;
+                    paceData.push({ time: t, wpm: Math.round(words * 2), accuracy: Math.round(accuracy) }); // *2 to get per minute
+                }
+            }
+
+            // Ensure we have at least one data point if there are captions
+            if (paceData.length === 0 && editedCaptions.length > 0) {
+                const totalWordsForPace = editedCaptions.reduce((acc, c) => {
+                    const text = c.corrected || c.text || '';
+                    return acc + text.split(/\s+/).filter(w => w.length > 0).length;
+                }, 0);
+                const wpm = sessionDuration > 0 ? Math.round((totalWordsForPace / sessionDuration) * 60) : Math.round(totalWordsForPace * 2);
+                paceData.push({ time: 0, wpm: wpm, accuracy: 85 });
+            }
+
+            console.log('paceData:', paceData);
+
             const maxPace = Math.max(...paceData.map(p => p.wpm), 1);
 
             return (
@@ -3816,7 +3873,7 @@
                             border: '1px solid var(--border-light)'
                         }}>
                             <div style={{fontSize: '32px', fontWeight: '700', color: 'var(--sage-darker)'}}>
-                                {formatTime(data.duration || 0)}
+                                {formatTime(sessionDuration || data.duration || 0)}
                             </div>
                             <div style={{fontSize: '13px', color: 'var(--text-medium)'}}>Duration</div>
                         </div>
@@ -3951,40 +4008,59 @@
                                 </div>
                             </div>
                             <div style={{height: '140px', position: 'relative'}}>
-                                {/* Bars for pace */}
-                                <div style={{height: '100%', display: 'flex', alignItems: 'flex-end', gap: '2px', position: 'absolute', width: '100%'}}>
-                                    {paceData.slice(0, 40).map((p, i) => (
-                                        <div key={i} style={{
-                                            flex: 1,
-                                            background: 'linear-gradient(to top, var(--sage-primary), var(--sage-light))',
-                                            height: `${Math.max(4, (p.wpm / maxPace) * 80)}%`,
-                                            borderRadius: '3px 3px 0 0',
-                                            transition: 'height 0.3s',
-                                            cursor: 'pointer',
-                                            opacity: 0.8
-                                        }} title={`${Math.floor(p.time / 60)}:${(p.time % 60).toString().padStart(2, '0')} - ${p.wpm} WPM, ${p.accuracy}% accuracy`}/>
-                                    ))}
-                                </div>
-                                {/* Line for accuracy */}
-                                <svg style={{position: 'absolute', width: '100%', height: '100%', pointerEvents: 'none'}}>
-                                    <polyline
-                                        fill="none"
-                                        stroke="#00A676"
-                                        strokeWidth="3"
-                                        strokeLinecap="round"
-                                        strokeLinejoin="round"
-                                        points={paceData.slice(0, 40).map((p, i) => {
-                                            const x = (i / Math.min(40, paceData.length)) * 100;
-                                            const y = 100 - ((p.accuracy - 70) / 30) * 80; // Scale 70-100 to 80% height
-                                            return `${x}%,${y}%`;
-                                        }).join(' ')}
-                                    />
-                                </svg>
+                                {paceData.length === 0 ? (
+                                    <div style={{
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'center',
+                                        height: '100%',
+                                        color: 'var(--text-light)',
+                                        fontSize: '14px',
+                                        flexDirection: 'column',
+                                        gap: '8px'
+                                    }}>
+                                        <span>No pace data available</span>
+                                        <span style={{fontSize: '12px'}}>({editedCaptions.length} captions)</span>
+                                    </div>
+                                ) : (
+                                    <>
+                                        {/* Bars for pace */}
+                                        <div style={{height: '100%', display: 'flex', alignItems: 'flex-end', gap: '2px', position: 'absolute', width: '100%'}}>
+                                            {paceData.slice(0, 40).map((p, i) => (
+                                                <div key={i} style={{
+                                                    flex: 1,
+                                                    background: 'linear-gradient(to top, var(--sage-primary), var(--sage-light))',
+                                                    height: `${Math.max(4, (p.wpm / maxPace) * 80)}%`,
+                                                    borderRadius: '3px 3px 0 0',
+                                                    transition: 'height 0.3s',
+                                                    cursor: 'pointer',
+                                                    opacity: 0.8
+                                                }} title={`${Math.floor(p.time / 60)}:${(p.time % 60).toString().padStart(2, '0')} - ${p.wpm} WPM, ${p.accuracy}% accuracy`}/>
+                                            ))}
+                                        </div>
+                                        {/* Line for accuracy */}
+                                        <svg style={{position: 'absolute', width: '100%', height: '100%', pointerEvents: 'none'}} viewBox="0 0 100 100" preserveAspectRatio="none">
+                                            <polyline
+                                                fill="none"
+                                                stroke="#00A676"
+                                                strokeWidth="2"
+                                                strokeLinecap="round"
+                                                strokeLinejoin="round"
+                                                vectorEffect="non-scaling-stroke"
+                                                points={paceData.slice(0, 40).map((p, i) => {
+                                                    const x = paceData.length > 1 ? (i / (Math.min(40, paceData.length) - 1)) * 100 : 50;
+                                                    const y = 100 - ((p.accuracy - 70) / 30) * 80;
+                                                    return `${x},${y}`;
+                                                }).join(' ')}
+                                            />
+                                        </svg>
+                                    </>
+                                )}
                             </div>
                             <div style={{display: 'flex', justifyContent: 'space-between', marginTop: '8px', fontSize: '11px', color: 'var(--text-light)'}}>
                                 <span>0:00</span>
                                 <span style={{textAlign: 'center'}}>Avg: {Math.round(paceData.reduce((a, p) => a + p.wpm, 0) / Math.max(1, paceData.length))} WPM, {Math.round(paceData.reduce((a, p) => a + p.accuracy, 0) / Math.max(1, paceData.length))}% accuracy</span>
-                                <span>{formatTime(data.duration || 0)}</span>
+                                <span>{formatTime(sessionDuration || data.duration || 0)}</span>
                             </div>
                         </div>
 
@@ -4740,6 +4816,7 @@
             const [rawCaption, setRawCaption] = useState('');
             const [corrections, setCorrections] = useState([]);
             const [allCorrections, setAllCorrections] = useState([]); // Full history for stats
+            const [allCaptions, setAllCaptions] = useState([]); // Full caption history for analysis
             const [recording, setRecording] = useState(true); // Recording on by default
             const [sessionName, setSessionName] = useState('');
             const [showEnginePanel, setShowEnginePanel] = useState(true); // Open by default
@@ -4767,6 +4844,22 @@
             const [modelLoading, setModelLoading] = useState(false);
             const [modelLoaded, setModelLoaded] = useState(false);
 
+            // Speechmatics state
+            const [speechmaticsRunning, setSpeechmaticsRunning] = useState(false);
+            const [speechmaticsApiKey, setSpeechmaticsApiKey] = useState('');
+            const [speechmaticsConfigured, setSpeechmaticsConfigured] = useState(false);
+            const [showSpeechmaticsConfig, setShowSpeechmaticsConfig] = useState(false);
+            const [latencyStats, setLatencyStats] = useState(null);
+            const [maxLatency, setMaxLatency] = useState(2000); // ms
+
+            // Local Whisper API state
+            const [localWhisperRunning, setLocalWhisperRunning] = useState(false);
+            const [localWhisperApiUrl, setLocalWhisperApiUrl] = useState('http://localhost:8000/v1/audio/transcriptions');
+            const [localWhisperApiKey, setLocalWhisperApiKey] = useState('');
+            const [localWhisperConfigured, setLocalWhisperConfigured] = useState(false);
+            const [showLocalWhisperConfig, setShowLocalWhisperConfig] = useState(false);
+            const [localWhisperServerAvailable, setLocalWhisperServerAvailable] = useState(null);
+
             // Session stats state
             const [wordCount, setWordCount] = useState(0);
             const [sessionDuration, setSessionDuration] = useState(0);
@@ -4782,6 +4875,11 @@
             // Post-session analysis state
             const [showAnalysis, setShowAnalysis] = useState(false);
             const [analysisData, setAnalysisData] = useState(null);
+
+            // Loading state for stop & analyze
+            const [analysisLoading, setAnalysisLoading] = useState(false);
+            const [analysisProgress, setAnalysisProgress] = useState(0);
+            const [analysisReady, setAnalysisReady] = useState(false);
 
             // RAG Suggestions state
             const [ragSuggestions, setRagSuggestions] = useState([]);
@@ -4815,10 +4913,6 @@
             const [burnCaptions, setBurnCaptions] = useState(false);
             const [generatingReel, setGeneratingReel] = useState(false);
             const [fetchingYoutube, setFetchingYoutube] = useState(false);
-
-            // Audio recording for Whisper second pass
-            const [recordAudio, setRecordAudio] = useState(true);  // Default to true
-            const [hasAudioRecording, setHasAudioRecording] = useState(false);
 
             // System info state
             const [systemInfo, setSystemInfo] = useState({
@@ -4868,7 +4962,8 @@
             // Timer for session duration
             useEffect(() => {
                 let timer;
-                if (browserListening || whisperRunning) {
+                const isActive = browserListening || whisperRunning || speechmaticsRunning || localWhisperRunning;
+                if (isActive) {
                     if (!sessionStartTime) {
                         setSessionStartTime(Date.now());
                     }
@@ -4877,7 +4972,7 @@
                     }, 1000);
                 }
                 return () => clearInterval(timer);
-            }, [browserListening, whisperRunning, sessionStartTime]);
+            }, [browserListening, whisperRunning, speechmaticsRunning, localWhisperRunning, sessionStartTime]);
 
             // Track total words - accumulate from all captions
             const lastCaptionRef = useRef('');
@@ -4921,8 +5016,32 @@
                 return `${m}:${s.toString().padStart(2, '0')}`;
             };
 
+            // Track captions locally for analysis
+            const lastCaptionTextRef = useRef('');
             useEffect(() => {
-                // Poll for caption and status updates
+                if (caption && caption !== lastCaptionTextRef.current) {
+                    const captionText = caption.trim();
+                    if (captionText.length > 0) {
+                        setAllCaptions(prev => {
+                            // Avoid duplicates
+                            const lastCaption = prev[prev.length - 1];
+                            if (lastCaption && lastCaption.corrected === captionText) {
+                                return prev;
+                            }
+                            return [...prev, {
+                                timestamp: sessionDuration,
+                                raw: rawCaption || captionText,
+                                corrected: captionText,
+                                corrections: corrections
+                            }];
+                        });
+                        lastCaptionTextRef.current = captionText;
+                    }
+                }
+            }, [caption, rawCaption, corrections, sessionDuration]);
+
+            useEffect(() => {
+                // Poll for caption and status updates - SIMPLE VERSION (no stoppedRef checks)
                 const interval = setInterval(() => {
                     fetch('/api/caption')
                         .then(r => r.json())
@@ -4965,24 +5084,39 @@
                     })
                     .catch(err => console.error('Error fetching devices:', err));
 
+                // Check Speechmatics status on mount
+                fetch('/api/speechmatics/status')
+                    .then(r => r.json())
+                    .then(data => {
+                        setSpeechmaticsConfigured(data.has_api_key);
+                    })
+                    .catch(err => console.error('Error checking Speechmatics:', err));
+
+                // Check Local Whisper API status on mount
+                fetch('/api/localwhisper/status')
+                    .then(r => r.json())
+                    .then(data => {
+                        setLocalWhisperConfigured(data.configured);
+                        setLocalWhisperServerAvailable(data.server_available);
+                        if (data.api_url) {
+                            setLocalWhisperApiUrl(data.api_url);
+                        }
+                    })
+                    .catch(err => console.error('Error checking Local Whisper API:', err));
+
                 // Auto-start recording session on mount
                 const autoSessionName = `Session ${new Date().toLocaleString()}`;
                 fetch('/api/session/start', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
-                        name: autoSessionName,
-                        record_audio: recordAudio,
-                        audio_device: selectedDevice || null
+                        name: autoSessionName
                     })
                 })
                 .then(r => r.json())
                 .then(data => {
                     setSessionStartTime(Date.now());
                     setRecording(true);
-                    if (data.session?.audio_recorded) {
-                        setHasAudioRecording(true);
-                    }
                 })
                 .catch(err => console.error('Error auto-starting session:', err));
 
@@ -5049,27 +5183,6 @@
                     return;
                 }
 
-                // Start a new session to clear previous data
-                const name = sessionName || `Session ${new Date().toLocaleString()}`;
-                fetch('/api/session/start', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        name,
-                        record_audio: recordAudio,
-                        audio_device: selectedDevice || null
-                    })
-                });
-
-                // Reset local state for new session
-                setCaption('');
-                setRawCaption('');
-                setCorrections([]);
-                setAllCorrections([]);
-                setWordCount(0);
-                setSessionDuration(0);
-                setSessionStartTime(Date.now());
-
                 const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
                 const recognition = new SpeechRecognition();
                 recognition.continuous = true;
@@ -5089,15 +5202,34 @@
                         }
                     }
 
-                    const textToSend = finalTranscript || interimTranscript;
-                    const isFinal = finalTranscript.length > 0;
-                    if (textToSend) {
+                    // Send final transcript with is_final flag for rolling buffer
+                    if (finalTranscript) {
                         fetch('/api/caption', {
                             method: 'POST',
                             headers: { 'Content-Type': 'application/json' },
                             body: JSON.stringify({
-                                caption: textToSend,
-                                is_final: isFinal,
+                                caption: finalTranscript,
+                                is_final: true,
+                                settings: {
+                                    fontSize,
+                                    lineHeight,
+                                    maxWidth,
+                                    fontFamily,
+                                    textColor,
+                                    backgroundColor: bgColor,
+                                    backgroundOpacity: bgOpacity
+                                }
+                            })
+                        });
+                    }
+                    // Send interim transcript for live preview (not added to buffer)
+                    if (interimTranscript) {
+                        fetch('/api/caption', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                caption: interimTranscript,
+                                is_final: false,
                                 settings: {
                                     fontSize,
                                     lineHeight,
@@ -5129,20 +5261,12 @@
             };
 
             const stopBrowserCaptions = () => {
-                console.log('stopBrowserCaptions called, recording state:', recording);
                 if (recognitionRef.current) {
                     recognitionRef.current.stop();
                     recognitionRef.current = null;
                 }
                 setBrowserListening(false);
-                // If recording is active, stop and analyze
-                if (recording) {
-                    console.log('Recording is true, calling stopAndAnalyze');
-                    stopAndAnalyze();
-                } else {
-                    console.log('⚠️ Recording is FALSE, NOT calling stopAndAnalyze!');
-                    alert('⚠️ Recording state is FALSE - session analysis will not open. This is the bug!');
-                }
+                stopAndAnalyze();
             };
 
             // Simulate realistic confidence and delay metrics
@@ -5181,24 +5305,6 @@
                         // Auto-start whisper after model loads if requested
                         if (autoStart) {
                             setTimeout(() => {
-                                // Start session and whisper
-                                const name = sessionName || `Session ${new Date().toLocaleString()}`;
-                                fetch('/api/session/start', {
-                                    method: 'POST',
-                                    headers: { 'Content-Type': 'application/json' },
-                                    body: JSON.stringify({
-                                        name,
-                                        record_audio: recordAudio,
-                                        audio_device: selectedDevice || null
-                                    })
-                                });
-                                setCaption('');
-                                setRawCaption('');
-                                setCorrections([]);
-                                setAllCorrections([]);
-                                setWordCount(0);
-                                setSessionDuration(0);
-                                setSessionStartTime(Date.now());
                                 fetch('/api/whisper/start', {
                                     method: 'POST',
                                     headers: { 'Content-Type': 'application/json' },
@@ -5218,152 +5324,249 @@
             };
 
             const startWhisper = () => {
-                // Start a new session to clear previous data
-                const name = sessionName || `Session ${new Date().toLocaleString()}`;
-                fetch('/api/session/start', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        name,
-                        record_audio: recordAudio,
-                        audio_device: selectedDevice || null
-                    })
-                });
-
-                // Reset local state for new session
-                setCaption('');
-                setRawCaption('');
-                setCorrections([]);
-                setAllCorrections([]);
-                setWordCount(0);
-                setSessionDuration(0);
-                setSessionStartTime(Date.now());
-                setRecording(true);
-
-                // Set whisperRunning optimistically, then confirm with server
-                setWhisperRunning(true);
-
                 fetch('/api/whisper/start', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ device_id: selectedDevice })
                 })
-                .then(r => r.json())
-                .then(data => {
-                    if (data.error) {
-                        console.error('Whisper start error:', data.error);
-                        setWhisperRunning(false);
-                        setRecording(false);
-                        alert('Failed to start Whisper: ' + data.error);
-                    }
-                })
-                .catch(err => {
-                    console.error('Error starting Whisper:', err);
-                    setWhisperRunning(false);
-                    setRecording(false);
-                });
+                .catch(err => console.error('Error starting Whisper:', err));
             };
 
             const stopWhisper = () => {
                 fetch('/api/whisper/stop', { method: 'POST' })
                 .catch(err => console.error('Error stopping Whisper:', err));
-                // If recording is active, stop and analyze
-                if (recording) {
-                    stopAndAnalyze();
+                stopAndAnalyze();
+            };
+
+            // Speechmatics functions
+            const checkSpeechmaticsStatus = async () => {
+                try {
+                    const res = await fetch('/api/speechmatics/status');
+                    const data = await res.json();
+                    setSpeechmaticsConfigured(data.has_api_key);
+                    if (data.latency_stats) {
+                        setLatencyStats(data.latency_stats);
+                    }
+                } catch (e) {
+                    console.error('Error checking Speechmatics status:', e);
                 }
             };
 
-            const stopAndAnalyze = () => {
-                alert('🔴 stopAndAnalyze called! Recording state: ' + recording); // DEBUG ALERT
-                console.log('stopAndAnalyze called, recording state:', recording);
-
-                // IMMEDIATELY stop speech recognition to prevent buffered captions
-                if (recognitionRef.current) {
-                    try {
-                        recognitionRef.current.stop();
-                        console.log('Speech recognition stopped');
-                    } catch (e) {
-                        console.warn('Error stopping recognition:', e);
-                    }
+            const configureSpeechmatics = async () => {
+                if (!speechmaticsApiKey) {
+                    alert('Please enter your Speechmatics API key');
+                    return;
                 }
-
-                // IMMEDIATELY stop Whisper if running
-                if (whisperRunning) {
-                    fetch('/api/whisper/stop', { method: 'POST' }).catch(e => console.warn('Error stopping Whisper:', e));
-                }
-
-                // Set flag to prevent any more captions from being processed
-                setRecording(false);
-
-                // Stop session on backend and show analysis in new tab
-                fetch('/api/session/stop', { method: 'POST' })
-                    .then(response => {
-                        console.log('Session stop response:', response);
-                        if (!response.ok) {
-                            throw new Error(`HTTP ${response.status}`);
-                        }
-                        return response.json();
-                    })
-                    .then(() => {
-                        console.log('Fetching session data...');
-                        // Fetch session data for analysis
-                        return Promise.all([
-                            fetch('/api/session/status').then(r => r.json()),
-                            fetch('/api/session/captions').then(r => r.json()),
-                            fetch('/api/session/analytics').then(r => r.json()).catch(() => ({}))
-                        ]);
-                    })
-                    .then(([status, captionsData, analytics]) => {
-                        console.log('Session data:', status, captionsData, analytics);
-                        // Build analysis data
-                        const analysisData = {
-                            name: sessionName || 'Untitled Session',
-                            start_time: sessionStartTime,
-                            duration: sessionDuration,
-                            wordCount: wordCount,
-                            corrections: allCorrections,
-                            captions: captionsData.captions || [],
-                            highlights: analytics.highlights || [],
-                            wordCloud: analytics.word_cloud || [],
-                            sentimentTimeline: analytics.sentiment_timeline || [],
-                            topics: analytics.topics || [],
-                            qualityScore: analytics.quality_score || 85
-                        };
-
-                        console.log('Storing analysis data and opening new tab...');
-                        // Store analysis data in localStorage for new tab to access
-                        localStorage.setItem('sessionAnalysis', JSON.stringify(analysisData));
-
-                        // Open dashboard in new tab with analysis flag
-                        const newTab = window.open('/?view=analysis', '_blank');
-                        if (!newTab) {
-                            alert('Pop-up blocked! Please allow pop-ups and try again, or manually open a new tab to /?view=analysis');
-                        }
-
-                        // Reset recording state
-                        setSessionStats(status);
-                        console.log('Analysis tab opened successfully');
-                    })
-                    .catch(err => {
-                        console.error('Error stopping session:', err);
-                        // Backup: Store current data and open tab anyway
-                        const backupData = {
-                            name: sessionName || 'Untitled Session',
-                            start_time: sessionStartTime,
-                            duration: sessionDuration,
-                            wordCount: wordCount,
-                            corrections: allCorrections,
-                            captions: [],
-                            highlights: [],
-                            wordCloud: [],
-                            sentimentTimeline: [],
-                            topics: [],
-                            qualityScore: 0
-                        };
-                        localStorage.setItem('sessionAnalysis', JSON.stringify(backupData));
-                        window.open('/?view=analysis', '_blank');
-                        alert(`Session data fetch failed: ${err.message}. Opening analysis with available data.`);
+                try {
+                    const res = await fetch('/api/speechmatics/config', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ api_key: speechmaticsApiKey })
                     });
+                    const data = await res.json();
+                    if (data.status === 'ok') {
+                        setSpeechmaticsConfigured(true);
+                        setShowSpeechmaticsConfig(false);
+                        alert('Speechmatics API key saved successfully!');
+                    } else {
+                        alert('Error: ' + (data.error || 'Unknown error'));
+                    }
+                } catch (e) {
+                    alert('Error saving API key: ' + e.message);
+                }
+            };
+
+            const startSpeechmatics = async () => {
+                try {
+                    // Start Speechmatics
+                    const res = await fetch('/api/speechmatics/start', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            device_id: selectedDevice || null
+                        })
+                    });
+                    const data = await res.json();
+
+                    if (data.error) {
+                        alert('Error starting Speechmatics: ' + data.error);
+                        setSpeechmaticsRunning(false);
+                    } else {
+                        setSpeechmaticsRunning(true);
+                    }
+                } catch (e) {
+                    alert('Error starting Speechmatics: ' + e.message);
+                    setSpeechmaticsRunning(false);
+                }
+            };
+
+            const stopSpeechmatics = () => {
+                fetch('/api/speechmatics/stop', { method: 'POST' })
+                .catch(err => console.error('Error stopping Speechmatics:', err));
+                setSpeechmaticsRunning(false);
+                stopAndAnalyze();
+            };
+
+            // Local Whisper API functions
+            const checkLocalWhisperStatus = async () => {
+                try {
+                    const res = await fetch('/api/localwhisper/status');
+                    const data = await res.json();
+                    setLocalWhisperConfigured(data.configured);
+                    setLocalWhisperServerAvailable(data.server_available);
+                    if (data.api_url) {
+                        setLocalWhisperApiUrl(data.api_url);
+                    }
+                } catch (e) {
+                    console.error('Error checking Local Whisper API status:', e);
+                }
+            };
+
+            const configureLocalWhisper = async () => {
+                if (!localWhisperApiUrl) {
+                    alert('Please enter the API URL');
+                    return;
+                }
+                try {
+                    const res = await fetch('/api/localwhisper/config', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            api_url: localWhisperApiUrl,
+                            api_key: localWhisperApiKey
+                        })
+                    });
+                    const data = await res.json();
+                    if (data.status === 'ok') {
+                        setLocalWhisperConfigured(true);
+                        setShowLocalWhisperConfig(false);
+                        alert('Local Whisper API configured successfully!');
+                    } else {
+                        alert('Error: ' + (data.error || 'Unknown error'));
+                    }
+                } catch (e) {
+                    alert('Error saving config: ' + e.message);
+                }
+            };
+
+            const startLocalWhisper = async () => {
+                try {
+                    const res = await fetch('/api/localwhisper/start', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            device_id: selectedDevice || null
+                        })
+                    });
+                    const data = await res.json();
+
+                    if (data.error) {
+                        alert('Error starting Local Whisper API: ' + data.error);
+                        setLocalWhisperRunning(false);
+                    } else {
+                        setLocalWhisperRunning(true);
+                    }
+                } catch (e) {
+                    alert('Error starting Local Whisper API: ' + e.message);
+                    setLocalWhisperRunning(false);
+                }
+            };
+
+            const stopLocalWhisper = () => {
+                fetch('/api/localwhisper/stop', { method: 'POST' })
+                .catch(err => console.error('Error stopping Local Whisper API:', err));
+                setLocalWhisperRunning(false);
+                stopAndAnalyze();
+            };
+
+            const stopAndAnalyze = async () => {
+                // Show loading state
+                setAnalysisLoading(true);
+                setAnalysisProgress(10);
+                setAnalysisReady(false);
+
+                // Stop speech recognition
+                if (recognitionRef.current) {
+                    recognitionRef.current.stop();
+                    recognitionRef.current = null;
+                }
+                setBrowserListening(false);
+
+                // Stop all ASR engines
+                if (whisperRunning) {
+                    fetch('/api/whisper/stop', { method: 'POST' }).catch(() => {});
+                }
+                if (speechmaticsRunning) {
+                    fetch('/api/speechmatics/stop', { method: 'POST' }).catch(() => {});
+                    setSpeechmaticsRunning(false);
+                }
+                if (localWhisperRunning) {
+                    fetch('/api/localwhisper/stop', { method: 'POST' }).catch(() => {});
+                    setLocalWhisperRunning(false);
+                }
+
+                setRecording(false);
+                setAnalysisProgress(30);
+
+                try {
+                    // Stop session on backend - returns session with duration
+                    const stopResult = await fetch('/api/session/stop', { method: 'POST' }).then(r => r.json());
+                    setAnalysisProgress(50);
+
+                    // Fetch session data
+                    const [captionsData, analytics] = await Promise.all([
+                        fetch('/api/session/captions').then(r => r.json()),
+                        fetch('/api/session/analytics').then(r => r.json()).catch(() => ({}))
+                    ]);
+                    setAnalysisProgress(80);
+
+                    // Get duration from stop result (most reliable), or calculate from captions
+                    let actualDuration = stopResult.session?.duration || sessionDuration || 0;
+                    if (!actualDuration && captionsData.captions && captionsData.captions.length > 0) {
+                        // Get duration from last caption timestamp
+                        const timestamps = captionsData.captions.map(c => {
+                            if (typeof c.timestamp === 'number') return c.timestamp;
+                            if (typeof c.timestamp === 'string') return parseFloat(c.timestamp) || 0;
+                            return 0;
+                        });
+                        actualDuration = Math.max(...timestamps) + 5; // Add 5 second buffer
+                    }
+
+                    // Build and store analysis data
+                    const data = {
+                        name: sessionName || 'Untitled Session',
+                        start_time: sessionStartTime,
+                        duration: actualDuration,
+                        wordCount: stopResult.session?.caption_count ? wordCount : wordCount,
+                        corrections: allCorrections,
+                        captions: captionsData.captions || [],
+                        highlights: analytics.highlights || [],
+                        wordCloud: analytics.word_cloud || [],
+                        sentimentTimeline: analytics.sentiment_timeline || [],
+                        topics: analytics.topics || [],
+                        qualityScore: analytics.quality_score || 85
+                    };
+
+                    localStorage.setItem('sessionAnalysis', JSON.stringify(data));
+                    setSessionStats(stopResult.session || {});
+                    setAnalysisProgress(100);
+
+                    // Show ready button
+                    setTimeout(() => {
+                        setAnalysisLoading(false);
+                        setAnalysisReady(true);
+                    }, 300);
+
+                } catch (err) {
+                    console.error('Error stopping session:', err);
+                    setAnalysisLoading(false);
+                    setAnalysisReady(true);
+                }
+            };
+
+            const openAnalysisPage = () => {
+                window.open('/?view=analysis', '_blank');
+                setAnalysisReady(false);
             };
 
             const toggleRecording = () => {
@@ -6303,6 +6506,93 @@
                     {/* AI Settings Modal */}
                     {showAiModal && <AiSettingsModal onClose={() => setShowAiModal(false)} />}
 
+                    {/* Analysis Loading Bar */}
+                    {analysisLoading && (
+                        <div style={{
+                            position: 'fixed',
+                            top: 0,
+                            left: 0,
+                            right: 0,
+                            zIndex: 1000,
+                            background: 'white',
+                            padding: '16px 24px',
+                            boxShadow: '0 2px 10px rgba(0,0,0,0.1)',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '16px'
+                        }}>
+                            <div style={{fontWeight: '600', color: 'var(--text-dark)'}}>Preparing Session Analysis...</div>
+                            <div style={{flex: 1, height: '8px', background: '#E5E7EB', borderRadius: '4px', overflow: 'hidden'}}>
+                                <div style={{
+                                    height: '100%',
+                                    width: `${analysisProgress}%`,
+                                    background: 'linear-gradient(90deg, var(--sage-primary), var(--sage-dark))',
+                                    borderRadius: '4px',
+                                    transition: 'width 0.3s ease'
+                                }}/>
+                            </div>
+                            <div style={{fontSize: '14px', color: 'var(--text-light)', minWidth: '40px'}}>{analysisProgress}%</div>
+                        </div>
+                    )}
+
+                    {/* Analysis Ready Button */}
+                    {analysisReady && (
+                        <div style={{
+                            position: 'fixed',
+                            top: 0,
+                            left: 0,
+                            right: 0,
+                            zIndex: 1000,
+                            background: 'linear-gradient(90deg, #059669, #10B981)',
+                            padding: '20px 24px',
+                            boxShadow: '0 4px 20px rgba(5, 150, 105, 0.3)',
+                            display: 'flex',
+                            justifyContent: 'center',
+                            alignItems: 'center',
+                            gap: '16px'
+                        }}>
+                            <span style={{color: 'white', fontWeight: '600', fontSize: '16px'}}>Session analysis ready!</span>
+                            <button
+                                onClick={openAnalysisPage}
+                                style={{
+                                    background: 'white',
+                                    color: '#059669',
+                                    border: 'none',
+                                    padding: '12px 32px',
+                                    borderRadius: '8px',
+                                    fontSize: '16px',
+                                    fontWeight: '700',
+                                    cursor: 'pointer',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: '8px',
+                                    boxShadow: '0 2px 8px rgba(0,0,0,0.1)'
+                                }}
+                            >
+                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                                    <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/>
+                                    <polyline points="15,3 21,3 21,9"/>
+                                    <line x1="10" y1="14" x2="21" y2="3"/>
+                                </svg>
+                                View Session Analytics
+                            </button>
+                            <button
+                                onClick={() => setAnalysisReady(false)}
+                                style={{
+                                    background: 'rgba(255,255,255,0.2)',
+                                    color: 'white',
+                                    border: '1px solid rgba(255,255,255,0.3)',
+                                    padding: '12px 20px',
+                                    borderRadius: '8px',
+                                    fontSize: '14px',
+                                    cursor: 'pointer'
+                                }}
+                            >
+                                Dismiss
+                            </button>
+                        </div>
+                    )}
+
                     <div className="dashboard-header">
                         <div style={{display: 'flex', alignItems: 'center', gap: '16px'}}>
                             <div className="logo-section" onClick={onBack} style={{cursor: 'pointer'}}>
@@ -6362,10 +6652,101 @@
                                                 onClick={() => setMode('whisper')} style={{padding: '8px 16px', fontSize: '13px'}}>
                                                 Whisper
                                             </button>
+                                            <button className={`mode-btn ${mode === 'speechmatics' ? 'active' : ''}`}
+                                                onClick={() => setMode('speechmatics')}
+                                                style={{
+                                                    padding: '8px 16px',
+                                                    fontSize: '13px',
+                                                    background: mode === 'speechmatics' ? 'linear-gradient(135deg, #059669, #10B981)' : undefined,
+                                                    borderColor: mode === 'speechmatics' ? '#059669' : undefined
+                                                }}
+                                                title="Cloud ASR with ~300ms latency. Requires API key.">
+                                                Speechmatics
+                                            </button>
+                                            <button className={`mode-btn ${mode === 'localwhisper' ? 'active' : ''}`}
+                                                onClick={() => setMode('localwhisper')}
+                                                style={{
+                                                    padding: '8px 16px',
+                                                    fontSize: '13px',
+                                                    background: mode === 'localwhisper' ? 'linear-gradient(135deg, #7C3AED, #8B5CF6)' : undefined,
+                                                    borderColor: mode === 'localwhisper' ? '#7C3AED' : undefined
+                                                }}
+                                                title="Local Whisper API server (faster-whisper-server, LocalAI, etc.)">
+                                                Local API
+                                            </button>
                                         </div>
                                     </div>
 
                                     <div style={{display: 'flex', alignItems: 'center', gap: '12px'}}>
+                                        {mode === 'localwhisper' && (
+                                            <div style={{display: 'flex', alignItems: 'center', gap: '8px'}}>
+                                                {!localWhisperConfigured ? (
+                                                    <button
+                                                        className="btn-large btn-outline"
+                                                        style={{padding: '10px 20px'}}
+                                                        onClick={() => setShowLocalWhisperConfig(true)}
+                                                    >
+                                                        Configure API
+                                                    </button>
+                                                ) : (
+                                                    <>
+                                                        <span style={{
+                                                            fontSize: '12px',
+                                                            color: 'white',
+                                                            background: localWhisperServerAvailable === true ? '#7C3AED' : localWhisperServerAvailable === false ? '#DC2626' : '#6B7280',
+                                                            padding: '4px 10px',
+                                                            borderRadius: '4px',
+                                                            fontWeight: '600'
+                                                        }}>
+                                                            {localWhisperServerAvailable === true ? '✓ Server Ready' : localWhisperServerAvailable === false ? '✗ Server Down' : '? Unknown'}
+                                                        </span>
+                                                        <button
+                                                            className="btn-small btn-outline"
+                                                            style={{padding: '4px 8px', fontSize: '11px'}}
+                                                            onClick={() => setShowLocalWhisperConfig(true)}
+                                                        >
+                                                            Edit
+                                                        </button>
+                                                    </>
+                                                )}
+                                            </div>
+                                        )}
+                                        {mode === 'speechmatics' && (
+                                            <div style={{display: 'flex', alignItems: 'center', gap: '8px'}}>
+                                                {!speechmaticsConfigured ? (
+                                                    <button
+                                                        className="btn-large btn-outline"
+                                                        style={{padding: '10px 20px'}}
+                                                        onClick={() => setShowSpeechmaticsConfig(true)}
+                                                    >
+                                                        Configure API Key
+                                                    </button>
+                                                ) : (
+                                                    <span style={{
+                                                        fontSize: '12px',
+                                                        color: 'white',
+                                                        background: '#059669',
+                                                        padding: '4px 10px',
+                                                        borderRadius: '4px',
+                                                        fontWeight: '600'
+                                                    }}>
+                                                        ✓ API Key Set
+                                                    </span>
+                                                )}
+                                                {latencyStats && speechmaticsRunning && (
+                                                    <span style={{
+                                                        fontSize: '11px',
+                                                        color: 'var(--text-medium)',
+                                                        padding: '4px 8px',
+                                                        background: 'var(--bg-sage-light)',
+                                                        borderRadius: '4px'
+                                                    }}>
+                                                        Latency: {latencyStats.current_latency_ms}ms
+                                                        {latencyStats.dropped_count > 0 && ` (${latencyStats.dropped_count} dropped)`}
+                                                    </span>
+                                                )}
+                                            </div>
+                                        )}
                                         {mode === 'whisper' && (
                                             <div style={{display: 'flex', alignItems: 'center', gap: '8px'}}>
                                                 <select className="setting-input" value={selectedModel}
@@ -6401,119 +6782,34 @@
                                                 )}
                                             </div>
                                         )}
-                                        {/* Browser mode OR Whisper with model loaded: Show Start/Stop Captioning */}
-                                        {(mode === 'browser' || (mode === 'whisper' && modelLoaded) || whisperRunning) && (
+                                        {/* Browser mode OR Whisper with model loaded OR Speechmatics configured OR Local API configured: Show Start/Stop Captioning */}
+                                        {(mode === 'browser' || (mode === 'whisper' && modelLoaded) || whisperRunning || (mode === 'speechmatics' && speechmaticsConfigured) || speechmaticsRunning || (mode === 'localwhisper' && localWhisperConfigured) || localWhisperRunning) && (
                                             <button
-                                                className={`btn-large ${(browserListening || whisperRunning) ? 'btn-danger' : 'btn-primary'}`}
-                                                style={{padding: '10px 24px', minWidth: '160px'}}
+                                                className={`btn-large ${(browserListening || whisperRunning || speechmaticsRunning || localWhisperRunning) ? 'btn-danger' : 'btn-primary'}`}
+                                                style={{
+                                                    padding: '10px 24px',
+                                                    minWidth: '160px',
+                                                    background: (browserListening || whisperRunning || speechmaticsRunning || localWhisperRunning)
+                                                        ? undefined
+                                                        : mode === 'speechmatics' ? 'linear-gradient(135deg, #059669, #10B981)'
+                                                        : mode === 'localwhisper' ? 'linear-gradient(135deg, #7C3AED, #8B5CF6)'
+                                                        : undefined
+                                                }}
                                                 onClick={() => {
                                                     if (mode === 'browser') {
                                                         browserListening ? stopBrowserCaptions() : startBrowserCaptions();
-                                                    } else {
+                                                    } else if (mode === 'whisper') {
                                                         whisperRunning ? stopWhisper() : startWhisper();
+                                                    } else if (mode === 'speechmatics') {
+                                                        speechmaticsRunning ? stopSpeechmatics() : startSpeechmatics();
+                                                    } else if (mode === 'localwhisper') {
+                                                        localWhisperRunning ? stopLocalWhisper() : startLocalWhisper();
                                                     }
                                                 }}
                                             >
-                                                {(browserListening || whisperRunning) ? 'Stop Captioning' : 'Start Captioning'}
+                                                {(browserListening || whisperRunning || speechmaticsRunning || localWhisperRunning) ? 'Stop Captioning' : 'Start Captioning'}
                                             </button>
                                         )}
-
-                                        {/* DEBUG: Force Stop & Analyze Button */}
-                                        {(browserListening || whisperRunning) && (
-                                            <button
-                                                className="btn-large"
-                                                style={{
-                                                    padding: '10px 24px',
-                                                    minWidth: '200px',
-                                                    background: '#9333EA',
-                                                    color: 'white',
-                                                    border: 'none'
-                                                }}
-                                                onClick={() => {
-                                                    alert('🔍 DEBUG: Force button clicked!');
-                                                    console.log('DEBUG BUTTON - Current states:', {
-                                                        browserListening,
-                                                        whisperRunning,
-                                                        recording,
-                                                        sessionName,
-                                                        wordCount
-                                                    });
-                                                    stopAndAnalyze();
-                                                }}
-                                            >
-                                                🔍 FORCE STOP & ANALYZE
-                                            </button>
-                                        )}
-
-                                        {/* Audio Recording Toggle - Prominent placement */}
-                                        {/* Audio Recording Toggle with Tooltip */}
-                                        <div style={{position: 'relative'}}>
-                                            <div style={{
-                                                display: 'flex',
-                                                alignItems: 'center',
-                                                gap: '8px',
-                                                padding: '8px 14px',
-                                                background: recordAudio ? 'var(--bg-sage-light)' : 'transparent',
-                                                border: `2px solid ${recordAudio ? 'var(--sage-primary)' : 'var(--border-light)'}`,
-                                                borderRadius: '10px',
-                                                cursor: 'pointer',
-                                                transition: 'all 0.2s'
-                                            }}
-                                            onClick={() => {
-                                                const newValue = !recordAudio;
-                                                setRecordAudio(newValue);
-                                                if (recording && newValue) {
-                                                    fetch('/api/session/stop', { method: 'POST' })
-                                                        .then(() => fetch('/api/session/start', {
-                                                            method: 'POST',
-                                                            headers: { 'Content-Type': 'application/json' },
-                                                            body: JSON.stringify({
-                                                                name: sessionName || `Session ${new Date().toLocaleString()}`,
-                                                                record_audio: true,
-                                                                audio_device: selectedDevice || null
-                                                            })
-                                                        }))
-                                                        .then(r => r.json())
-                                                        .then(data => {
-                                                            if (data.session?.audio_recorded) setHasAudioRecording(true);
-                                                        });
-                                                }
-                                            }}
-                                            title="Record audio for Whisper second pass processing. Enables higher accuracy post-processing, crash recovery, and side-by-side comparison. ~10 MB/min.">
-                                                <div style={{
-                                                    width: '18px',
-                                                    height: '18px',
-                                                    borderRadius: '4px',
-                                                    border: `2px solid ${recordAudio ? 'var(--sage-primary)' : 'var(--text-medium)'}`,
-                                                    background: recordAudio ? 'var(--sage-primary)' : 'transparent',
-                                                    display: 'flex',
-                                                    alignItems: 'center',
-                                                    justifyContent: 'center'
-                                                }}>
-                                                    {recordAudio && (
-                                                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3">
-                                                            <polyline points="20,6 9,17 4,12"/>
-                                                        </svg>
-                                                    )}
-                                                </div>
-                                                <span style={{fontSize: '13px', fontWeight: '500', color: recordAudio ? 'var(--sage-darker)' : 'var(--text-medium)'}}>
-                                                    Record Audio
-                                                </span>
-                                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--text-light)" strokeWidth="2" style={{marginLeft: '2px'}}>
-                                                    <circle cx="12" cy="12" r="10"/>
-                                                    <path d="M12 16v-4M12 8h.01"/>
-                                                </svg>
-                                                {hasAudioRecording && (
-                                                    <span style={{
-                                                        width: '8px',
-                                                        height: '8px',
-                                                        borderRadius: '50%',
-                                                        background: '#DC2626',
-                                                        animation: 'pulse 1.5s infinite'
-                                                    }}/>
-                                                )}
-                                            </div>
-                                        </div>
 
                                     </div>
                                 </div>
@@ -6529,6 +6825,184 @@
                                                 <option key={device.id} value={device.id}>{device.name}</option>
                                             ))}
                                         </select>
+                                    </div>
+                                )}
+
+                                {/* Speechmatics device selector and latency config - shown inline when speechmatics mode */}
+                                {mode === 'speechmatics' && (
+                                    <div style={{marginTop: '12px', paddingTop: '12px', borderTop: '1px solid var(--border-light)', display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap'}}>
+                                        <label style={{fontSize: '13px', color: 'var(--text-medium)'}}>Audio Device:</label>
+                                        <select className="setting-input" value={selectedDevice}
+                                            onChange={(e) => setSelectedDevice(e.target.value)}
+                                            style={{flex: 1, padding: '8px 12px', maxWidth: '300px'}}>
+                                            {whisperDevices.map(device => (
+                                                <option key={device.id} value={device.id}>{device.name}</option>
+                                            ))}
+                                        </select>
+                                        <label style={{fontSize: '13px', color: 'var(--text-medium)', marginLeft: '16px'}}>Max Latency:</label>
+                                        <select className="setting-input" value={maxLatency}
+                                            onChange={(e) => {
+                                                const val = parseInt(e.target.value);
+                                                setMaxLatency(val);
+                                                fetch('/api/latency/config', {
+                                                    method: 'POST',
+                                                    headers: { 'Content-Type': 'application/json' },
+                                                    body: JSON.stringify({ max_latency_ms: val })
+                                                });
+                                            }}
+                                            style={{width: 'auto', padding: '8px 12px'}}>
+                                            <option value={1000}>1 second</option>
+                                            <option value={2000}>2 seconds</option>
+                                            <option value={3000}>3 seconds</option>
+                                            <option value={5000}>5 seconds</option>
+                                        </select>
+                                        <span style={{fontSize: '11px', color: 'var(--text-light)'}}>
+                                            (drops old audio when behind)
+                                        </span>
+                                    </div>
+                                )}
+
+                                {/* Speechmatics API Key Configuration Modal */}
+                                {showSpeechmaticsConfig && (
+                                    <div style={{
+                                        position: 'fixed',
+                                        top: 0, left: 0, right: 0, bottom: 0,
+                                        background: 'rgba(0,0,0,0.5)',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'center',
+                                        zIndex: 1000
+                                    }} onClick={() => setShowSpeechmaticsConfig(false)}>
+                                        <div style={{
+                                            background: 'white',
+                                            padding: '32px',
+                                            borderRadius: '16px',
+                                            maxWidth: '500px',
+                                            width: '90%'
+                                        }} onClick={e => e.stopPropagation()}>
+                                            <h3 style={{margin: '0 0 16px', fontSize: '20px', fontWeight: '600'}}>
+                                                Configure Speechmatics
+                                            </h3>
+                                            <p style={{margin: '0 0 16px', color: 'var(--text-medium)', fontSize: '14px'}}>
+                                                Speechmatics provides professional cloud-based speech recognition with ~300ms latency.
+                                                Get your API key at <a href="https://portal.speechmatics.com" target="_blank" rel="noopener" style={{color: '#059669'}}>portal.speechmatics.com</a>
+                                            </p>
+                                            <div style={{
+                                                background: 'var(--bg-sage-light)',
+                                                padding: '12px',
+                                                borderRadius: '8px',
+                                                marginBottom: '16px',
+                                                fontSize: '13px'
+                                            }}>
+                                                <strong>Pricing:</strong> ~$0.012-0.024/min (pay-as-you-go)
+                                            </div>
+                                            <label style={{display: 'block', marginBottom: '8px', fontSize: '14px', fontWeight: '500'}}>
+                                                API Key
+                                            </label>
+                                            <input
+                                                type="password"
+                                                className="setting-input"
+                                                style={{width: '100%', padding: '12px', marginBottom: '16px'}}
+                                                placeholder="Enter your Speechmatics API key"
+                                                value={speechmaticsApiKey}
+                                                onChange={e => setSpeechmaticsApiKey(e.target.value)}
+                                            />
+                                            <div style={{display: 'flex', gap: '12px', justifyContent: 'flex-end'}}>
+                                                <button
+                                                    className="btn-large btn-outline"
+                                                    onClick={() => setShowSpeechmaticsConfig(false)}
+                                                >
+                                                    Cancel
+                                                </button>
+                                                <button
+                                                    className="btn-large"
+                                                    style={{background: 'linear-gradient(135deg, #059669, #10B981)'}}
+                                                    onClick={configureSpeechmatics}
+                                                >
+                                                    Save API Key
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                )}
+
+                                {/* Local Whisper API Configuration Modal */}
+                                {showLocalWhisperConfig && (
+                                    <div style={{
+                                        position: 'fixed',
+                                        top: 0, left: 0, right: 0, bottom: 0,
+                                        background: 'rgba(0,0,0,0.5)',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'center',
+                                        zIndex: 1000
+                                    }} onClick={() => setShowLocalWhisperConfig(false)}>
+                                        <div style={{
+                                            background: 'white',
+                                            padding: '32px',
+                                            borderRadius: '16px',
+                                            maxWidth: '550px',
+                                            width: '90%'
+                                        }} onClick={e => e.stopPropagation()}>
+                                            <h3 style={{margin: '0 0 16px', fontSize: '20px', fontWeight: '600'}}>
+                                                Configure Local Whisper API
+                                            </h3>
+                                            <p style={{margin: '0 0 16px', color: 'var(--text-medium)', fontSize: '14px'}}>
+                                                Connect to a local OpenAI-compatible Whisper server for real-time transcription.
+                                                Compatible with faster-whisper-server, LocalAI, whisper.cpp, and Ollama.
+                                            </p>
+                                            <div style={{
+                                                background: 'var(--bg-sage-light)',
+                                                padding: '12px',
+                                                borderRadius: '8px',
+                                                marginBottom: '16px',
+                                                fontSize: '13px'
+                                            }}>
+                                                <strong>Setup:</strong> Run a local Whisper server first. Examples:
+                                                <ul style={{margin: '8px 0 0 16px', paddingLeft: '0'}}>
+                                                    <li><code>faster-whisper-server</code> - pip install faster-whisper-server</li>
+                                                    <li><code>LocalAI</code> - docker run -p 8000:8000 localai/localai</li>
+                                                    <li><code>Ollama</code> - ollama serve (with whisper model)</li>
+                                                </ul>
+                                            </div>
+                                            <label style={{display: 'block', marginBottom: '8px', fontSize: '14px', fontWeight: '500'}}>
+                                                API URL
+                                            </label>
+                                            <input
+                                                type="text"
+                                                className="setting-input"
+                                                style={{width: '100%', padding: '12px', marginBottom: '16px', fontFamily: 'monospace'}}
+                                                placeholder="http://localhost:8000/v1/audio/transcriptions"
+                                                value={localWhisperApiUrl}
+                                                onChange={e => setLocalWhisperApiUrl(e.target.value)}
+                                            />
+                                            <label style={{display: 'block', marginBottom: '8px', fontSize: '14px', fontWeight: '500'}}>
+                                                API Key <span style={{fontWeight: '400', color: 'var(--text-light)'}}>(optional)</span>
+                                            </label>
+                                            <input
+                                                type="password"
+                                                className="setting-input"
+                                                style={{width: '100%', padding: '12px', marginBottom: '16px'}}
+                                                placeholder="Leave blank if not required"
+                                                value={localWhisperApiKey}
+                                                onChange={e => setLocalWhisperApiKey(e.target.value)}
+                                            />
+                                            <div style={{display: 'flex', gap: '12px', justifyContent: 'flex-end'}}>
+                                                <button
+                                                    className="btn-large btn-outline"
+                                                    onClick={() => setShowLocalWhisperConfig(false)}
+                                                >
+                                                    Cancel
+                                                </button>
+                                                <button
+                                                    className="btn-large"
+                                                    style={{background: 'linear-gradient(135deg, #7C3AED, #8B5CF6)'}}
+                                                    onClick={configureLocalWhisper}
+                                                >
+                                                    Save Configuration
+                                                </button>
+                                            </div>
+                                        </div>
                                     </div>
                                 )}
 
@@ -6550,6 +7024,8 @@
                                     <div className="preview-badge mode">{mode.toUpperCase()}</div>
                                     {browserListening && <div className="preview-badge listening">LISTENING</div>}
                                     {whisperRunning && <div className="preview-badge whisper">WHISPER</div>}
+                                    {speechmaticsRunning && <div className="preview-badge" style={{background: '#059669'}}>SPEECHMATICS</div>}
+                                    {localWhisperRunning && <div className="preview-badge" style={{background: '#7C3AED'}}>LOCAL API</div>}
                                     {engineEnabled && <div className="preview-badge engine">ENGINE ON</div>}
                                     {recording && <div className="preview-badge" style={{background: '#DC2626'}}>REC</div>}
                                 </div>

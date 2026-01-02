@@ -1,13 +1,14 @@
 #!/usr/bin/env python3
 """
-Community Captioner v4.0 - Advanced RAG Caption Engine
+Community Captioner v4.1 - Advanced RAG Caption Engine
 
 FEATURES:
-  - Dual captioning modes (Web Speech / Whisper)
+  - Triple captioning modes (Web Speech / Whisper / Speechmatics)
   - Advanced RAG Caption Engine with semantic similarity matching
   - Vector embeddings for context-aware corrections
   - Fuzzy matching with confidence thresholds
   - Real-time learning from ASR patterns
+  - Adaptive latency management with queue drop/catch-up
   - Post-session refinement with consistency enforcement
   - Session recording with timestamps and audio
   - Post-session analytics dashboard
@@ -21,6 +22,9 @@ INSTALLATION:
 
   For Whisper mode:
     pip3 install faster-whisper sounddevice numpy
+
+  For Speechmatics mode (cloud ASR):
+    pip3 install speechmatics-python
 
   For AI features (optional):
     pip3 install openai  # or use local LLM via Ollama
@@ -44,6 +48,8 @@ import math
 from pathlib import Path
 from datetime import datetime, timedelta
 from urllib.parse import urlparse, parse_qs
+import urllib.request
+import urllib.error
 from collections import deque, Counter
 from difflib import SequenceMatcher
 from typing import Dict, List, Tuple, Optional, Any
@@ -62,6 +68,25 @@ sentence_model = None
 try:
     from sentence_transformers import SentenceTransformer
     EMBEDDINGS_AVAILABLE = True
+except ImportError:
+    pass
+
+# Speechmatics for cloud ASR
+SPEECHMATICS_AVAILABLE = False
+try:
+    import speechmatics
+    from speechmatics.models import ConnectionSettings
+    from speechmatics.batch_client import BatchClient
+    SPEECHMATICS_AVAILABLE = True
+except ImportError:
+    pass
+
+# WebSocket for Speechmatics real-time
+WEBSOCKETS_AVAILABLE = False
+try:
+    import asyncio
+    import websockets
+    WEBSOCKETS_AVAILABLE = True
 except ImportError:
     pass
 
@@ -98,7 +123,12 @@ ai_config = {
     "lmstudio_model": "local-model",
     "custom_base_url": "",
     "custom_api_key": "",
-    "custom_model": ""
+    "custom_model": "",
+    # Speechmatics configuration
+    "speechmatics_api_key": os.getenv('SPEECHMATICS_API_KEY', ''),
+    # Local Whisper API configuration (faster-whisper-server, LocalAI, etc.)
+    "local_whisper_api_url": os.getenv('LOCAL_WHISPER_API_URL', 'http://localhost:8000/v1/audio/transcriptions'),
+    "local_whisper_api_key": os.getenv('LOCAL_WHISPER_API_KEY', ''),
 }
 
 # Load saved AI config
@@ -1685,27 +1715,18 @@ class SessionManager:
         self.audio_thread = None
         self.sample_rate = 16000
 
-    def start_session(self, name=None, record_audio=False, audio_device=None):
-        """Start a new captioning session with optional audio recording"""
+    def start_session(self, name=None, **kwargs):
+        """Start a new captioning session"""
         session_id = str(uuid.uuid4())[:8]
         self.current_session = {
             "id": session_id,
             "name": name or f"Session {datetime.now().strftime('%Y-%m-%d %H:%M')}",
             "started": datetime.now().isoformat(),
-            "mode": "browser",
-            "audio_recorded": False,
-            "audio_file": None
+            "mode": "browser"
         }
         self.captions = []
         self.start_time = datetime.now()
         self.is_recording = True
-
-        # Start audio recording if requested and available
-        if record_audio and AUDIO_AVAILABLE and NUMPY_AVAILABLE:
-            self._start_audio_recording(session_id, audio_device)
-            self.current_session["audio_recorded"] = True
-            self.current_session["audio_file"] = f"{session_id}.wav"
-
         return self.current_session
 
     def _start_audio_recording(self, session_id: str, device_id=None):
@@ -1779,26 +1800,19 @@ class SessionManager:
         return None
     
     def add_caption(self, raw: str, corrected: str, corrections: list):
-        """Add a caption to the current session with deduplication"""
+        """Add a caption to the current session with light deduplication"""
         if not self.is_recording:
             return
 
-        # Deduplication: check if this text was recently added
-        corrected_clean = corrected.strip().lower()
+        corrected_clean = corrected.strip()
+        if not corrected_clean:
+            return
+
+        # Light deduplication: only skip exact duplicates of the LAST caption
         if self.captions:
-            # Check last 3 captions for duplicates
-            for recent in self.captions[-3:]:
-                recent_text = (recent.get('corrected') or recent.get('raw', '')).strip().lower()
-                # Skip if exact match or if new text is substring of recent (interim result)
-                if corrected_clean == recent_text or corrected_clean in recent_text:
-                    return
-                # Also skip if recent is substring of new (we're replacing interim with final)
-                if recent_text in corrected_clean and len(corrected_clean) > len(recent_text):
-                    # Update the recent caption instead of adding new
-                    recent['raw'] = raw
-                    recent['corrected'] = corrected
-                    recent['corrections'] = corrections
-                    return
+            last_text = (self.captions[-1].get('corrected') or self.captions[-1].get('raw', '')).strip()
+            if corrected_clean.lower() == last_text.lower():
+                return  # Skip exact duplicate
 
         elapsed = (datetime.now() - self.start_time).total_seconds()
         self.captions.append({
@@ -1809,6 +1823,8 @@ class SessionManager:
             "corrections": corrections,
             "added": datetime.now().isoformat()
         })
+
+        print(f"   💾 Caption saved: [{self._format_time(elapsed)}] {corrected[:50]}...")
     
     def stop_session(self):
         """Stop the current session and save audio if recorded"""
@@ -2258,16 +2274,671 @@ class WhisperEngine:
             self.stream = None
         return {"status": "stopped"}
     
-    def transcribe_audio(self, audio_data):
-        """Transcribe audio data for accuracy pass"""
+    def transcribe_audio(self, audio_data, high_accuracy=False):
+        """Transcribe audio data for accuracy pass
+
+        Args:
+            audio_data: Audio data as numpy array
+            high_accuracy: If True, use higher beam_size for better accuracy
+        """
         if not self.model:
             return {"error": "No model loaded"}
 
         try:
-            segments, _ = self.model.transcribe(audio_data, beam_size=5, language="en")
+            # Use higher beam_size for post-processing and video transcription
+            beam_size = 10 if high_accuracy else 5
+            segments, _ = self.model.transcribe(
+                audio_data,
+                beam_size=beam_size,
+                language="en",
+                vad_filter=True,
+                word_timestamps=high_accuracy  # More detailed for post-processing
+            )
             return {"text": " ".join(seg.text for seg in segments).strip()}
         except Exception as e:
             return {"error": str(e)}
+
+
+# =============================================================================
+# ADAPTIVE LATENCY MANAGER - Queue drop/catch-up for real-time captions
+# =============================================================================
+
+class AdaptiveLatencyManager:
+    """
+    Manages caption latency by dropping old audio chunks when falling behind.
+    Ensures captions stay as close to real-time as possible.
+    """
+
+    def __init__(self, max_latency_ms: int = 2000):
+        self.max_latency_ms = max_latency_ms  # Maximum acceptable latency
+        self.queue = deque()
+        self.queue_lock = threading.Lock()
+        self.last_process_time = time.time()
+        self.dropped_count = 0
+        self.total_processed = 0
+        self.current_latency_ms = 0
+
+    def add_chunk(self, audio_chunk, timestamp: float = None):
+        """Add audio chunk to queue with timestamp, proactively dropping old chunks"""
+        if timestamp is None:
+            timestamp = time.time()
+
+        with self.queue_lock:
+            # Proactively clean old chunks when adding new ones
+            current_time = time.time()
+            dropped = 0
+            while self.queue:
+                oldest = self.queue[0]
+                age_ms = (current_time - oldest["timestamp"]) * 1000
+                # Be aggressive: drop anything older than max_latency
+                if age_ms > self.max_latency_ms:
+                    self.queue.popleft()
+                    dropped += 1
+                    self.dropped_count += 1
+                else:
+                    break
+
+            if dropped > 0:
+                print(f"⚡ Proactive catch-up: dropped {dropped} old chunks (queue was behind)")
+
+            self.queue.append({
+                "audio": audio_chunk,
+                "timestamp": timestamp
+            })
+
+    def get_next_chunk(self):
+        """Get next chunk to process, dropping old ones if needed"""
+        with self.queue_lock:
+            if not self.queue:
+                return None
+
+            current_time = time.time()
+
+            # Drop old chunks if we're behind - keep only the most recent
+            dropped_this_round = 0
+            while len(self.queue) > 1:
+                oldest = self.queue[0]
+                age_ms = (current_time - oldest["timestamp"]) * 1000
+
+                if age_ms > self.max_latency_ms:
+                    self.queue.popleft()
+                    dropped_this_round += 1
+                    self.dropped_count += 1
+                else:
+                    break
+
+            if dropped_this_round > 0:
+                print(f"⚡ Latency catch-up: dropped {dropped_this_round} old chunks")
+
+            if self.queue:
+                chunk = self.queue.popleft()
+                self.current_latency_ms = (current_time - chunk["timestamp"]) * 1000
+                self.total_processed += 1
+                return chunk
+
+            return None
+
+    def drop_all_but_latest(self):
+        """Aggressively drop everything except the latest chunk"""
+        with self.queue_lock:
+            if len(self.queue) <= 1:
+                return 0
+            dropped = len(self.queue) - 1
+            latest = self.queue[-1] if self.queue else None
+            self.queue.clear()
+            if latest:
+                self.queue.append(latest)
+            self.dropped_count += dropped
+            if dropped > 0:
+                print(f"⚡ Aggressive catch-up: dropped {dropped} chunks, keeping only latest")
+            return dropped
+
+    def get_stats(self) -> Dict:
+        """Get latency management statistics"""
+        return {
+            "queue_size": len(self.queue),
+            "current_latency_ms": round(self.current_latency_ms, 1),
+            "dropped_count": self.dropped_count,
+            "total_processed": self.total_processed,
+            "max_latency_ms": self.max_latency_ms,
+            "drop_rate": round(self.dropped_count / max(self.total_processed, 1) * 100, 1)
+        }
+
+    def set_max_latency(self, max_latency_ms: int):
+        """Update maximum acceptable latency"""
+        self.max_latency_ms = max_latency_ms
+
+    def clear(self):
+        """Clear the queue"""
+        with self.queue_lock:
+            self.queue.clear()
+            self.dropped_count = 0
+            self.total_processed = 0
+            self.current_latency_ms = 0
+
+
+# =============================================================================
+# SPEECHMATICS ENGINE - Cloud-based real-time ASR
+# =============================================================================
+
+class SpeechmaticsEngine:
+    """
+    Real-time speech-to-text using Speechmatics cloud API.
+    Provides low-latency (~300-500ms) high-accuracy transcription.
+
+    Authentication: Uses API key in Authorization header for server-side connections.
+    See: https://docs.speechmatics.com/get-started/authentication
+    """
+
+    # US region endpoint (us.rt not us1.rt)
+    SPEECHMATICS_RT_URL = "wss://us.rt.speechmatics.com/v2"
+    SPEECHMATICS_TOKEN_URL = "https://mp.speechmatics.com/v1/api_keys"
+
+    def __init__(self):
+        self.api_key = None
+        self.is_running = False
+        self.text_callback = None
+        self.sample_rate = 16000
+        self.stream = None
+        self.ws_thread = None
+        self.audio_thread = None
+        self.ws = None
+        self.audio_buffer = []
+        self.buffer_lock = threading.Lock()
+        self.latency_manager = AdaptiveLatencyManager(max_latency_ms=2000)
+        self.loop = None
+
+    def get_status(self) -> Dict:
+        """Get Speechmatics engine status"""
+        has_key = bool(ai_config.get("speechmatics_api_key"))
+        return {
+            "available": WEBSOCKETS_AVAILABLE and AUDIO_AVAILABLE,
+            "has_api_key": has_key,
+            "is_running": self.is_running,
+            "missing_packages": [] if WEBSOCKETS_AVAILABLE else ["websockets"],
+            "latency_stats": self.latency_manager.get_stats()
+        }
+
+    def set_api_key(self, api_key: str):
+        """Set the Speechmatics API key"""
+        self.api_key = api_key
+        ai_config["speechmatics_api_key"] = api_key
+        # Save to config
+        try:
+            with open(AI_CONFIG_FILE, 'w') as f:
+                json.dump(ai_config, f, indent=2)
+        except:
+            pass
+        return {"status": "ok"}
+
+    def _audio_callback(self, indata, frames, time_info, status):
+        """Callback for audio input - adds to latency-managed queue"""
+        self.latency_manager.add_chunk(indata.copy())
+
+    def _get_temp_token(self, api_key: str) -> Optional[str]:
+        """
+        Generate a temporary JWT token from the long-lived API key.
+        This is the recommended approach per Speechmatics docs.
+        """
+        try:
+            url = f"{self.SPEECHMATICS_TOKEN_URL}?type=rt"
+            data = json.dumps({"ttl": 3600}).encode('utf-8')  # 1 hour TTL
+
+            req = urllib.request.Request(url, data=data, method='POST')
+            req.add_header('Content-Type', 'application/json')
+            req.add_header('Authorization', f'Bearer {api_key}')
+
+            with urllib.request.urlopen(req, timeout=10) as resp:
+                result = json.loads(resp.read().decode('utf-8'))
+                temp_key = result.get('key_value')
+                if temp_key:
+                    print("✓ Speechmatics temporary token generated")
+                    return temp_key
+                else:
+                    print(f"⚠️ No key_value in response: {result}")
+                    return None
+        except urllib.error.HTTPError as e:
+            error_body = e.read().decode('utf-8') if e.fp else str(e)
+            print(f"❌ Failed to generate temp token: {e.code} - {error_body}")
+            return None
+        except Exception as e:
+            print(f"❌ Failed to generate temp token: {e}")
+            return None
+
+    async def _websocket_handler(self):
+        """Handle WebSocket connection to Speechmatics"""
+        api_key = self.api_key or ai_config.get("speechmatics_api_key")
+        if not api_key:
+            print("❌ No Speechmatics API key configured")
+            return
+
+        # Try API key directly in Authorization header (works reliably)
+        url = self.SPEECHMATICS_RT_URL
+        headers = [("Authorization", f"Bearer {api_key}")]
+
+        try:
+            connect_kwargs = {'additional_headers': headers}
+            await self._try_websocket_connection(url, connect_kwargs)
+        except Exception as e:
+            print(f"❌ Speechmatics connection failed: {e}")
+
+    async def _try_websocket_connection(self, url: str, connect_kwargs: dict):
+        """Attempt WebSocket connection with given URL and kwargs"""
+        async with websockets.connect(url, **connect_kwargs) as ws:
+            self.ws = ws
+
+            # Send start recognition message
+            start_msg = {
+                "message": "StartRecognition",
+                "audio_format": {
+                    "type": "raw",
+                    "encoding": "pcm_s16le",
+                    "sample_rate": self.sample_rate
+                },
+                "transcription_config": {
+                    "language": "en",
+                    "enable_partials": True,
+                    "max_delay": 2.0
+                }
+            }
+            await ws.send(json.dumps(start_msg))
+            print("🎤 Speechmatics connected, starting transcription...")
+
+            # Start audio sending task
+            send_task = asyncio.create_task(self._send_audio(ws))
+
+            # Receive transcription results
+            async for message in ws:
+                if not self.is_running:
+                    break
+
+                try:
+                    data = json.loads(message)
+                    msg_type = data.get("message")
+
+                    # Debug: log all message types
+                    if msg_type not in ["AudioAdded"]:  # Ignore audio acks
+                        print(f"   [WS] Received: {msg_type}")
+
+                    if msg_type == "RecognitionStarted":
+                        print("✓ Speechmatics recognition started")
+
+                    elif msg_type == "AddTranscript":
+                        # Final transcript - check both possible locations
+                        # Debug: print full data structure
+                        print(f"   [WS] AddTranscript data keys: {data.keys()}")
+                        text = data.get("metadata", {}).get("transcript", "")
+                        if not text:
+                            # Try alternative: results array
+                            results = data.get("results", [])
+                            if results:
+                                text = " ".join([r.get("alternatives", [{}])[0].get("content", "") for r in results])
+                        print(f"   [WS] AddTranscript text: '{text}'")
+                        if text and self.text_callback:
+                            self.text_callback(text, is_final=True)
+                        else:
+                            print(f"   [WS] WARNING: No text or no callback! metadata={data.get('metadata')}, results={data.get('results')}")
+
+                    elif msg_type == "AddPartialTranscript":
+                        # Partial/interim transcript - debug first one
+                        text = data.get("metadata", {}).get("transcript", "")
+                        if not text:
+                            results = data.get("results", [])
+                            if results:
+                                text = " ".join([r.get("alternatives", [{}])[0].get("content", "") for r in results])
+                        # Debug: log partial transcripts too
+                        if text:
+                            print(f"   [WS] Partial: '{text}'")
+                        if text and self.text_callback:
+                            self.text_callback(text, is_final=False)
+
+                    elif msg_type == "Error":
+                        error_info = data.get("reason", data)
+                        print(f"❌ Speechmatics error: {error_info}")
+
+                    elif msg_type == "Warning":
+                        print(f"⚠️ Speechmatics warning: {data.get('reason', data)}")
+
+                except json.JSONDecodeError:
+                    pass
+
+            send_task.cancel()
+
+    async def _send_audio(self, ws):
+        """Send audio chunks to Speechmatics"""
+        while self.is_running:
+            chunk_data = self.latency_manager.get_next_chunk()
+
+            if chunk_data:
+                audio = chunk_data["audio"]
+                # Convert to 16-bit PCM
+                if hasattr(audio, 'tobytes'):
+                    audio_bytes = (audio * 32768).astype('int16').tobytes()
+                else:
+                    audio_bytes = audio
+
+                try:
+                    await ws.send(audio_bytes)
+                except:
+                    break
+            else:
+                await asyncio.sleep(0.01)
+
+    def _run_async_loop(self):
+        """Run the async event loop in a separate thread"""
+        self.loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(self.loop)
+        try:
+            self.loop.run_until_complete(self._websocket_handler())
+        finally:
+            self.loop.close()
+            self.loop = None
+
+    def start(self, device_id=None, callback=None):
+        """Start Speechmatics real-time transcription"""
+        if not AUDIO_AVAILABLE:
+            return {"error": "sounddevice not installed"}
+        if not WEBSOCKETS_AVAILABLE:
+            return {"error": "websockets not installed. Run: pip3 install websockets"}
+
+        api_key = self.api_key or ai_config.get("speechmatics_api_key")
+        if not api_key:
+            return {"error": "No Speechmatics API key configured"}
+
+        # If already running, stop first (handles stale state after page refresh)
+        if self.is_running or self.stream or self.ws_thread:
+            print("⚠️ Speechmatics was in stale state, cleaning up...")
+            self.stop()
+
+        self.text_callback = callback
+        self.is_running = True
+        self.latency_manager.clear()
+
+        try:
+            # Start audio input
+            self.stream = sd.InputStream(
+                device=device_id,
+                channels=1,
+                samplerate=self.sample_rate,
+                callback=self._audio_callback,
+                blocksize=int(self.sample_rate * 0.1)
+            )
+            self.stream.start()
+
+            # Start WebSocket handler in separate thread
+            self.ws_thread = threading.Thread(target=self._run_async_loop, daemon=True)
+            self.ws_thread.start()
+
+            print("🎤 Speechmatics listening...")
+            return {"status": "started"}
+
+        except Exception as e:
+            self.is_running = False
+            self.stream = None
+            return {"error": str(e)}
+
+    def stop(self):
+        """Stop Speechmatics transcription"""
+        print("🛑 Stopping Speechmatics...")
+        self.is_running = False
+
+        # Stop audio stream first
+        if self.stream:
+            try:
+                self.stream.stop()
+                self.stream.close()
+            except Exception as e:
+                print(f"   Error stopping audio stream: {e}")
+            self.stream = None
+
+        # Close WebSocket connection
+        if self.ws:
+            try:
+                # Send end of stream message if possible
+                pass
+            except:
+                pass
+            self.ws = None
+
+        # Stop the async loop
+        if self.loop and self.loop.is_running():
+            try:
+                self.loop.call_soon_threadsafe(self.loop.stop)
+            except Exception as e:
+                print(f"   Error stopping loop: {e}")
+
+        # Wait for thread to finish (with timeout)
+        if self.ws_thread and self.ws_thread.is_alive():
+            try:
+                self.ws_thread.join(timeout=2.0)
+            except:
+                pass
+        self.ws_thread = None
+        self.loop = None
+
+        self.latency_manager.clear()
+        print("✓ Speechmatics stopped")
+        return {"status": "stopped", "stats": self.latency_manager.get_stats()}
+
+    def set_max_latency(self, max_latency_ms: int):
+        """Set maximum acceptable latency"""
+        self.latency_manager.set_max_latency(max_latency_ms)
+        return {"status": "ok", "max_latency_ms": max_latency_ms}
+
+
+# =============================================================================
+# LOCAL WHISPER API ENGINE - OpenAI-compatible local transcription
+# =============================================================================
+
+class LocalWhisperAPIEngine:
+    """
+    Real-time speech-to-text using a local OpenAI-compatible Whisper API.
+    Works with: faster-whisper-server, LocalAI, whisper.cpp server, etc.
+
+    Setup options:
+    1. faster-whisper-server: pip install faster-whisper-server && faster-whisper-server
+    2. LocalAI: Follow https://localai.io docs
+    3. whisper.cpp: ./server -m models/ggml-base.bin
+    """
+
+    def __init__(self):
+        self.api_url = None
+        self.api_key = None
+        self.is_running = False
+        self.text_callback = None
+        self.sample_rate = 16000
+        self.stream = None
+        self.process_thread = None
+        self.audio_buffer = []
+        self.buffer_lock = threading.Lock()
+        self.latency_manager = AdaptiveLatencyManager(max_latency_ms=2000)
+        self.chunk_duration = 2.0  # seconds of audio per API call
+
+    def get_status(self) -> Dict:
+        """Get Local Whisper API engine status"""
+        api_url = ai_config.get("local_whisper_api_url", "")
+        configured = bool(api_url)
+
+        # Try to check if server is running
+        server_available = False
+        if configured:
+            try:
+                import urllib.request
+                # Try a simple GET to check if server is up
+                base_url = api_url.rsplit('/v1', 1)[0] if '/v1' in api_url else api_url.rsplit('/audio', 1)[0]
+                req = urllib.request.Request(base_url, method='GET')
+                req.add_header('User-Agent', 'Community-Captioner/4.1')
+                with urllib.request.urlopen(req, timeout=2) as resp:
+                    server_available = resp.status == 200
+            except:
+                # Server might still work, just not respond to GET on base
+                server_available = None  # Unknown
+
+        return {
+            "available": AUDIO_AVAILABLE,
+            "configured": configured,
+            "api_url": api_url,
+            "server_available": server_available,
+            "is_running": self.is_running,
+            "latency_stats": self.latency_manager.get_stats()
+        }
+
+    def set_config(self, api_url: str, api_key: str = ""):
+        """Set the Local Whisper API configuration"""
+        self.api_url = api_url
+        self.api_key = api_key
+        ai_config["local_whisper_api_url"] = api_url
+        ai_config["local_whisper_api_key"] = api_key
+        # Save to config
+        try:
+            with open(AI_CONFIG_FILE, 'w') as f:
+                json.dump(ai_config, f, indent=2)
+        except:
+            pass
+        return {"status": "ok"}
+
+    def _audio_callback(self, indata, frames, time_info, status):
+        """Callback for audio input - adds to latency-managed queue"""
+        self.latency_manager.add_chunk(indata.copy())
+
+    def _transcription_loop(self):
+        """Process audio chunks and send to API"""
+        import urllib.request
+        import urllib.error
+        import io
+        import wave
+
+        accumulated_audio = []
+        samples_needed = int(self.sample_rate * self.chunk_duration)
+
+        while self.is_running:
+            chunk_data = self.latency_manager.get_next_chunk()
+
+            if chunk_data:
+                accumulated_audio.append(chunk_data["audio"])
+                total_samples = sum(len(a) for a in accumulated_audio)
+
+                # When we have enough audio, send to API
+                if total_samples >= samples_needed:
+                    # Combine audio chunks
+                    audio_data = np.concatenate(accumulated_audio)
+                    accumulated_audio = []
+
+                    # Convert to WAV bytes
+                    wav_buffer = io.BytesIO()
+                    with wave.open(wav_buffer, 'wb') as wf:
+                        wf.setnchannels(1)
+                        wf.setsampwidth(2)  # 16-bit
+                        wf.setframerate(self.sample_rate)
+                        wf.writeframes((audio_data * 32768).astype(np.int16).tobytes())
+                    wav_bytes = wav_buffer.getvalue()
+
+                    # Send to API
+                    try:
+                        api_url = self.api_url or ai_config.get("local_whisper_api_url")
+                        api_key = self.api_key or ai_config.get("local_whisper_api_key", "")
+
+                        # Build multipart form data
+                        boundary = '----WebKitFormBoundary7MA4YWxkTrZu0gW'
+                        body = (
+                            f'--{boundary}\r\n'
+                            f'Content-Disposition: form-data; name="file"; filename="audio.wav"\r\n'
+                            f'Content-Type: audio/wav\r\n\r\n'
+                        ).encode('utf-8') + wav_bytes + (
+                            f'\r\n--{boundary}\r\n'
+                            f'Content-Disposition: form-data; name="model"\r\n\r\n'
+                            f'whisper-1\r\n'
+                            f'--{boundary}--\r\n'
+                        ).encode('utf-8')
+
+                        req = urllib.request.Request(api_url, data=body, method='POST')
+                        req.add_header('Content-Type', f'multipart/form-data; boundary={boundary}')
+                        if api_key:
+                            req.add_header('Authorization', f'Bearer {api_key}')
+
+                        with urllib.request.urlopen(req, timeout=10) as resp:
+                            result = json.loads(resp.read().decode('utf-8'))
+                            text = result.get('text', '').strip()
+                            if text and self.text_callback:
+                                self.text_callback(text)
+
+                    except urllib.error.URLError as e:
+                        print(f"❌ Local Whisper API error: {e}")
+                    except Exception as e:
+                        print(f"❌ Local Whisper API error: {e}")
+
+            else:
+                time.sleep(0.01)
+
+    def start(self, device_id=None, callback=None):
+        """Start Local Whisper API transcription"""
+        if not AUDIO_AVAILABLE:
+            return {"error": "sounddevice not installed"}
+
+        api_url = self.api_url or ai_config.get("local_whisper_api_url")
+        if not api_url:
+            return {"error": "No Local Whisper API URL configured"}
+
+        # If already running, stop first
+        if self.is_running or self.stream or self.process_thread:
+            print("⚠️ Local Whisper API was in stale state, cleaning up...")
+            self.stop()
+
+        self.text_callback = callback
+        self.is_running = True
+        self.latency_manager.clear()
+
+        try:
+            # Start audio input
+            self.stream = sd.InputStream(
+                device=device_id,
+                channels=1,
+                samplerate=self.sample_rate,
+                callback=self._audio_callback,
+                blocksize=int(self.sample_rate * 0.1)
+            )
+            self.stream.start()
+
+            # Start transcription thread
+            self.process_thread = threading.Thread(target=self._transcription_loop, daemon=True)
+            self.process_thread.start()
+
+            print("🎤 Local Whisper API listening...")
+            return {"status": "started"}
+
+        except Exception as e:
+            self.is_running = False
+            self.stream = None
+            return {"error": str(e)}
+
+    def stop(self):
+        """Stop Local Whisper API transcription"""
+        print("🛑 Stopping Local Whisper API...")
+        self.is_running = False
+
+        if self.stream:
+            try:
+                self.stream.stop()
+                self.stream.close()
+            except Exception as e:
+                print(f"   Error stopping audio stream: {e}")
+            self.stream = None
+
+        if self.process_thread and self.process_thread.is_alive():
+            try:
+                self.process_thread.join(timeout=2.0)
+            except:
+                pass
+        self.process_thread = None
+
+        self.latency_manager.clear()
+        print("✓ Local Whisper API stopped")
+        return {"status": "stopped", "stats": self.latency_manager.get_stats()}
+
+    def set_max_latency(self, max_latency_ms: int):
+        """Set maximum acceptable latency"""
+        self.latency_manager.set_max_latency(max_latency_ms)
+        return {"status": "ok", "max_latency_ms": max_latency_ms}
 
 
 # =============================================================================
@@ -2911,9 +3582,12 @@ caption_engine = CaptionEngine(DATA_DIR)
 knowledge_base = KnowledgeBase(KNOWLEDGE_DIR, caption_engine.embeddings)
 session_manager = SessionManager(SESSIONS_DIR)
 whisper_engine = WhisperEngine()
+speechmatics_engine = SpeechmaticsEngine()
+local_whisper_api_engine = LocalWhisperAPIEngine()
 gpt_processor = GPTPostProcessor()
 session_analytics = SessionAnalytics()
 video_intelligence = VideoIntelligence(VIDEO_DIR)
+latency_manager = AdaptiveLatencyManager(max_latency_ms=2000)  # Global for browser captions
 
 # Caption state
 caption_state = {
@@ -2931,22 +3605,147 @@ caption_state = {
 }
 
 whisper_buffer = ""
+speechmatics_buffer = ""  # Rolling buffer for Speechmatics
+local_whisper_api_buffer = ""
+browser_caption_buffer = ""  # Rolling buffer for Browser Speech API
+
+# =============================================================================
+# ROLLING CAPTION BUFFER - Keeps text visible longer (up to 2 lines)
+# =============================================================================
+
+def update_rolling_caption(new_text, is_final=False):
+    """
+    Update caption with rolling buffer behavior.
+    Text accumulates up to 2 lines worth, then older text scrolls off.
+    """
+    global speechmatics_buffer
+
+    new_text = new_text.strip()
+    if not new_text:
+        return
+
+    if is_final:
+        # For final transcripts, append to buffer
+        if speechmatics_buffer:
+            speechmatics_buffer = speechmatics_buffer + " " + new_text
+        else:
+            speechmatics_buffer = new_text
+    else:
+        # For partials, replace the end of buffer after last final
+        # This prevents partials from accumulating incorrectly
+        speechmatics_buffer = new_text
+
+    # Apply corrections and update caption state
+    result = process_caption(speechmatics_buffer)
+    caption_state["raw_caption"] = result["raw"]
+    caption_state["caption"] = result["corrected"]
+    caption_state["corrections"] = result["corrections"]
+
+# =============================================================================
+# CAPTION CALLBACKS - All use rolling buffer for 2-line display
+# =============================================================================
 
 def on_whisper_text(text):
     """Callback when Whisper produces text"""
     global whisper_buffer
+
+    text = text.strip()
+    if not text:
+        return
+
+    # Accumulate for display
     whisper_buffer = (whisper_buffer + " " + text).strip()
+
+    # Apply corrections and limit to 2 lines
     result = process_caption(whisper_buffer)
     caption_state["raw_caption"] = result["raw"]
     caption_state["caption"] = result["corrected"]
     caption_state["corrections"] = result["corrections"]
 
-    # Add to session if recording
+    # Save to session
     if session_manager.is_recording:
         session_manager.add_caption(result["raw"], result["corrected"], result["corrections"])
 
     print(f"   📝 Whisper: {text}")
-    print(f"   ✅ Caption state updated: {caption_state['caption'][:50]}...")
+
+def on_speechmatics_text(text, is_final=False):
+    """
+    Callback when Speechmatics produces text.
+    Only shows FINAL transcripts - partials are ignored to prevent repetition.
+    """
+    global speechmatics_buffer
+
+    text = text.strip()
+    if not text:
+        return
+
+    # IGNORE partials entirely - they just repeat what will become final
+    # This prevents the "falling behind" issue from repeating text
+    if not is_final:
+        return
+
+    print(f"   ✅ FINAL: {text}")
+
+    # Save to session (just this segment)
+    result = process_caption(text)
+    if session_manager.is_recording:
+        session_manager.add_caption(result["raw"], result["corrected"], result["corrections"])
+
+    # Append to buffer and trim to ~100 chars (roughly 2 lines)
+    if speechmatics_buffer:
+        speechmatics_buffer = speechmatics_buffer + " " + text
+    else:
+        speechmatics_buffer = text
+
+    # Trim buffer to last ~100 chars, breaking at word boundary
+    if len(speechmatics_buffer) > 100:
+        trimmed = speechmatics_buffer[-100:]
+        space_idx = trimmed.find(' ')
+        if space_idx > 0 and space_idx < 30:
+            speechmatics_buffer = trimmed[space_idx + 1:]
+        else:
+            speechmatics_buffer = trimmed
+
+    # Update display with trimmed buffer
+    result = process_caption(speechmatics_buffer)
+    caption_state["raw_caption"] = result["raw"]
+    caption_state["caption"] = result["corrected"]
+    caption_state["corrections"] = result["corrections"]
+
+    # Update latency stats
+    try:
+        caption_state["latency_stats"] = speechmatics_engine.latency_manager.get_stats()
+    except:
+        pass
+
+def on_local_whisper_api_text(text):
+    """Callback when Local Whisper API produces text"""
+    global local_whisper_api_buffer
+
+    text = text.strip()
+    if not text:
+        return
+
+    # Accumulate for display
+    local_whisper_api_buffer = (local_whisper_api_buffer + " " + text).strip()
+
+    # Apply corrections
+    result = process_caption(local_whisper_api_buffer)
+    caption_state["raw_caption"] = result["raw"]
+    caption_state["caption"] = result["corrected"]
+    caption_state["corrections"] = result["corrections"]
+
+    # Save to session
+    if session_manager.is_recording:
+        session_manager.add_caption(result["raw"], result["corrected"], result["corrections"])
+
+    # Update latency stats
+    try:
+        caption_state["latency_stats"] = local_whisper_api_engine.latency_manager.get_stats()
+    except:
+        pass
+
+    print(f"   📝 Local Whisper API: {text}")
 
 def limit_lines(text, max_lines=2, max_width=80):
     chars = int(50 * max_width / 80) * max_lines
@@ -3028,6 +3827,8 @@ class Handler(http.server.SimpleHTTPRequestHandler):
 
         # Caption endpoints
         if path == '/api/caption':
+            # Debug: log every caption request (uncomment to debug)
+            # print(f"   [API] Caption requested. Current: '{caption_state.get('caption', '')[:40]}...'")
             self.send_json({**caption_state, "session": session_manager.get_status()})
         
         elif path == '/api/info':
@@ -3104,10 +3905,21 @@ class Handler(http.server.SimpleHTTPRequestHandler):
         # Whisper endpoints
         elif path == '/api/whisper/status':
             self.send_json(whisper_engine.get_status())
-        
+
         elif path == '/api/whisper/devices':
             self.send_json({"devices": whisper_engine.get_audio_devices()})
-        
+
+        # Speechmatics endpoints
+        elif path == '/api/speechmatics/status':
+            self.send_json(speechmatics_engine.get_status())
+
+        # Latency stats endpoint
+        elif path == '/api/latency/stats':
+            self.send_json({
+                "global": latency_manager.get_stats(),
+                "speechmatics": speechmatics_engine.latency_manager.get_stats()
+            })
+
         # Server-Sent Events for real-time caption streaming (hardware encoder integration)
         elif path == '/api/caption/stream':
             self.send_response(200)
@@ -3266,30 +4078,64 @@ class Handler(http.server.SimpleHTTPRequestHandler):
                 pass
 
     def _handle_post(self):
-        global whisper_buffer, caption_state
+        global whisper_buffer, speechmatics_buffer, local_whisper_api_buffer, browser_caption_buffer, caption_state
         path = urlparse(self.path).path
         data = self.read_json()
 
-        # Caption from browser
+        # Caption from browser - uses rolling buffer for 2-line display
         if path == '/api/caption':
             if 'caption' in data:
-                result = process_caption(data['caption'])
-                caption_state['raw_caption'] = result["raw"]
-                caption_state['caption'] = result["corrected"]
-                caption_state['corrections'] = result["corrections"]
+                new_text = data['caption'].strip()
+                is_final = data.get('is_final', True)
 
-                # Only add FINAL captions to session (not interim results)
-                is_final = data.get('is_final', True)  # Default True for backwards compatibility
-                if session_manager.is_recording and result["corrected"] and is_final:
-                    session_manager.add_caption(result["raw"], result["corrected"], result["corrections"])
-            
+                if is_final and new_text:
+                    # Save to session FIRST (just this segment)
+                    result = process_caption(new_text)
+                    if session_manager.is_recording and result["corrected"]:
+                        session_manager.add_caption(result["raw"], result["corrected"], result["corrections"])
+
+                    # Append to buffer
+                    if browser_caption_buffer:
+                        browser_caption_buffer = browser_caption_buffer + " " + new_text
+                    else:
+                        browser_caption_buffer = new_text
+
+                    # Trim buffer to last ~100 chars, breaking at word boundary
+                    if len(browser_caption_buffer) > 100:
+                        trimmed = browser_caption_buffer[-100:]
+                        space_idx = trimmed.find(' ')
+                        if space_idx > 0 and space_idx < 30:
+                            browser_caption_buffer = trimmed[space_idx + 1:]
+                        else:
+                            browser_caption_buffer = trimmed
+
+                    # Update display with trimmed buffer
+                    result = process_caption(browser_caption_buffer)
+                    caption_state['raw_caption'] = result["raw"]
+                    caption_state['caption'] = result["corrected"]
+                    caption_state['corrections'] = result["corrections"]
+                else:
+                    # For partials, show buffer + current partial
+                    if browser_caption_buffer:
+                        display_text = browser_caption_buffer + " " + new_text
+                    else:
+                        display_text = new_text
+
+                    result = process_caption(display_text)
+                    caption_state['raw_caption'] = result["raw"]
+                    caption_state['caption'] = result["corrected"]
+                    caption_state['corrections'] = result["corrections"]
+
             if 'settings' in data:
                 caption_state['settings'].update(data['settings'])
-            
+
             self.send_json({"status": "ok", "corrections": caption_state.get("corrections", [])})
         
         elif path == '/api/clear':
             whisper_buffer = ""
+            speechmatics_buffer = ""
+            local_whisper_api_buffer = ""
+            browser_caption_buffer = ""
             caption_state["caption"] = ""
             caption_state["raw_caption"] = ""
             caption_state["corrections"] = []
@@ -3571,7 +4417,96 @@ class Handler(http.server.SimpleHTTPRequestHandler):
             result = whisper_engine.stop()
             caption_state["whisper_running"] = False
             self.send_json(result)
-        
+
+        # Speechmatics controls
+        elif path == '/api/speechmatics/status':
+            self.send_json(speechmatics_engine.get_status())
+
+        elif path == '/api/speechmatics/config':
+            api_key = data.get('api_key')
+            if api_key:
+                result = speechmatics_engine.set_api_key(api_key)
+                self.send_json(result)
+            else:
+                self.send_json({"error": "API key required"}, 400)
+
+        elif path == '/api/speechmatics/start':
+            # Convert device_id to integer if it's a string
+            device_id = data.get('device_id')
+            if device_id is not None and isinstance(device_id, str):
+                try:
+                    device_id = int(device_id)
+                except (ValueError, TypeError):
+                    device_id = None
+            result = speechmatics_engine.start(device_id=device_id, callback=on_speechmatics_text)
+            if "error" not in result:
+                caption_state["mode"] = "speechmatics"
+                caption_state["speechmatics_running"] = True
+            self.send_json(result)
+
+        elif path == '/api/speechmatics/stop':
+            result = speechmatics_engine.stop()
+            caption_state["speechmatics_running"] = False
+            self.send_json(result)
+
+        elif path == '/api/speechmatics/latency':
+            max_latency = data.get('max_latency_ms', 2000)
+            result = speechmatics_engine.set_max_latency(max_latency)
+            self.send_json(result)
+
+        # Local Whisper API controls
+        elif path == '/api/localwhisper/status':
+            self.send_json(local_whisper_api_engine.get_status())
+
+        elif path == '/api/localwhisper/config':
+            api_url = data.get('api_url')
+            api_key = data.get('api_key', '')
+            if api_url:
+                result = local_whisper_api_engine.set_config(api_url, api_key)
+                self.send_json(result)
+            else:
+                self.send_json({"error": "API URL required"}, 400)
+
+        elif path == '/api/localwhisper/start':
+            local_whisper_api_buffer = ""
+            # Convert device_id to integer if it's a string
+            device_id = data.get('device_id')
+            if device_id is not None and isinstance(device_id, str):
+                try:
+                    device_id = int(device_id)
+                except (ValueError, TypeError):
+                    device_id = None
+            result = local_whisper_api_engine.start(device_id=device_id, callback=on_local_whisper_api_text)
+            if "error" not in result:
+                caption_state["mode"] = "localwhisper"
+                caption_state["localwhisper_running"] = True
+            self.send_json(result)
+
+        elif path == '/api/localwhisper/stop':
+            result = local_whisper_api_engine.stop()
+            caption_state["localwhisper_running"] = False
+            self.send_json(result)
+
+        elif path == '/api/localwhisper/latency':
+            max_latency = data.get('max_latency_ms', 2000)
+            result = local_whisper_api_engine.set_max_latency(max_latency)
+            self.send_json(result)
+
+        # Latency management for all modes
+        elif path == '/api/latency/config':
+            max_latency = data.get('max_latency_ms', 2000)
+            latency_manager.set_max_latency(max_latency)
+            speechmatics_engine.latency_manager.set_max_latency(max_latency)
+            local_whisper_api_engine.latency_manager.set_max_latency(max_latency)
+            self.send_json({"status": "ok", "max_latency_ms": max_latency})
+
+        elif path == '/api/latency/stats':
+            self.send_json({
+                "global": latency_manager.get_stats(),
+                "speechmatics": speechmatics_engine.latency_manager.get_stats(),
+                "localwhisper": local_whisper_api_engine.latency_manager.get_stats()
+            })
+
         # Session controls
         elif path == '/api/session/start':
             # Clear previous caption state when starting new session
@@ -3579,19 +4514,7 @@ class Handler(http.server.SimpleHTTPRequestHandler):
             caption_state["raw_caption"] = ""
             caption_state["corrections"] = []
 
-            # Convert audio_device to integer if it's a string
-            audio_device = data.get('audio_device')
-            if audio_device is not None and isinstance(audio_device, str):
-                try:
-                    audio_device = int(audio_device)
-                except (ValueError, TypeError):
-                    audio_device = None
-
-            session = session_manager.start_session(
-                name=data.get('name'),
-                record_audio=data.get('record_audio', True),  # Default to True
-                audio_device=audio_device
-            )
+            session = session_manager.start_session(name=data.get('name'))
             self.send_json({"status": "ok", "session": session})
 
         elif path == '/api/session/stop':
@@ -3630,12 +4553,14 @@ class Handler(http.server.SimpleHTTPRequestHandler):
                     frames = wf.readframes(wf.getnframes())
                     audio_data = np.frombuffer(frames, dtype=np.int16).astype(np.float32) / 32768.0
 
-                # Transcribe with Whisper
+                # Transcribe with Whisper using HIGH ACCURACY settings for post-processing
+                # Uses beam_size=10 and word_timestamps for best quality
                 segments, _ = whisper_engine.model.transcribe(
                     audio_data,
-                    beam_size=5,
+                    beam_size=10,  # Higher beam size for better accuracy
                     language="en",
-                    vad_filter=True
+                    vad_filter=True,
+                    word_timestamps=True  # More detailed timing
                 )
 
                 # Build new captions from Whisper output
@@ -4172,12 +5097,14 @@ class Handler(http.server.SimpleHTTPRequestHandler):
                     frames = wf.readframes(wf.getnframes())
                     audio_data = np.frombuffer(frames, dtype=np.int16).astype(np.float32) / 32768.0
 
-                # Transcribe with Whisper
+                # Transcribe with Whisper using HIGH ACCURACY settings for video transcription
+                # Uses beam_size=10 and word_timestamps for best quality
                 segments, info = whisper_engine.model.transcribe(
                     audio_data,
-                    beam_size=5,
+                    beam_size=10,  # Higher beam size for better accuracy
                     language="en",
-                    vad_filter=True
+                    vad_filter=True,
+                    word_timestamps=True  # More detailed timing for video sync
                 )
 
                 # Build transcript with timestamps

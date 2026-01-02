@@ -1,12 +1,12 @@
-# Community Captioner v4.0 - Advanced RAG Engine
+# Community Captioner v4.1 - Advanced RAG Engine
 
 ## Project Overview
 
-**Community Captioner v4.0** is a free, open-source live captioning system for community media organizations. It provides real-time speech-to-text with an **Advanced RAG Caption Engine** that uses semantic similarity matching, fuzzy matching, and real-time learning for near-human accuracy correction of proper nouns.
+**Community Captioner v4.1** is a free, open-source live captioning system for community media organizations. It provides real-time speech-to-text with an **Advanced RAG Caption Engine** that uses semantic similarity matching, fuzzy matching, and real-time learning for near-human accuracy correction of proper nouns.
 
 **Primary User:** Brookline Interactive Group (BIG) - a community media organization in Brookline, MA that broadcasts town meetings, events, and local programming.
 
-**Problem Solved:** Commercial captioning encoders cost $30K+. This provides a zero-cost alternative using browser APIs, optional local Whisper AI, and advanced AI-powered corrections.
+**Problem Solved:** Commercial captioning encoders cost $30K+. This provides a zero-cost alternative using browser APIs, optional local Whisper AI, cloud ASR (Speechmatics), and advanced AI-powered corrections.
 
 ## Architecture (v4.0)
 
@@ -49,6 +49,14 @@
 ### 1. Captioning Modes
 - **Web Speech API** (browser) - Real-time ~200ms, requires Chrome/Edge + internet
 - **Whisper** (local) - Accurate, 2-4s latency, works offline, requires `faster-whisper`
+- **Speechmatics** (cloud) - Professional ASR, ~300-500ms latency, requires API key (~$0.012/min)
+
+### 1.1 Adaptive Latency Management (v4.1)
+When captions fall behind real-time, the system automatically:
+- Drops old audio chunks that exceed the max latency threshold (default 2 seconds)
+- Catches up to current audio position
+- Shows latency stats in the UI (current latency, dropped chunks)
+- Configurable max latency: 1s, 2s, 3s, or 5s
 
 ### 2. Advanced RAG Caption Engine (v4.0) - THE CORE FEATURE
 The v4.0 engine uses a hybrid approach combining:
@@ -187,6 +195,17 @@ community-captioner/
 - `POST /api/whisper/start` - Start listening `{device_id}`
 - `POST /api/whisper/stop` - Stop listening
 
+### Speechmatics (v4.1)
+- `GET /api/speechmatics/status` - Availability, API key status, latency stats
+- `POST /api/speechmatics/config` - Set API key `{api_key}`
+- `POST /api/speechmatics/start` - Start listening `{device_id}`
+- `POST /api/speechmatics/stop` - Stop listening
+- `POST /api/speechmatics/latency` - Set max latency `{max_latency_ms}`
+
+### Latency Management (v4.1)
+- `GET /api/latency/stats` - Get latency stats for all engines
+- `POST /api/latency/config` - Set max latency `{max_latency_ms}` (applies to all)
+
 ### Session
 - `GET /api/session/status` - Recording status and stats
 - `GET /api/session/captions` - All captions in session
@@ -304,7 +323,54 @@ community-captioner/
 
 ### Latest Updates - January 1, 2026
 
-#### Homepage Redesign (v4.1.3 - Current Session)
+#### Rolling Caption Buffer & Session Analysis Fixes (v4.1.5 - Current Session)
+- [x] **Rolling Caption Buffer** - All caption modes now show 2 lines of text
+  - Text stays visible longer for better readability
+  - Buffer trimmed to ~100 chars, breaking at word boundaries
+  - Older text pushed off as new captions arrive
+  - Applies to: Browser Speech API, Speechmatics, Whisper, Local Whisper API
+- [x] **Speechmatics Optimization** - Fixed caption repetition and lag
+  - Now only displays FINAL transcripts (ignores partials)
+  - Prevents repetitive text that caused falling behind
+  - Much faster catch-up when processing delays occur
+- [x] **Speaking Pace Graph Fix** - Session analysis now displays correctly
+  - Duration now properly passed from `/api/session/stop` response
+  - Fallback calculation from caption timestamps if needed
+  - Pace data calculated from actual session duration
+- [x] **Frontend `is_final` Flag** - Browser Speech API now sends proper flag
+  - Finals added to rolling buffer
+  - Partials show buffer + current text for live preview
+
+#### Latency Management & Speechmatics (v4.1.4 - Previous Session)
+- [x] **Adaptive Latency Management** - Queue drop/catch-up logic for real-time captions
+  - `AdaptiveLatencyManager` class tracks audio chunk timestamps
+  - Automatically drops old chunks when latency exceeds threshold
+  - Configurable max latency: 1s, 2s, 3s, or 5s (default 2s)
+  - Real-time latency stats displayed in UI
+  - Prevents captions from falling further behind when processing can't keep up
+- [x] **Speechmatics Cloud ASR Integration** - Third captioning mode
+  - Professional cloud-based speech recognition
+  - ~300-500ms latency (much faster than local Whisper)
+  - WebSocket streaming for real-time transcription
+  - API key configuration modal with pricing info
+  - Supports partial (interim) and final transcripts
+  - Green color scheme to distinguish from other modes
+  - Cost: ~$0.012-0.024/min (pay-as-you-go)
+- [x] **High-Accuracy Whisper for Post-Processing**
+  - Session reprocessing now uses `beam_size=10` (was 5)
+  - Video transcription uses `beam_size=10` + `word_timestamps=True`
+  - Better accuracy for archival and video intelligence features
+- [x] **New API Endpoints**
+  - `GET/POST /api/speechmatics/*` - Full Speechmatics control
+  - `GET/POST /api/latency/*` - Latency management configuration
+- [x] **UI Updates**
+  - Third mode button "Speechmatics" with green gradient
+  - API key configuration modal
+  - Real-time latency stats display
+  - Max latency selector (1-5 seconds)
+  - Audio device selector for Speechmatics mode
+
+#### Homepage Redesign (v4.1.3 - Previous Session)
 - [x] **Who We Are Section** - Redesigned with 3-column grid layout
   - Removed "WHAT MAKES IT UNIQUE" section completely
   - Changed "OUR STORY" to "WHO WE ARE"
