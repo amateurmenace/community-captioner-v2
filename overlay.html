@@ -121,13 +121,23 @@
             statusIndicator.className = 'status-indicator ' + (isError ? 'error' : '');
         }
 
+        var fetchInProgress = false;
+        var consecutiveErrors = 0;
+        var maxConsecutiveErrors = 5;
+
         function fetchCaption() {
+            // Prevent overlapping requests
+            if (fetchInProgress) return;
+            fetchInProgress = true;
+
             var xhr = new XMLHttpRequest();
             xhr.open('GET', '/api/caption', true);
-            xhr.timeout = 5000;
+            xhr.timeout = 2000;  // 2 second timeout (reduced from 5)
             xhr.onreadystatechange = function() {
                 if (xhr.readyState === 4) {
+                    fetchInProgress = false;
                     if (xhr.status === 200) {
+                        consecutiveErrors = 0;  // Reset error count on success
                         try {
                             var data = JSON.parse(xhr.responseText);
                             if (!connectionOk) {
@@ -148,17 +158,28 @@
                             updateStatus('Parse error', true);
                         }
                     } else if (xhr.status !== 0) {
+                        consecutiveErrors++;
                         updateStatus('Server error: ' + xhr.status, true);
                         connectionOk = false;
                     }
                 }
             };
-            xhr.onerror = function() { updateStatus('Connection failed', true); connectionOk = false; };
-            xhr.ontimeout = function() { updateStatus('Timeout', true); connectionOk = false; };
+            xhr.onerror = function() {
+                fetchInProgress = false;
+                consecutiveErrors++;
+                updateStatus('Connection failed (' + consecutiveErrors + ')', true);
+                connectionOk = false;
+            };
+            xhr.ontimeout = function() {
+                fetchInProgress = false;
+                consecutiveErrors++;
+                updateStatus('Timeout (' + consecutiveErrors + ')', true);
+                connectionOk = false;
+            };
             xhr.send();
         }
 
-        setInterval(fetchCaption, 100);
+        setInterval(fetchCaption, 150);  // Poll every 150ms (was 100ms)
         updateStatus('Connecting...', false);
         fetchCaption();
     </script>

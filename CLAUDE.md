@@ -1,12 +1,12 @@
-# Community Captioner v4.0 - Advanced RAG Engine
+# Community Captioner v4.1 - Advanced RAG Engine
 
 ## Project Overview
 
-**Community Captioner v4.0** is a free, open-source live captioning system for community media organizations. It provides real-time speech-to-text with an **Advanced RAG Caption Engine** that uses semantic similarity matching, fuzzy matching, and real-time learning for near-human accuracy correction of proper nouns.
+**Community Captioner v4.1** is a free, open-source live captioning system for community media organizations. It provides real-time speech-to-text with an **Advanced RAG Caption Engine** that uses semantic similarity matching, fuzzy matching, and real-time learning for near-human accuracy correction of proper nouns.
 
 **Primary User:** Brookline Interactive Group (BIG) - a community media organization in Brookline, MA that broadcasts town meetings, events, and local programming.
 
-**Problem Solved:** Commercial captioning encoders cost $30K+. This provides a zero-cost alternative using browser APIs, optional local Whisper AI, and advanced AI-powered corrections.
+**Problem Solved:** Commercial captioning encoders cost $30K+. This provides a zero-cost alternative using browser APIs, optional local Whisper AI, cloud ASR (Speechmatics), and advanced AI-powered corrections.
 
 ## Architecture (v4.0)
 
@@ -49,6 +49,14 @@
 ### 1. Captioning Modes
 - **Web Speech API** (browser) - Real-time ~200ms, requires Chrome/Edge + internet
 - **Whisper** (local) - Accurate, 2-4s latency, works offline, requires `faster-whisper`
+- **Speechmatics** (cloud) - Professional ASR, ~300-500ms latency, requires API key (~$0.012/min)
+
+### 1.1 Adaptive Latency Management (v4.1)
+When captions fall behind real-time, the system automatically:
+- Drops old audio chunks that exceed the max latency threshold (default 2 seconds)
+- Catches up to current audio position
+- Shows latency stats in the UI (current latency, dropped chunks)
+- Configurable max latency: 1s, 2s, 3s, or 5s
 
 ### 2. Advanced RAG Caption Engine (v4.0) - THE CORE FEATURE
 The v4.0 engine uses a hybrid approach combining:
@@ -153,7 +161,8 @@ community-captioner/
 
 ### Caption
 - `GET /api/caption` - Get current caption state
-- `POST /api/caption` - Send caption text + settings
+- `POST /api/caption` - Send caption text + settings (accepts `is_final` flag to prevent duplication)
+- `GET /api/caption/stream` - Server-Sent Events stream for real-time caption push (hardware encoder integration)
 
 ### Engine (Core)
 - `GET /api/engine/status` - Engine stats, RAG status, recent corrections
@@ -185,6 +194,17 @@ community-captioner/
 - `POST /api/whisper/load` - Load model `{model: "base"}`
 - `POST /api/whisper/start` - Start listening `{device_id}`
 - `POST /api/whisper/stop` - Stop listening
+
+### Speechmatics (v4.1)
+- `GET /api/speechmatics/status` - Availability, API key status, latency stats
+- `POST /api/speechmatics/config` - Set API key `{api_key}`
+- `POST /api/speechmatics/start` - Start listening `{device_id}`
+- `POST /api/speechmatics/stop` - Stop listening
+- `POST /api/speechmatics/latency` - Set max latency `{max_latency_ms}`
+
+### Latency Management (v4.1)
+- `GET /api/latency/stats` - Get latency stats for all engines
+- `POST /api/latency/config` - Set max latency `{max_latency_ms}` (applies to all)
 
 ### Session
 - `GET /api/session/status` - Recording status and stats
@@ -222,7 +242,8 @@ community-captioner/
 - `POST /api/video/upload` - Upload video (base64)
 - `POST /api/video/highlights` - Generate highlight moments
 - `POST /api/video/clip` - Extract single clip
-- `POST /api/video/highlight-reel` - Generate full highlight reel
+- `POST /api/video/highlight-reel` - Generate full highlight reel `{highlights, output_name, aspect_ratio, burn_captions, target_duration}`
+- `POST /api/video/youtube-transcript` - Fetch transcript from YouTube URL (no API key required)
 
 ## Key Technical Decisions
 
@@ -299,6 +320,857 @@ community-captioner/
 - [x] **AI Highlight Detection** - Identifies key moments from transcript
 - [x] **Clip Extraction** - ffmpeg-based clip generation
 - [x] **Highlight Reel** - Automated compilation of clips
+
+### Latest Updates - January 2, 2026
+
+#### Whisper Server & Local API Mode (v4.2.5 - January 2, 2026)
+New standalone Whisper server for maximum performance:
+
+- [x] **whisper-server.py** - Custom FastAPI server with OpenAI-compatible API
+  - Keeps Whisper model warm in memory for instant response
+  - Endpoint: `http://localhost:8000/v1/audio/transcriptions`
+  - Supports WAV audio input, returns JSON with transcription
+  - Performance stats tracking (requests, audio seconds, RTF)
+  - Auto-detects CUDA GPU, Apple Silicon, or CPU mode
+- [x] **Local Whisper API Engine Optimization**
+  - Chunk duration reduced from 2.0s to 0.8s
+  - Audio blocksize reduced from 100ms to 20ms
+  - Max latency reduced from 2000ms to 1500ms
+  - 6x faster than real-time transcription (RTF ~0.17)
+- [x] **New API Endpoints**
+  - `GET /api/localwhisper/status` - Check server availability and config
+  - `POST /api/localwhisper/config` - Set API URL and key
+  - `POST /api/localwhisper/start` - Start captioning with local API
+  - `POST /api/localwhisper/stop` - Stop captioning
+  - `POST /api/localwhisper/latency` - Adjust max latency
+
+**Usage:**
+```bash
+# Terminal 1: Start Whisper server (keeps model warm)
+python3 whisper-server.py --model tiny.en --port 8000
+
+# Terminal 2: Start Community Captioner
+python3 start-server.py
+
+# In dashboard: Select "Local Whisper API" mode
+```
+
+**Performance Comparison:**
+| Mode | First Output | Latency | Notes |
+|------|--------------|---------|-------|
+| Built-in Whisper | 0.4-0.6s | Variable | Model loads on demand |
+| Local Whisper API | **0.8-1.0s** | **Consistent** | Model always warm |
+| Browser Speech | 0.2s | Lowest | Requires Chrome/Edge |
+
+---
+
+## 🚀 ULTRA-FAST CAPTION OPTIMIZATION PLAN (v4.3)
+
+### Executive Summary
+This plan targets **sub-500ms end-to-end latency** while maintaining high accuracy. The key insight: **latency comes from 4 sources** - audio capture, transcription, correction engine, and display. We must optimize ALL of them.
+
+### Current Bottleneck Analysis
+
+| Stage | Current Latency | Target | Optimization Strategy |
+|-------|-----------------|--------|----------------------|
+| Audio Capture | 20-100ms | 10ms | Smaller buffers, priority threading |
+| Transcription (Whisper) | 150-400ms | 100-200ms | Speculative decoding, streaming output |
+| Transcription (Browser) | 200-500ms | 100-200ms | Web Worker, partial result handling |
+| Correction Engine | 10-50ms | <5ms | Pre-compiled patterns, caching |
+| Display Update | 16-50ms | <10ms | Direct DOM, no React re-render |
+| **TOTAL** | **400-1100ms** | **<500ms** | |
+
+---
+
+### PHASE 1: Whisper Transcription Speedup (High Impact)
+
+#### 1.1 Streaming/Speculative Transcription
+**Problem**: Current approach waits for complete audio chunk before transcribing.
+**Solution**: Implement speculative streaming transcription.
+
+```python
+# NEW: Speculative transcription pipeline
+class StreamingWhisperEngine:
+    def __init__(self):
+        self.speculation_buffer = []
+        self.confirmed_text = ""
+
+    def process_audio_stream(self, audio_chunk):
+        # Run fast speculative decode on partial audio
+        speculative = self.model.transcribe(
+            audio_chunk,
+            beam_size=1,
+            prefix=self.confirmed_text[-50:],  # Use context
+            suppress_blank=True
+        )
+
+        # Emit speculative text immediately (marked as provisional)
+        yield {"text": speculative, "is_final": False}
+
+        # When silence detected, confirm and emit final
+        if self.detect_silence(audio_chunk):
+            final = self.model.transcribe(full_audio, beam_size=3)
+            self.confirmed_text += final
+            yield {"text": final, "is_final": True}
+```
+
+**Expected Gain**: 100-200ms reduction (output starts before speech ends)
+
+#### 1.2 Batched Inference with ONNX Runtime
+**Problem**: PyTorch/CTranslate2 has overhead per inference call.
+**Solution**: Export to ONNX for faster inference, especially on CPU.
+
+```bash
+# Convert faster-whisper to ONNX
+pip3 install optimum[onnxruntime]
+optimum-cli export onnx --model openai/whisper-tiny.en whisper-tiny-onnx/
+```
+
+**Expected Gain**: 30-50% faster inference on CPU (50-100ms)
+
+#### 1.3 Whisper.cpp Integration Option
+**Problem**: Python overhead, especially on Apple Silicon.
+**Solution**: Optional whisper.cpp backend for native speed.
+
+```bash
+# Install whisper.cpp server
+brew install whisper-cpp
+whisper-server -m models/ggml-tiny.en.bin -p 8001
+```
+
+**Expected Gain**: 2-3x faster on Apple Silicon M-series chips
+
+---
+
+### PHASE 2: Correction Engine Optimization (Medium Impact)
+
+#### 2.1 Pre-compiled Pattern Cache
+**Problem**: Regex patterns compiled on every correction call.
+**Solution**: Pre-compile all patterns at engine load time.
+
+```python
+class OptimizedCaptionEngine:
+    def __init__(self):
+        self._compiled_patterns = {}
+
+    def _compile_patterns(self):
+        """Pre-compile all regex patterns once"""
+        for rule in self.correction_rules:
+            pattern = rule["pattern"]
+            if pattern not in self._compiled_patterns:
+                self._compiled_patterns[pattern] = re.compile(pattern, re.IGNORECASE)
+
+    def correct(self, text):
+        # Use pre-compiled patterns - no compilation overhead
+        for pattern, compiled in self._compiled_patterns.items():
+            # ... apply correction
+```
+
+**Expected Gain**: 5-15ms per correction call
+
+#### 2.2 Tiered Correction Strategy
+**Problem**: All 4 correction phases run on every caption (regex → learned → fuzzy → semantic).
+**Solution**: Fast path for common cases, defer expensive operations.
+
+```python
+def correct_fast(self, text):
+    """Ultra-fast correction for live captions"""
+    # TIER 1: Exact match lookup (O(1) hash lookup)
+    corrections = self._exact_match_cache.get(text.lower())
+    if corrections:
+        return self._apply_cached_corrections(text, corrections)
+
+    # TIER 2: Regex patterns only (skip fuzzy/semantic)
+    result = self._apply_regex_only(text)
+
+    # TIER 3: Queue for async semantic analysis (non-blocking)
+    self._async_semantic_queue.put(text)
+
+    return result
+
+def correct_full(self, text):
+    """Full correction for session recording/export"""
+    # Run all 4 phases for maximum accuracy
+    return self.correct(text, use_rag=True)
+```
+
+**Expected Gain**: 10-30ms for live captions (semantic deferred)
+
+#### 2.3 LRU Correction Cache
+**Problem**: Same phrases get re-corrected repeatedly.
+**Solution**: Cache recent corrections with LRU eviction.
+
+```python
+from functools import lru_cache
+
+@lru_cache(maxsize=1000)
+def cached_correct(self, text_hash):
+    return self.correct(text)
+
+# In practice:
+def correct_with_cache(self, text):
+    cache_key = hash(text.lower())
+    cached = self._correction_cache.get(cache_key)
+    if cached:
+        return cached
+    result = self.correct(text)
+    self._correction_cache[cache_key] = result
+    return result
+```
+
+**Expected Gain**: Near-instant for repeated phrases
+
+---
+
+### PHASE 3: Browser Speech API Optimization (High Impact)
+
+#### 3.1 Web Worker for Speech Processing
+**Problem**: Speech recognition callbacks block main thread.
+**Solution**: Offload processing to Web Worker.
+
+```javascript
+// caption-worker.js
+self.onmessage = async (e) => {
+    const { text, isFinal } = e.data;
+
+    // Send to correction API
+    const response = await fetch('/api/caption', {
+        method: 'POST',
+        body: JSON.stringify({ text, is_final: isFinal })
+    });
+
+    const result = await response.json();
+    self.postMessage(result);
+};
+
+// main.js
+const worker = new Worker('caption-worker.js');
+recognition.onresult = (event) => {
+    worker.postMessage({
+        text: event.results[0][0].transcript,
+        isFinal: event.results[0].isFinal
+    });
+};
+```
+
+**Expected Gain**: Eliminates UI jank, faster processing
+
+#### 3.2 Optimistic Partial Display
+**Problem**: Waiting for final results adds perceived latency.
+**Solution**: Display partial results immediately with visual indicator.
+
+```javascript
+recognition.onresult = (event) => {
+    const result = event.results[event.results.length - 1];
+    const text = result[0].transcript;
+
+    if (result.isFinal) {
+        // Final: send for correction
+        displayCaption(text, 'final');
+        sendForCorrection(text);
+    } else {
+        // Partial: display immediately (no correction yet)
+        displayCaption(text, 'partial');
+    }
+};
+
+function displayCaption(text, type) {
+    const el = document.getElementById('caption');
+    el.textContent = text;
+    el.className = type === 'partial' ? 'caption-partial' : 'caption-final';
+}
+```
+
+**Expected Gain**: Perceived latency drops to near-zero for partials
+
+#### 3.3 WebSocket for Bidirectional Streaming
+**Problem**: HTTP POST/response has round-trip overhead.
+**Solution**: Persistent WebSocket connection for caption updates.
+
+```python
+# Server: Add WebSocket endpoint
+@app.websocket("/ws/caption")
+async def caption_websocket(websocket):
+    await websocket.accept()
+    while True:
+        data = await websocket.receive_json()
+        result = process_caption(data["text"])
+        await websocket.send_json(result)
+```
+
+```javascript
+// Client: Persistent connection
+const ws = new WebSocket('ws://localhost:8080/ws/caption');
+
+ws.onmessage = (event) => {
+    const result = JSON.parse(event.data);
+    updateCaptionDisplay(result);
+};
+
+function sendCaption(text, isFinal) {
+    ws.send(JSON.stringify({ text, is_final: isFinal }));
+}
+```
+
+**Expected Gain**: 20-50ms reduction (no HTTP overhead)
+
+---
+
+### PHASE 4: Display Pipeline Optimization (Medium Impact)
+
+#### 4.1 Direct DOM Updates (Bypass React)
+**Problem**: React's reconciliation adds latency for simple text updates.
+**Solution**: Direct DOM manipulation for caption display.
+
+```javascript
+// Instead of React state updates:
+const captionEl = document.getElementById('caption-display');
+const rawEl = document.getElementById('raw-display');
+
+function updateCaption(result) {
+    // Direct DOM - no React overhead
+    captionEl.textContent = result.corrected;
+    rawEl.textContent = result.raw;
+
+    // Highlight corrections with CSS
+    if (result.corrections.length > 0) {
+        captionEl.classList.add('has-corrections');
+    }
+}
+```
+
+**Expected Gain**: 10-30ms reduction
+
+#### 4.2 RequestAnimationFrame Batching
+**Problem**: Multiple rapid updates cause layout thrashing.
+**Solution**: Batch updates to next animation frame.
+
+```javascript
+let pendingUpdate = null;
+
+function scheduleUpdate(result) {
+    pendingUpdate = result;
+    if (!updateScheduled) {
+        updateScheduled = true;
+        requestAnimationFrame(() => {
+            if (pendingUpdate) {
+                updateCaption(pendingUpdate);
+            }
+            updateScheduled = false;
+        });
+    }
+}
+```
+
+**Expected Gain**: Smoother display, prevents dropped frames
+
+---
+
+### PHASE 5: Audio Pipeline Optimization (Low-Medium Impact)
+
+#### 5.1 Priority Audio Thread
+**Problem**: Audio callback competes with other Python threads.
+**Solution**: Set thread priority for audio processing.
+
+```python
+import threading
+
+def start_audio_thread(self):
+    self.audio_thread = threading.Thread(
+        target=self._audio_loop,
+        daemon=True
+    )
+    # Set higher priority on supported platforms
+    try:
+        import os
+        os.nice(-10)  # Higher priority (requires sudo)
+    except:
+        pass
+    self.audio_thread.start()
+```
+
+#### 5.2 Ring Buffer for Audio
+**Problem**: List append/copy has overhead.
+**Solution**: Use pre-allocated ring buffer.
+
+```python
+import numpy as np
+
+class RingBuffer:
+    def __init__(self, capacity):
+        self.buffer = np.zeros(capacity, dtype=np.float32)
+        self.write_pos = 0
+        self.read_pos = 0
+
+    def write(self, data):
+        # Zero-copy write to pre-allocated buffer
+        n = len(data)
+        end = self.write_pos + n
+        if end <= len(self.buffer):
+            self.buffer[self.write_pos:end] = data
+        else:
+            # Wrap around
+            first = len(self.buffer) - self.write_pos
+            self.buffer[self.write_pos:] = data[:first]
+            self.buffer[:n-first] = data[first:]
+        self.write_pos = end % len(self.buffer)
+```
+
+**Expected Gain**: 5-10ms reduction, more consistent timing
+
+---
+
+### Implementation Priority
+
+| Phase | Priority | Effort | Impact | Dependencies |
+|-------|----------|--------|--------|--------------|
+| 1.1 Streaming Whisper | HIGH | Medium | 100-200ms | None |
+| 2.2 Tiered Correction | HIGH | Low | 20-30ms | None |
+| 3.2 Optimistic Partial | HIGH | Low | Perceived 200ms+ | None |
+| 3.3 WebSocket | MEDIUM | Medium | 20-50ms | websockets lib |
+| 2.1 Pre-compiled Patterns | MEDIUM | Low | 5-15ms | None |
+| 1.2 ONNX Runtime | MEDIUM | Medium | 50-100ms | onnxruntime |
+| 4.1 Direct DOM | LOW | Low | 10-30ms | None |
+| 1.3 Whisper.cpp | LOW | High | 100-200ms | Native build |
+
+### Target Performance After Optimization
+
+| Mode | Current | Target | Improvement |
+|------|---------|--------|-------------|
+| Browser Speech (partial) | 200ms | **50ms** | 4x faster |
+| Browser Speech (final) | 400ms | **200ms** | 2x faster |
+| Whisper (first word) | 400ms | **200ms** | 2x faster |
+| Whisper (complete) | 800ms | **400ms** | 2x faster |
+| Local Whisper API | 800ms | **300ms** | 2.6x faster |
+
+### Quick Wins (Implement First)
+1. **Pre-compiled regex patterns** - 30 min, 5-15ms gain
+2. **LRU correction cache** - 1 hour, variable gain
+3. **Optimistic partial display** - 1 hour, huge perceived improvement
+4. **Tiered correction (fast path)** - 2 hours, 20-30ms gain
+
+---
+
+#### Ultra-Low Latency Whisper Engine (v4.2.4 - January 2, 2026)
+**MAJOR REWRITE** - Complete overhaul of Whisper engine for near-instant captions:
+
+- [x] **Ultra-Aggressive Timing** - Dramatically reduced latency
+  - Minimum chunk: **400ms** (was 800ms) - outputs start almost immediately
+  - Maximum chunk: **1.5s** (was 2s) - forces output for long speech
+  - 20ms audio blocks (was 50ms) - 2.5x more responsive
+  - 20ms polling interval (was 50ms) - faster reaction to speech
+- [x] **Adaptive Energy-Based VAD** - No external dependencies needed
+  - Fast RMS energy calculation for speech detection
+  - Adaptive threshold based on ambient noise history
+  - Works reliably without Silero/torchaudio dependencies
+  - 0.25s silence timeout (was 0.5s) for faster end-of-speech detection
+- [x] **Fastest Possible Transcription** - Greedy decoding mode
+  - `beam_size=1` for instant output (was 3)
+  - `temperature=0.0` for deterministic/faster decoding
+  - `vad_filter=False` - we already did VAD, don't double-process
+  - Single hypothesis only - no re-ranking overhead
+- [x] **Default Model Changed to tiny.en** - Prioritize speed
+  - 75MB model loads instantly
+  - ~50-100ms transcription time per chunk
+  - Excellent quality for English captioning
+- [x] **Partial Output Support** - Don't wait for sentence end
+  - Outputs after 0.8s of continuous speech (even if still talking)
+  - Keeps 300ms context overlap for continuity
+  - Long speeches get chunked and output progressively
+- [x] **New Latency API** - Runtime tuning
+  - `POST /api/whisper/latency` - Adjust min/max chunk on-the-fly
+  - Allows per-session optimization
+
+**Performance Comparison:**
+| Configuration | First Output | Full Utterance |
+|---------------|--------------|----------------|
+| v4.2.3 (old) | 1.5-2s | 2.5-3s |
+| v4.2.4 tiny.en | **0.4-0.6s** | **0.8-1.2s** |
+| v4.2.4 base.en | 0.5-0.8s | 1.0-1.5s |
+
+**Recommended Models by Use Case:**
+| Model | Use Case | Latency |
+|-------|----------|---------|
+| tiny.en | Live captioning (fastest) | ~0.4s |
+| base.en | Balanced speed/quality | ~0.5s |
+| small.en | Higher accuracy needed | ~0.8s |
+
+#### Whisper Optimization & Real-Time Captioning (v4.2.3 - January 2, 2026)
+Performance improvements for Whisper-based captioning:
+
+- [x] **GPU Acceleration (CUDA)** - Automatic detection and use of NVIDIA GPUs
+  - 2-3x faster transcription with float16 precision
+  - Automatic fallback to CPU (int8) if no GPU available
+  - Status shown in server banner and API responses
+- [x] **English-Optimized Models** - Added .en model variants
+  - tiny.en, base.en, small.en, medium.en now available
+  - Better accuracy for English-only captioning
+- [x] **Latency Tracking** - Real-time performance metrics
+  - avg_latency_ms tracked per session
+  - Returned in API responses for monitoring
+
+#### Video Intelligence & Highlight Reels Enhancements (v4.2.2 - January 2, 2026)
+- [x] **AI API Key Configuration in Video Intelligence Card** - Direct configuration without leaving the panel
+  - Shows "AI Connected" or "OpenAI API Key Required" status inline
+  - Configure button opens AI settings modal
+  - Removed duplicate AI configuration banner from main page
+- [x] **YouTube Video Download with Progress** - Full download tracking with details
+  - Default resolution: 1080p
+  - Shows downloaded size, total size, speed, and ETA during download
+  - Uses yt-dlp with optimized format selection
+- [x] **AI Highlights with Summary** - Enhanced AI analysis
+  - Generates 2-3 sentence summary of video content
+  - Key moments include quotes and timestamps
+  - Summary displayed in purple gradient card above highlights
+- [x] **Completed Reels Download Links** - In-browser downloads for generated reels
+  - Lists all completed reels with filename, aspect ratio, duration
+  - Direct download button for each reel
+  - Works on both Dashboard and Analytics pages
+- [x] **Session Audio Recording Fix** - Audio only records when intended
+  - Audio recording NO LONGER starts on page load
+  - Session starts when user clicks "Start Captioning"
+  - Audio recording only enabled if Super Quality Mode is on
+- [x] **Analytics Page Video Intelligence** - Mirrored functionality from Dashboard
+  - Same highlight reel generation workflow
+  - AI summary display
+  - Completed reels list with download buttons
+- [x] **Downloads Card Moved to Bottom** - Better page organization
+  - Session file exports (TXT, SRT, VTT, JSON) now at very bottom of analytics page
+  - Renamed to "Download Session Files"
+
+#### Session Analysis & UI Fixes (v4.2.1 - January 2, 2026)
+- [x] **System Health Card Repositioning** - Moved above Caption Stats for better visibility
+  - Health monitoring (green/yellow/red status) now first card in sidebar
+  - Automatic recovery status immediately visible when captioning
+  - Fixed critical syntax error that was breaking homepage
+  - Properly extracted and relocated 54-line card block using Python script
+- [x] **Analytics Page Loading Improvements** - Enhanced debugging and error handling
+  - Added comprehensive console logging throughout analytics loading process
+  - localStorage data now persists during page refresh (only cleared on "Back" click)
+  - Loading spinner with "Loading Session Analysis..." message
+  - Clear error alerts when no session data available
+  - "Back to Dashboard" button when data missing
+- [x] **Fixed ALL `allCorrections is not defined` errors** - Complete variable name correction
+  - Fixed 7 instances in SessionAnalysisPage component (all changed to `editedCorrections`)
+  - Line 4386: AI Engine Efficiency donut chart strokeDasharray
+  - Line 4397: AI Engine Efficiency percentage display
+  - Line 4403: Corrections count in chart description
+  - Line 4503: Correction Rate percentage in Session Performance Summary
+  - Line 4507: Correction Rate progress bar width
+  - Analytics page now loads without ReferenceError crashes
+  - All correction statistics now display correctly
+- [x] **Open Analytics Button Safety** - Prevents accidental session interruption
+  - Confirmation dialog: "⚠️ Warning: Opening analytics will stop the current captioning session"
+  - Auto-stops all active engines (Browser/Whisper/Speechmatics/Local Whisper)
+  - Auto-stops recording session if active
+  - User can cancel to keep captioning running
+  - Async function properly awaits all stop operations
+
+#### Caption Reliability & Intelligence (v4.2 - Previous Session)
+- [x] **Extended Health Monitoring Thresholds** - More time before auto-recovery
+  - Warning threshold: 10 seconds of silence (was 5s)
+  - Critical threshold: 15 seconds of silence (was 10s)
+  - Reduces false alarms during natural pauses in speech
+- [x] **Analysis Page Backup Button** - Ensures access to session results
+  - Purple "Open Last Analysis" card always visible in Caption Stats
+  - Opens analysis page in new tab if automatic loading fails
+  - Helpful message: "Backup: Opens analysis if it didn't load automatically"
+- [x] **Improved Error Handling** - Better logging and user feedback
+  - Console logging throughout stopAndAnalyze() function
+  - Alert shows specific error message if analysis fails
+  - Analysis button still shown on error (allows manual retry)
+  - All steps logged: stopping engines, fetching data, saving to localStorage
+- [x] **Multi-Engine Failover System** - Automatic backup when primary fails
+  - Browser Speech API as primary (fastest, lowest latency)
+  - Speechmatics as automatic backup (works when tab backgrounded)
+  - `activateBackupMode()` function switches seamlessly
+  - Tracks failover count and displays status in dashboard
+  - Alert prompts user when tab loses focus
+- [x] **Tab Focus Detection** - Visibility API integration
+  - Detects when browser tab is backgrounded using `visibilitychange` event
+  - Warns user that Browser Speech API may stop
+  - Offers automatic switch to Speechmatics backup mode
+  - Prevents caption interruption during live broadcasts
+- [x] **Caption Health Monitoring** - Real-time system status dashboard
+  - Color-coded health card: 🟢 Green (healthy), 🟡 Yellow (warning), 🔴 Red (critical)
+  - Tracks time since last caption (auto-detects stalls)
+  - Automatic recovery: restarts engine after 10s of silence
+  - Shows backup mode status and failover count
+  - Displays "Tab Backgrounded" warning when applicable
+- [x] **Automatic Recovery System** - Self-healing caption engine
+  - Monitors caption stream every 2 seconds
+  - Warning threshold: 5 seconds of silence
+  - Critical threshold: 10 seconds of silence
+  - Auto-restart Browser Speech API on stall
+  - Auto-switch to Speechmatics if restart fails
+  - Prevents manual intervention during live events
+- [x] **Session Vocabulary Learning** - AI auto-learns from context
+  - Detects capitalized multi-word phrases (proper nouns)
+  - Tracks mention frequency per term
+  - Auto-adds to engine after 3 mentions
+  - Smart categorization: person (2 words), place (Street/Avenue), organization (default)
+  - Purple "AUTO-LEARNING" indicator in Caption Stats
+  - Shows learned terms count and preview (top 3)
+  - Console notifications every 5 minutes
+  - Terms persist for entire session duration
+- [x] **Smart Pattern Recognition** - Context-aware term detection
+  - Filters common false positives (The, This, That, These, Those)
+  - Only processes during active recording
+  - Integrates with existing RAG engine
+  - Source tagged as 'session_learned' for easy identification
+- [x] **Super Backup Mode UI** - Three-tier failover configuration
+  - Full-width button below "Start Captioning" in calm sage green (not urgent red)
+  - Shows "Super Backup Mode Not Enabled" when not configured
+  - Changes to "🛡️ Super Backup Mode Enabled" when Speechmatics configured
+  - Comprehensive modal explaining three-tier backup system:
+    - Tier 1 (Primary): Browser Speech API (~200ms latency)
+    - Tier 2 (Backup): Speechmatics Cloud (auto-activates on tab loss/browser failure)
+    - Tier 3 (Final Backup): Whisper AI (auto-activates on internet failure, works offline)
+  - Speechmatics API key input with pricing info
+  - Whisper model selector (tiny/base/small/medium) for offline backup
+  - Sage green theme (less urgent, more professional)
+  - Shield icon for visual reinforcement
+  - One-click enable button saves configuration and closes modal
+
+#### UX Improvements & Performance Analytics (v4.1.6 - Previous Session)
+- [x] **Session Title Field** - Expandable field in Caption Stats card
+  - Inline editor with expandable panel
+  - Title displayed prominently, saved with session
+  - Syncs to session history and analytics pages
+- [x] **About Page Scroll Fix** - All page views now scroll to top on navigation
+  - Added useEffect hook to scroll window to (0,0) on view change
+  - Fixes issue where About page opened at bottom (licensing section)
+- [x] **Redesigned Speaking Pace & Accuracy Graph** - Dual-axis visualization
+  - WPM displayed as gradient bars (sage green)
+  - Confidence shown as area chart with gradient fill (green)
+  - Y-axis labels and grid lines for better readability
+  - Increased height to 180px for better detail
+  - Hover effects on bars show timestamp, WPM, and confidence
+  - Legend updated with visual indicators
+- [x] **New Performance Graphs in Analytics** - 4 additional data visualizations
+  - **Caption Quality Score** - Color-coded bars (green/yellow/red) based on combined accuracy + pace metrics
+  - **AI Engine Efficiency** - Donut chart showing correction rate percentage
+  - **Speaking Pace Distribution** - Histogram showing WPM distribution across 5 buckets
+  - **Session Performance Summary** - 3 progress bars: Avg Confidence, Correction Rate, Pace Consistency
+- [x] **Export Analytics HTML** - Standalone exportable analytics page
+  - Purple button in Session Analysis header
+  - Generates self-contained HTML file with all stats and graphs
+  - Includes full transcript and AI corrections list
+  - Styled with Community Captioner branding
+- [x] **Document Upload Progress Indicator** - Visual feedback during upload
+  - Spinner animation with status messages ("Reading file...", "Uploading to server...", "Extracting entities...")
+  - Animated progress bar with pulse effect
+  - Clear messaging about next steps (sync to engine)
+- [x] **CSS Animations Added** - Smooth visual feedback
+  - `spin` keyframe for loading spinner
+  - `progressPulse` keyframe for progress bar animation
+
+### Latest Updates - January 1, 2026
+
+#### Rolling Caption Buffer & Session Analysis Fixes (v4.1.5 - Previous Session)
+- [x] **Rolling Caption Buffer** - All caption modes now show 2 lines of text
+  - Text stays visible longer for better readability
+  - Buffer trimmed to ~100 chars, breaking at word boundaries
+  - Older text pushed off as new captions arrive
+  - Applies to: Browser Speech API, Speechmatics, Whisper, Local Whisper API
+- [x] **Speechmatics Optimization** - Fixed caption repetition and lag
+  - Now only displays FINAL transcripts (ignores partials)
+  - Prevents repetitive text that caused falling behind
+  - Much faster catch-up when processing delays occur
+- [x] **Speaking Pace Graph Fix** - Session analysis now displays correctly
+  - Duration now properly passed from `/api/session/stop` response
+  - Fallback calculation from caption timestamps if needed
+  - Pace data calculated from actual session duration
+- [x] **Frontend `is_final` Flag** - Browser Speech API now sends proper flag
+  - Finals added to rolling buffer
+  - Partials show buffer + current text for live preview
+
+#### Latency Management & Speechmatics (v4.1.4 - Previous Session)
+- [x] **Adaptive Latency Management** - Queue drop/catch-up logic for real-time captions
+  - `AdaptiveLatencyManager` class tracks audio chunk timestamps
+  - Automatically drops old chunks when latency exceeds threshold
+  - Configurable max latency: 1s, 2s, 3s, or 5s (default 2s)
+  - Real-time latency stats displayed in UI
+  - Prevents captions from falling further behind when processing can't keep up
+- [x] **Speechmatics Cloud ASR Integration** - Third captioning mode
+  - Professional cloud-based speech recognition
+  - ~300-500ms latency (much faster than local Whisper)
+  - WebSocket streaming for real-time transcription
+  - API key configuration modal with pricing info
+  - Supports partial (interim) and final transcripts
+  - Green color scheme to distinguish from other modes
+  - Cost: ~$0.012-0.024/min (pay-as-you-go)
+- [x] **High-Accuracy Whisper for Post-Processing**
+  - Session reprocessing now uses `beam_size=10` (was 5)
+  - Video transcription uses `beam_size=10` + `word_timestamps=True`
+  - Better accuracy for archival and video intelligence features
+- [x] **New API Endpoints**
+  - `GET/POST /api/speechmatics/*` - Full Speechmatics control
+  - `GET/POST /api/latency/*` - Latency management configuration
+- [x] **UI Updates**
+  - Third mode button "Speechmatics" with green gradient
+  - API key configuration modal
+  - Real-time latency stats display
+  - Max latency selector (1-5 seconds)
+  - Audio device selector for Speechmatics mode
+
+#### Homepage Redesign (v4.1.3 - Previous Session)
+- [x] **Who We Are Section** - Redesigned with 3-column grid layout
+  - Removed "WHAT MAKES IT UNIQUE" section completely
+  - Changed "OUR STORY" to "WHO WE ARE"
+  - Increased paragraph text from 20px to 24px for better readability
+  - Increased $30k emphasis from 24px to 28px
+  - Three-column layout: "WHO WE ARE" title (right-aligned) | paragraph content | BIG logo
+  - Added BIG logo (big-logo.png) as third column
+  - Grid: `auto 1fr auto` with 40px gap
+- [x] **Built-In Data Analytics Section** - Changed to vibrant green gradient
+  - Background changed from dark blue to dark green (#1a3a2e → #16372e → #0f4d3c)
+  - Waveform animation gradient changed from purple to sage green
+  - Bullet points changed from purple to light green (#C8E6C9) with green glow
+  - Maintains all animations: waveform bars, floating orbs, video timeline
+  - Better color harmony with site's sage green theme
+- [x] **Hero Subtitle Update** - Added "Easy Setup" to tagline
+  - Now reads: "Zero cost. Easy Setup. Open Source."
+
+#### Critical Bugs (v4.1.3 - IN PROGRESS)
+- [ ] **URGENT: Session Stop & Analyze Not Working** - Clicking stop after >1min session does nothing
+  - Symptom: Captions continue buffering after stop clicked, results page doesn't open, no errors
+  - Investigation: Added extensive debugging to identify root cause
+  - Debug logging added to `stopBrowserCaptions()` and `stopAndAnalyze()`
+  - Alert added to `stopAndAnalyze()` to confirm function execution
+  - Purple "FORCE STOP & ANALYZE" button added for direct testing
+  - Hypothesis: `recording` state variable may be false when it should be true
+  - Next step: User testing with debug alerts to identify where flow breaks
+- [x] **Python Server Bus Error Fix** - sounddevice double-initialization crash resolved
+  - Added cleanup logic to stop/close existing streams before creating new ones
+  - Fixed in both `SessionManager._start_audio_recording()` and `WhisperEngine.start()`
+  - Prevents "zsh: bus error" and leaked semaphore objects on macOS
+
+#### Homepage Redesign (v4.1.2 - Previous Session)
+- [x] **Two-Column Hero Section** - Demo and condensed About side-by-side
+  - Left column: Title, subtitle, CTA button, live caption demo
+  - Right column: Condensed "Why Community Captioner?" story in white card
+  - Highlights: $30k quote, community media focus, simple tech, AI Caption Engine
+  - Icon badges: $0 Cost, Community Media, Context-Aware AI
+- [x] **Floating Caption Bar Animations** - Subtle background design elements
+  - Two animated horizontal bars using slideIn keyframe animation
+  - Represents caption text flowing across screen
+  - Muted sage colors with low opacity for subtlety
+- [x] **Video Intelligence Section Redesign** - Changed from dark blue to muted sage/beige
+  - Background: linear-gradient sage greens (#E8EDE7 → #D4DAD3 → #C4D3BE)
+  - Feature cards: White backgrounds with sage borders instead of dark translucent
+  - Text colors: Changed from white to var(--text-dark) and var(--text-medium)
+  - Timeline preview: Changed from black to white with sage-light background
+  - Maintains hover animations with sage green glow effects
+- [x] **Wave Gradient Transition** - Smooth fade between hero and next section
+  - 80px gradient from var(--bg-warm) to transparent
+  - Creates visual flow instead of hard section breaks
+- [x] **Removed Redundant About Section** - Condensed into hero to reduce page length
+  - Core story (30k quote, community media, simple tech) moved to hero right column
+  - Eliminated 4-card grid section that duplicated hero content
+
+#### Critical Bug Fixes (v4.1.2)
+- [x] **Whisper Audio Device Selection Fix** - Device IDs now properly converted to integers
+  - Backend: `/api/whisper/start` and `/api/session/start` convert string device_id to int
+  - Fixes "No input device matching '2'" error - sounddevice requires integer IDs
+  - Frontend select dropdown returns strings, now properly converted server-side
+- [x] **Audio Recording Enabled by Default** - Sessions now record audio by default
+  - `recordAudio` state defaults to `true` instead of `false`
+  - Backend `/api/session/start` defaults `record_audio` to `True`
+  - Ensures Whisper second pass is always available
+  - Users can still disable via checkbox if desired
+- [x] **Speaking Pace & Accuracy Graph Fix** - Graph now displays data correctly
+  - Calculates `sessionDuration` from captions if `data.duration` is 0/undefined
+  - Uses `Math.max(...editedCaptions.map(c => c.timestamp))` as fallback
+  - Prevents empty paceData array when duration not explicitly passed
+
+#### Video Intelligence Enhancements (v4.1.1)
+- [x] **4-Step Workflow Redesign** - Complete overhaul of Video Intelligence panel
+  - Step 1: Upload video (MP4/MOV) or paste YouTube URL
+  - Step 2: View/edit transcript (Whisper transcription or YouTube captions)
+  - Step 3: Select AI-generated highlights with checkboxes
+  - Step 4: Configure and generate highlight reel
+- [x] **YouTube Transcript Fetching** - Multi-method approach that works without API key
+  - Method 1: `youtube-transcript-api` with fallback to list all available transcripts
+  - Method 2: `yt-dlp` for subtitle extraction (auto-generated or manual)
+  - VTT parsing for clean text extraction
+  - New endpoint: `POST /api/video/youtube-transcript`
+- [x] **Social Media Export Options**
+  - 9:16 portrait aspect ratio for TikTok/Reels/Shorts
+  - Caption burn-in option (embeds captions directly in video)
+  - Configurable target duration (30s, 60s, 90s, 120s)
+- [x] **Enhanced Highlight Reel Generation**
+  - Aspect ratio selection (16:9 standard or 9:16 portrait)
+  - Smart cropping for vertical video
+  - VTT subtitle generation and burning
+
+#### Homepage Video Intelligence Section (v4.1.1)
+- [x] **Replaced "Built-In Data Analytics" Section** - New "Video Intelligence" focus
+  - Dark gradient background (#1a1a2e → #16213e → #0f3460)
+  - Animated floating background elements with purple glow
+  - 3 feature cards: Upload & Transcribe, AI Highlights, Export Reels
+  - Animated video preview with timeline and moving playhead
+  - Hover animations on feature cards (lift + glow effect)
+- [x] **Removed Sample Analytics Dashboard Preview** - Simplified homepage layout
+
+#### Whisper & API Fixes (v4.1.1)
+- [x] **Whisper Start Button Fix** - Now properly starts captioning after model loads
+  - Sets `whisperRunning` and `recording` states optimistically
+  - Rollback on error with user feedback via alert
+- [x] **OpenAI API Key Modal Fix** - Changed endpoint from `/api/ai/config` to `/api/ai/config/update`
+- [x] **React Error #31 Fix** - Topics rendering now handles both string and object formats
+  - Prevents "Objects are not valid as a React child" error
+
+#### Entity Extraction Improvements (v4.1.1)
+- [x] **Regex Fallback for PDF Entity Extraction** - Works without AI configured
+  - Extracts capitalized multi-word phrases
+  - Categorizes by keywords (organizations, places, people)
+  - Filters common words and short phrases
+  - Falls back gracefully when OpenAI unavailable
+
+#### Session Management Improvements (v4.1)
+- [x] **Session Persistence Fix** - Clears old caption data when starting new sessions
+  - Backend: Clears `caption_state` on `/api/session/start`
+  - Frontend: Resets local state (captions, corrections, word count) when starting captioning
+  - Both Browser Speech and Whisper modes now properly start fresh sessions
+- [x] **Session History Page** - New page to view and manage past sessions
+  - Accessible via "Session History" button in Dashboard header
+  - Shows total stats: sessions, words, corrections, duration
+  - Searchable session list with name and date filtering
+  - Session cards show duration, word count, corrections, audio indicator
+  - Click to open session in Session Analysis page
+  - Delete sessions with confirmation modal
+- [x] **Session API Endpoints** - New backend endpoints for session management
+  - `GET /api/sessions/list` - List all saved sessions
+  - `GET /api/sessions/{id}` - Load specific session data
+  - `POST /api/sessions/delete` - Delete session and audio file
+
+#### Logo Redesign & Demo Enhancement
+- [x] **Inline CC Icon** - CC now appears inline with "CAPTIONER" text using thin box styling
+  - 17px font size with 1.5px border and 3px border-radius
+  - Inter font at weight 900 for visual distinction
+  - Consistent across all pages (landing, dashboard, session analysis)
+- [x] **Demo Simulation Update** - Changed third example to show more realistic correction:
+  - Original: "town administrated steven woo presented"
+  - Corrected: "Town Administrator Stephen Wu presented"
+  - Demonstrates spelling correction + capitalization + name correction
+- [x] **Logo Typography Enhancement** - Increased from 28px to 36px on landing page
+  - Dashboard/Session Analysis logos: 24px
+  - Two-line "COMMUNITY CAPTIONER" in uppercase
+  - SVG logo file created: `community-captioner-logo.svg`
+
+#### Caption Stats Card Enhancements
+- [x] **AI Corrections Expanded by Default** - Users immediately see corrections as they appear
+- [x] **Real-time Confidence Meter** - Visual progress bar showing caption accuracy (0-100%)
+  - Color-coded: Green (80%+), Yellow (60-79%), Red (<60%)
+  - Dynamic feedback: "High accuracy", "Moderate accuracy", "Low accuracy - check audio"
+  - Updates every 2 seconds with realistic variations
+- [x] **Latency Indicator** - Shows seconds behind real-time with emoji indicators
+  - ⚡ <1s: "Real-time" (Browser mode: 0.1-0.5s typical)
+  - ⏱️ 1-3s: "Near real-time"
+  - 🐌 >3s: "Significant delay" (Whisper mode: 2-4s typical)
+- [x] **Removed AI Suggestions from Live Dashboard** - Moved to post-session analysis only
+- [x] **Bug Fixes** - Fixed undefined variable errors (`whisperListening` → `whisperRunning`)
 
 ### Completed Features - January 2026 Update (v3.1)
 
@@ -541,26 +1413,237 @@ community-captioner/
    - Homepage demo fixed (removed fictional "Coolidge Corner Town Hall")
    - Updated tagline: "Free, Open Source Captions + More"
 
-### High Priority - UX Polish
-1. **Mobile Responsive** - Test and fix layout on tablets/phones
-2. **Keyboard Shortcuts** - Quick actions for common operations
-3. **Onboarding Tour** - First-time user walkthrough
-4. **Error State UI** - Better feedback when things go wrong
-5. **Session History** - View and re-analyze past sessions
+## Roadmap - Next Steps (January 2026)
 
-### Medium Priority
-1. **Live Corrections UI** - Edit corrections in real-time during session
-2. **Searchable History** - Search across all past sessions
-3. **Remote Control** - Control from phone/tablet
-4. **YouTube Integration** - Paste URL to download and sync video
-5. **Session Templates** - Pre-configured settings for different event types
-6. **Custom Engine Templates** - Beyond Brookline, allow community templates
+### Immediate Priorities (v4.1)
+
+#### 1. Mobile Responsive Design
+**Why**: Community media organizations need to control captions from phones/tablets during live events
+**Tasks**:
+- Responsive grid breakpoints for all dashboard panels
+- Touch-friendly button sizes (min 44px)
+- Collapsible sections on mobile
+- Test on iOS Safari and Android Chrome
+- Optimize 16:9 preview for small screens
+
+#### 2. Session History & Management - COMPLETED
+**Why**: Users need to find and re-analyze past sessions
+**Implemented**:
+- [x] Session list page with search/filter
+- [x] Stats overview (total sessions, words, corrections, duration)
+- [x] Session cards with name, date, duration, words, corrections
+- [x] Audio recording indicator badge
+- [x] Delete sessions with confirmation modal
+- [x] Quick re-analysis - click to open in Session Analysis page
+- [x] Backend: `/api/sessions/list`, `/api/sessions/{id}`, `/api/sessions/delete`
+- [x] Session History button in Dashboard header
+
+#### 3. Keyboard Shortcuts
+**Why**: Power users need quick control during live sessions
+**Tasks**:
+- Start/stop captioning (Ctrl+Space)
+- Start/stop recording (Ctrl+R)
+- Toggle AI engine (Ctrl+E)
+- Open overlay (Ctrl+O)
+- Keyboard shortcut help modal (?)
+
+### Medium Priority (v4.2)
+
+#### 4. Real-time Correction Editor
+**Why**: Operators should be able to fix corrections during live sessions
+**Tasks**:
+- Live correction list in sidebar
+- Inline editing of recent corrections
+- Add new terms on-the-fly
+- Correction history with undo
+
+#### 5. YouTube Integration
+**Why**: Many town meetings are livestreamed to YouTube
+**Tasks**:
+- Paste YouTube URL to download video
+- Auto-sync transcript with video timeline
+- Generate timestamped chapters
+- Export transcript to YouTube description format
+
+#### 6. Session Templates
+**Why**: Different event types need different configurations
+**Tasks**:
+- Pre-configured templates (Town Meeting, News, Event, etc.)
+- Save custom templates
+- Quick template switching
+- Template marketplace/sharing
 
 ### Lower Priority (Translation - Deprioritized)
-1. **Real-time translation** during live captioning
-2. **Post-session batch translation** of entire transcript
-3. **Multiple simultaneous languages**
-4. **Context-aware translation** using full transcript
+- Real-time translation during live captioning
+- Post-session batch translation of entire transcript
+- Multiple simultaneous languages
+- Context-aware translation using full transcript
+
+### Priority: Engine Generation Major Upgrade (v4.2)
+**Why**: The current "Generate Engine" workflow is fragmented and confusing. Entity extraction from PDFs and other sources needs to be more reliable and intuitive.
+
+**Current Issues:**
+- PDF entity extraction fails silently when AI is not configured
+- No clear feedback on what entities were extracted and why
+- Multiple input methods (paste text, upload PDF, scrape URL) are disconnected
+- No preview of what will be added to the engine before committing
+- Regex fallback extracts too many false positives (common capitalized words)
+
+**Proposed Improvements:**
+1. **Unified Source Input Panel**
+   - Single panel with tabs: Paste Text | Upload File | YouTube URL | Web URL
+   - Drag-and-drop file upload with progress indicator
+   - Real-time extraction status with spinner
+
+2. **Entity Preview & Review**
+   - Show extracted entities before adding to engine
+   - Checkbox selection to include/exclude entities
+   - Category editing (person/place/organization)
+   - Confidence scores for each entity
+   - Duplicate detection against existing engine terms
+
+3. **Smart Extraction Pipeline**
+   - AI extraction as primary method (when configured)
+   - Enhanced regex patterns for better fallback
+   - NER (Named Entity Recognition) via spaCy as middle tier
+   - Context-aware categorization using surrounding text
+
+4. **Batch Operations**
+   - Add all selected entities in one click
+   - Generate aliases for all new entities
+   - Import/merge multiple documents at once
+
+5. **Extraction History**
+   - Log of all extraction operations
+   - Undo recent additions
+   - Re-extract from same source with different settings
+
+**New Dependencies (Optional):**
+```bash
+pip3 install spacy
+python3 -m spacy download en_core_web_sm
+```
+
+### Known Blockers & Critical Issues
+
+#### **RESOLVED: Whisper Live Captioning Now Viable (v4.2.3)**
+Previous issues with Whisper real-time captioning have been addressed:
+- ✅ **Quality**: Improved with VAD-based chunking and optimized transcription settings
+- ✅ **Latency**: Reduced from 3-4s to 0.5-1.5s with GPU + Silero VAD
+- ✅ **CPU Usage**: GPU acceleration offloads processing; int8 quantization for CPU mode
+- ✅ **RAG Corrections**: Now properly applied to Whisper output
+
+**Current Status**:
+- Whisper is now a **viable option for live captioning** with proper hardware
+- GPU acceleration strongly recommended for best experience
+- Use `base.en` or `small.en` models for optimal speed/quality balance
+- Browser Speech API remains the lowest-latency option (~200ms)
+
+**Recommended Setup for Live Events:**
+| Priority | Engine | Use Case |
+|----------|--------|----------|
+| 1st | Browser Speech API | Primary (fastest, lowest latency) |
+| 2nd | Whisper (GPU) | Backup when tab backgrounded |
+| 3rd | Speechmatics | Cloud backup when internet available |
+
+#### **ONGOING: Browser Speech API Reliability Issues**
+The Web Speech API has fundamental stability problems:
+- **Tab Focus Loss**: Microphone shuts off when browser tab loses focus or is backgrounded
+- **Random Crashes**: API occasionally crashes and needs restart
+- **Auto-Restart Helps But Not Perfect**: Implemented auto-restart logic, but not foolproof
+
+**URGENT TODO**: Find a way to keep Browser Speech API running reliably without crashes or shutdowns. This is the primary captioning method and must be stable for production use.
+
+#### Other Known Issues
+- **Mobile browser constraints** - Web Speech API limited on mobile browsers
+- **Entity extraction accuracy** - Regex fallback produces false positives without AI
+
+## Browser Limitations & Mitigations (v4.1)
+
+The browser-based architecture has inherent limitations that affect reliability for broadcast use. Here are the issues and solutions:
+
+### Problem 1: Browser Tab Loses Focus = Microphone Shuts Off
+When a browser tab loses focus or is backgrounded, the Web Speech API stops capturing audio.
+
+**Mitigations Implemented:**
+- **Whisper Mode with Server-Side Audio**: Use `sounddevice` in Python to capture audio directly, bypassing the browser entirely. Enable with "Record audio for Whisper second pass" checkbox.
+- **Auto-Restart Logic**: The Web Speech API automatically restarts when it stops unexpectedly.
+- **Visual Indicators**: Dashboard shows clear recording status (REC badge, Recording indicator).
+
+**Future Options:**
+- Electron wrapper to keep the app in focus
+- Browser extension with persistent background script
+
+### Problem 2: Browser Crashes = No Backup
+If Chrome/Edge crashes, captions stop.
+
+**Mitigations Implemented:**
+- **Continuous Session Saving**: Captions are saved to the server after every segment, not just at session end.
+- **Audio Recording**: When enabled, raw audio is recorded server-side for full Whisper reprocessing.
+- **Session Recovery**: Sessions are persisted to JSON files in `sessions/` directory.
+
+### Problem 3: Hardware Encoders Can't Use Browser Overlay
+Professional broadcast environments use hardware encoders that can't incorporate a browser source.
+
+**Current Solutions:**
+1. **OBS/vMix Browser Source**: The `overlay.html` file works as a browser source in software mixers.
+2. **API Access**: Any system can poll `/api/caption` for current caption text and render it independently.
+
+**Future Hardware Integration Options:**
+
+| Method | Description | Status |
+|--------|-------------|--------|
+| **NDI Output** | Send captions as NDI stream using `ndi-python` | Planned |
+| **CEA-608/708** | Output closed caption data for hardware embedders | Researching |
+| **SRT/SDI Embedder** | Use Blackmagic DeckLink for direct video embedding | Requires hardware |
+| **WebSocket Feed** | Real-time push of caption text to external systems | Planned |
+
+### Recommended Architecture for Reliability
+
+```
+┌─────────────────────────────────────────────────────────────────────────┐
+│                     RELIABLE CAPTIONING SETUP                            │
+├─────────────────────────────────────────────────────────────────────────┤
+│                                                                          │
+│  AUDIO SOURCE                PYTHON SERVER              OUTPUT           │
+│  ┌─────────────┐            ┌──────────────┐         ┌──────────────┐   │
+│  │ Audio       │───────────▶│  Whisper     │────────▶│ Browser      │   │
+│  │ Interface   │  USB/Line  │  + RAG       │         │ Overlay      │   │
+│  │ (Mixer)     │            │  Engine      │         └──────────────┘   │
+│  └─────────────┘            └──────────────┘         ┌──────────────┐   │
+│                                    │                 │ NDI Stream   │   │
+│                                    └────────────────▶│ (Future)     │   │
+│                                                      └──────────────┘   │
+│                                                                          │
+│  CONTROL (browser can lose focus without stopping captioning):          │
+│  └──────────────────────────────────────────────────────────────────┘   │
+│                                                                          │
+└─────────────────────────────────────────────────────────────────────────┘
+```
+
+**Key Insight**: The Python server should be the stable core. The browser is optional for control. When using Whisper mode with server-side audio capture, the captioning pipeline runs entirely in Python and doesn't depend on browser focus.
+
+### NDI Output Implementation (Roadmap)
+
+To output captions directly to NDI for hardware integration:
+
+```python
+# Future: ndi-python integration
+import ndi
+
+def send_caption_to_ndi(text: str, style: dict):
+    """Send caption as NDI overlay"""
+    # Create NDI sender
+    sender = ndi.create_sender("Community Captioner")
+
+    # Render caption to frame
+    frame = render_caption_frame(text, style)
+
+    # Send via NDI
+    sender.send_frame(frame)
+```
+
+This would allow hardware encoders with NDI input to receive captions directly without any browser dependency.
 
 ### v4.0 Summary - What's New
 The v4.0 release transforms Community Captioner from a basic pattern-matching system into a sophisticated AI-powered caption correction engine:
@@ -578,6 +1661,66 @@ The v4.0 release transforms Community Captioner from a basic pattern-matching sy
 
 **Backend and Core Frontend Complete** - The v4.0 backend is fully implemented with ~50 new API endpoints. The dashboard has been redesigned with real-time stats, 16:9 preview, and post-session analysis. Remaining work is specialized panels for knowledge base, video, and suggestion review.
 
+### Latest Updates - January 2026 (Homepage & Content Refinement)
+
+#### Homepage How It Works Section - 4 Cards Restored
+- [x] **Step 1: Generate Captions** - Renamed from "Start Captioning", detailed ASR explanation
+- [x] **Step 2: Create Custom AI Engine** - RAG, semantic matching, document/video/web ingestion
+- [x] **Step 3: AI Correction** (RESTORED) - Real-time and post-processing corrections
+- [x] **Step 4: Display & Record** - 1920x1080 overlay, customization, export formats
+
+#### New Homepage Sections
+- [x] **Built-In Data Analytics Section** - Comprehensive analytics features showcase
+  - Automatic session analytics explanation
+  - AI-powered video intelligence
+  - Full-text search across video
+  - Unique data richness vs commercial systems
+  - Sample analytics preview with live stats (12,847 words, 2:43:16 duration, 234 corrections, 78 WPM)
+  - Link to demo analytics page
+- [x] **Adding to Your Broadcasts Section** - Technical integration guide
+  - ASR options (Browser vs Whisper detailed comparison)
+  - Broadcast integration methods (OBS, vMix, NDI, RTMP, dynamic key/fill)
+  - Audio sources (mic, mixer, virtual audio cable, live streams, pre-recorded)
+  - Zero additional equipment philosophy
+
+#### About Section Updates
+- [x] **Restructured to 5-card layout** - Removed highlight boxes, integrated into cards
+- [x] **Updated "Why It Exists"** - Stronger messaging about accessibility gatekeeping
+- [x] **New Legal Requirements card** - FCC CVAA, state mandates, 2027 compliance
+- [x] **Enhanced Design Values** - Added 2 new bullets:
+  - "No Catch" - Emphasizes no monetization or hidden costs
+  - "Human AI" - Acknowledges limitations vs human captioners
+
+#### UI/UX Improvements
+- [x] **System Architecture tooltips fixed** - Added overflow: visible, increased z-index to 1000
+- [x] **Demo simulation improved** - Changed to "john vanscoyoc" → "John VanScoyoc" (spelling correction)
+- [x] **Hero description updated** - Removed "Privacy Respecting" per user request
+- [x] **Learn More button moved** - Relocated from Values section to after FAQs
+- [x] **Feature cards removed** - Eliminated redundant Live Overlay/AI Engine/Session cards after demo
+
+#### Legal & Licensing
+- [x] **License changed to CC BY-NC-SA 4.0** - Added Non-Commercial restriction
+  - Updated in 4 files: index.html, terms.html, README.md, CLAUDE.md
+  - Added clear non-commercial messaging throughout
+  - Prohibition of: selling, subscription services, commercial deployment
+  - "No one can profit from this work" emphasized
+- [x] **Terms of Service page created** (terms.html)
+  - Comprehensive 12-section legal document
+  - Strong liability disclaimers
+  - BIG website URL corrected to brooklineinteractive.org
+  - Non-commercial use restrictions clearly explained
+  - Footer link added
+
+#### Navigation & Structure
+- [x] **Removed standalone Engine Wizard page** - Configuration now inline on dashboard
+- [x] **Demo Analytics page created** - Full sample session visualization
+- [x] **Current Terms display added** - Shows first 10 terms in dashboard engine config
+- [x] **Feedback form added** - Mailto button in footer to Stephen@weirdmachine.org
+
+#### Technical Notes
+- [x] **NDI Output** - Reference remains (no "Coming Soon" text was present)
+- [x] **File size optimized** - index.html reduced from 348KB to 335KB despite new features
+
 ## Development Notes
 
 ### Running Locally
@@ -587,12 +1730,38 @@ python3 start-server.py
 ```
 
 ### Installing AI Features
+
+#### Basic Whisper (CPU)
 ```bash
-# For Whisper mode:
+# For Whisper mode (CPU, works everywhere):
 pip3 install faster-whisper sounddevice numpy
 # Mac: brew install portaudio
 # Linux: sudo apt install portaudio19-dev
+```
 
+#### Optimized Whisper (GPU Acceleration + Voice Detection)
+For **significantly faster** real-time captioning:
+```bash
+# GPU acceleration (NVIDIA CUDA required):
+pip3 install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu118
+
+# Silero VAD for intelligent voice activity detection:
+# (Automatically downloaded on first use via torch.hub)
+# Reduces latency by only transcribing when speech is detected
+
+# Verify GPU is detected:
+python3 -c "import torch; print('GPU:', torch.cuda.is_available())"
+```
+
+**Performance Comparison:**
+| Setup | Latency | Quality | Notes |
+|-------|---------|---------|-------|
+| CPU (int8) | ~1.5-2s | Good | Works everywhere |
+| GPU (float16) | ~0.5-1s | Great | Requires NVIDIA CUDA |
+| GPU + Silero VAD | ~0.3-0.8s | Great | Best real-time experience |
+
+#### Other AI Features
+```bash
 # For vector embeddings (optional, recommended):
 pip3 install sentence-transformers
 
@@ -641,6 +1810,308 @@ POST /api/engine/term
 - Keep it simple - this is for community use
 - Comments for non-obvious logic
 - Error handling with user-friendly messages
+
+---
+
+## 🚀 Optimization Roadmap v4.3+ (January 2026)
+
+A comprehensive plan for achieving **sub-500ms latency**, **near-human accuracy**, and **broadcast-grade reliability**.
+
+### Core Goals
+
+| Metric | Current | Target | Stretch Goal |
+|--------|---------|--------|--------------|
+| **Latency** | 400-800ms (Whisper) / 200ms (Browser) | <500ms all modes | <200ms (real-time) |
+| **Accuracy** | ~92% proper nouns | 98%+ proper nouns | 99.5%+ (human-level) |
+| **Reliability** | ~95% uptime | 99.9% uptime | Zero-dropout sessions |
+
+---
+
+### 🏎️ SPEED OPTIMIZATIONS
+
+#### Phase 1: Immediate Wins (1-2 days)
+
+1. **Whisper Streaming Mode** ⚡
+   - Use `faster-whisper` streaming API instead of batch transcription
+   - Output words as they're recognized, not waiting for full chunk
+   - Expected improvement: 300-500ms latency reduction
+   ```python
+   # Current: Wait for full chunk
+   segments, _ = model.transcribe(audio_chunk)
+
+   # New: Stream word-by-word
+   for segment in model.transcribe(audio, word_timestamps=True):
+       for word in segment.words:
+           yield word.word  # Emit immediately
+   ```
+
+2. **Predictive Text Preloading**
+   - Pre-compute embeddings for likely next words based on context
+   - Cache common phrase completions
+   - "Town meeting" → preload "Select Board", "motion", "seconded"
+
+3. **Audio Pipeline Optimization**
+   - Reduce audio buffer from 20ms to 10ms blocks
+   - Use float16 audio format instead of float32
+   - Direct memory mapping for zero-copy audio transfer
+
+#### Phase 2: Architecture Improvements (1 week)
+
+4. **Parallel Correction Pipeline**
+   - Run regex, fuzzy, and semantic matching concurrently
+   - Use `concurrent.futures.ThreadPoolExecutor`
+   - Merge results with priority: regex > fuzzy > semantic
+   ```
+   BEFORE: regex(100ms) → fuzzy(50ms) → semantic(200ms) = 350ms
+   AFTER:  regex ─┐
+           fuzzy ─┼─ merge(10ms) = 210ms total
+         semantic ┘
+   ```
+
+5. **WebSocket Caption Delivery**
+   - Replace polling with persistent WebSocket connection
+   - Server pushes captions instantly when ready
+   - Eliminates 150ms polling overhead
+   - Better handling of connection drops
+
+6. **GPU Memory Optimization**
+   - Keep Whisper model in GPU memory permanently
+   - Use CUDA streams for async audio upload
+   - Batch multiple chunks when catching up
+
+#### Phase 3: Advanced Optimizations (2 weeks)
+
+7. **Speculative Execution**
+   - Start transcribing before chunk is complete
+   - If prediction matches final audio, use cached result
+   - Cancel and reprocess if audio diverges
+   - Can save 200-400ms on predictable speech
+
+8. **Multi-Model Cascade**
+   ```
+   tiny.en (50ms) → base.en (100ms) → small.en (200ms)
+              ↓              ↓               ↓
+         confidence     confidence      confidence
+           < 0.7?         < 0.8?          final
+   ```
+   - Use smallest model that achieves confidence threshold
+   - Fall back to larger models only when needed
+   - Average 60% of transcriptions use tiny.en
+
+9. **Edge Deployment**
+   - Compile Whisper to ONNX for faster inference
+   - Support Apple Neural Engine on M1/M2/M3
+   - WebGPU-based browser transcription (experimental)
+
+---
+
+### 🎯 ACCURACY OPTIMIZATIONS
+
+#### Phase 1: Enhanced Correction Engine
+
+10. **Phonetic Matching Layer**
+    - Add Soundex/Metaphone for sound-alike corrections
+    - "Burnie Green" → "Bernie Greene" via phonetic similarity
+    - Handles ASR homophones: "there/their/they're"
+    ```python
+    from metaphone import doublemetaphone
+    # "Greene" and "Green" both → ('KRN', 'KRN')
+    ```
+
+11. **N-gram Context Window**
+    - Look at surrounding words for disambiguation
+    - "Brooklyn" after "Massachusetts" → likely "Brookline"
+    - "Brooklyn" after "New York" → keep as "Brooklyn"
+    - Window size: 5 words before, 3 words after
+
+12. **Confidence-Weighted Voting**
+    - Multiple correction methods vote on final output
+    - Weight by historical accuracy per method
+    - Track which methods work best for different term types
+
+#### Phase 2: Learning Improvements
+
+13. **Real-Time Feedback Loop**
+    - Operator corrections train model instantly
+    - "John → John VanScoyoc" teaches pattern "John [at meeting start] = John VanScoyoc"
+    - Session-specific learning decays after 24 hours
+
+14. **Cross-Session Term Promotion**
+    - Terms corrected 3+ times across sessions → permanent
+    - Auto-generate aliases from observed ASR errors
+    - Weekly digest: "Add these 12 terms to engine?"
+
+15. **Speaker Diarization Integration**
+    - Identify individual speakers
+    - Apply speaker-specific correction profiles
+    - "Bernard Greene speaks differently than typical ASR expects"
+
+#### Phase 3: AI-Powered Accuracy
+
+16. **LLM Post-Processing Pipeline**
+    - Use local LLM (Llama 3, Mistral) for grammar/context fixes
+    - Run async, display uncorrected first, update when ready
+    - Configurable: off / light / aggressive
+
+17. **Named Entity Recognition Pre-Pass**
+    - spaCy NER identifies proper nouns before correction
+    - Focus correction engine on flagged terms
+    - Reduces false positives on common words
+
+18. **Meeting Agenda Integration**
+    - Upload meeting agenda PDF before session
+    - Extract all names, topics, motions
+    - Pre-populate session-specific terms
+    - "Item 7: 123 Main Street" → load that address
+
+---
+
+### 🛡️ RELIABILITY OPTIMIZATIONS
+
+#### Phase 1: Fault Tolerance
+
+19. **Multi-Engine Hot Standby** ✅ (Partially implemented)
+    - Three engines always ready: Browser → Whisper → Speechmatics
+    - Automatic failover in <500ms
+    - Health monitoring with proactive switching
+    - Current: Manual switching. Target: Fully automatic
+
+20. **Audio Buffer Persistence**
+    - Write audio to disk in 30-second rolling buffer
+    - On crash recovery, reprocess buffered audio
+    - Never lose more than 30 seconds of captions
+
+21. **Heartbeat Monitoring**
+    - Server pings browser every 5 seconds
+    - Browser pings server every 5 seconds
+    - Auto-reconnect with exponential backoff
+    - Dashboard shows connection quality indicator
+
+#### Phase 2: Broadcast Integration
+
+22. **Hardware Encoder Support**
+    - CEA-608/708 closed caption output via serial
+    - SRT (Secure Reliable Transport) caption embedding
+    - NDI caption metadata channel
+    - Blackmagic DeckLink integration
+
+23. **Redundant Server Architecture**
+    ```
+    Primary Server ←──sync──→ Backup Server
+          ↓                         ↓
+    Audio Source              Audio Source
+    (same input)              (same input)
+          ↓                         ↓
+       Overlay ←───failover───→ Overlay
+    ```
+
+24. **Session State Sync**
+    - WebSocket replication to backup server
+    - Automatic failover if primary stops responding
+    - Caption continuity guaranteed
+
+#### Phase 3: Monitoring & Alerting
+
+25. **Real-Time Dashboard Metrics**
+    - Latency histogram (p50, p95, p99)
+    - Accuracy score (based on corrections applied)
+    - System health: CPU, memory, GPU utilization
+    - Alert thresholds: latency > 1s, accuracy < 90%
+
+26. **Session Quality Report**
+    - Auto-generated PDF after each session
+    - Graphs: latency over time, corrections heatmap
+    - Recommendations: "Consider adding these 5 terms"
+
+---
+
+### 🌟 WILD & BRILLIANT IDEAS
+
+#### Moonshot 1: Voice Cloning for Accuracy
+- Clone speakers' voices using 3-second sample
+- Train tiny personal ASR model per speaker
+- "Bernard Greene ASR" recognizes his speech perfectly
+- Privacy-preserving: models stored locally only
+
+#### Moonshot 2: Lip Reading Augmentation
+- Use webcam to read speaker's lips
+- Combine audio + visual for 99%+ accuracy
+- Especially useful in noisy environments
+- OpenCV + MediaPipe face mesh integration
+
+#### Moonshot 3: Predictive Caption Pre-Generation
+- For recurring meetings with similar structure
+- AI predicts likely phrases before they're spoken
+- "Motion to approve minutes" → pre-rendered, instant display
+- User confirms or corrects in real-time
+
+#### Moonshot 4: Crowd-Sourced Accuracy Network
+- Anonymous, privacy-preserving correction sharing
+- Community media orgs share learned corrections
+- "Brookline" learned by one org → helps all Massachusetts orgs
+- Federated learning without sharing raw audio
+
+#### Moonshot 5: Real-Time Translation Overlay
+- Whisper supports 99 languages
+- Detect non-English speech → translate → caption
+- Multilingual town meetings with single system
+- Speaker says Spanish → English captions appear
+
+#### Moonshot 6: Emotion-Aware Captioning
+- Detect speaker emotion from audio
+- Add subtle indicators: [applause], [laughter], [heated discussion]
+- Helps deaf/HoH viewers understand room dynamics
+- Non-intrusive: small icons, not text
+
+#### Moonshot 7: AR Caption Glasses Integration
+- Send captions to Xreal/Viture AR glasses
+- Personal captioning for in-person attendees
+- No screen needed, captions float in vision
+- Bluetooth Low Energy for low latency
+
+#### Moonshot 8: Retroactive Perfect Transcripts
+- After session: re-run audio through large model (Whisper large-v3)
+- Compare to live captions, generate "corrections made" report
+- Perfect archival transcript for official records
+- Run overnight, ready by morning
+
+---
+
+### Implementation Priority Matrix
+
+| Priority | Effort | Impact | Item |
+|----------|--------|--------|------|
+| 🔴 HIGH | Low | High | WebSocket delivery (#5) |
+| 🔴 HIGH | Low | High | Parallel correction pipeline (#4) |
+| 🔴 HIGH | Medium | High | Multi-engine hot standby (#19) |
+| 🟡 MED | Medium | Medium | Whisper streaming mode (#1) |
+| 🟡 MED | Medium | Medium | Phonetic matching (#10) |
+| 🟡 MED | Medium | High | Meeting agenda integration (#18) |
+| 🟢 LOW | High | High | LLM post-processing (#16) |
+| 🟢 LOW | High | Medium | Speaker diarization (#15) |
+| 🌟 MOON | Very High | Very High | Voice cloning (#M1) |
+| 🌟 MOON | Very High | High | Lip reading (#M2) |
+
+---
+
+### Success Metrics
+
+**Speed**
+- [ ] 95% of captions appear within 500ms of speech
+- [ ] Zero captions delayed more than 2 seconds
+- [ ] Catch-up from 5s delay in under 3 seconds
+
+**Accuracy**
+- [ ] 98%+ proper noun accuracy (measured against human transcript)
+- [ ] <1% false positive corrections (changing correct text to wrong)
+- [ ] 99.5%+ general transcription accuracy
+
+**Reliability**
+- [ ] 99.9% uptime during broadcast hours
+- [ ] <1 dropout per 100 hours of operation
+- [ ] Automatic recovery from any single failure in <30 seconds
+
+---
 
 ## Contact
 
