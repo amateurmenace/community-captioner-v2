@@ -1811,6 +1811,308 @@ POST /api/engine/term
 - Comments for non-obvious logic
 - Error handling with user-friendly messages
 
+---
+
+## 🚀 Optimization Roadmap v4.3+ (January 2026)
+
+A comprehensive plan for achieving **sub-500ms latency**, **near-human accuracy**, and **broadcast-grade reliability**.
+
+### Core Goals
+
+| Metric | Current | Target | Stretch Goal |
+|--------|---------|--------|--------------|
+| **Latency** | 400-800ms (Whisper) / 200ms (Browser) | <500ms all modes | <200ms (real-time) |
+| **Accuracy** | ~92% proper nouns | 98%+ proper nouns | 99.5%+ (human-level) |
+| **Reliability** | ~95% uptime | 99.9% uptime | Zero-dropout sessions |
+
+---
+
+### 🏎️ SPEED OPTIMIZATIONS
+
+#### Phase 1: Immediate Wins (1-2 days)
+
+1. **Whisper Streaming Mode** ⚡
+   - Use `faster-whisper` streaming API instead of batch transcription
+   - Output words as they're recognized, not waiting for full chunk
+   - Expected improvement: 300-500ms latency reduction
+   ```python
+   # Current: Wait for full chunk
+   segments, _ = model.transcribe(audio_chunk)
+
+   # New: Stream word-by-word
+   for segment in model.transcribe(audio, word_timestamps=True):
+       for word in segment.words:
+           yield word.word  # Emit immediately
+   ```
+
+2. **Predictive Text Preloading**
+   - Pre-compute embeddings for likely next words based on context
+   - Cache common phrase completions
+   - "Town meeting" → preload "Select Board", "motion", "seconded"
+
+3. **Audio Pipeline Optimization**
+   - Reduce audio buffer from 20ms to 10ms blocks
+   - Use float16 audio format instead of float32
+   - Direct memory mapping for zero-copy audio transfer
+
+#### Phase 2: Architecture Improvements (1 week)
+
+4. **Parallel Correction Pipeline**
+   - Run regex, fuzzy, and semantic matching concurrently
+   - Use `concurrent.futures.ThreadPoolExecutor`
+   - Merge results with priority: regex > fuzzy > semantic
+   ```
+   BEFORE: regex(100ms) → fuzzy(50ms) → semantic(200ms) = 350ms
+   AFTER:  regex ─┐
+           fuzzy ─┼─ merge(10ms) = 210ms total
+         semantic ┘
+   ```
+
+5. **WebSocket Caption Delivery**
+   - Replace polling with persistent WebSocket connection
+   - Server pushes captions instantly when ready
+   - Eliminates 150ms polling overhead
+   - Better handling of connection drops
+
+6. **GPU Memory Optimization**
+   - Keep Whisper model in GPU memory permanently
+   - Use CUDA streams for async audio upload
+   - Batch multiple chunks when catching up
+
+#### Phase 3: Advanced Optimizations (2 weeks)
+
+7. **Speculative Execution**
+   - Start transcribing before chunk is complete
+   - If prediction matches final audio, use cached result
+   - Cancel and reprocess if audio diverges
+   - Can save 200-400ms on predictable speech
+
+8. **Multi-Model Cascade**
+   ```
+   tiny.en (50ms) → base.en (100ms) → small.en (200ms)
+              ↓              ↓               ↓
+         confidence     confidence      confidence
+           < 0.7?         < 0.8?          final
+   ```
+   - Use smallest model that achieves confidence threshold
+   - Fall back to larger models only when needed
+   - Average 60% of transcriptions use tiny.en
+
+9. **Edge Deployment**
+   - Compile Whisper to ONNX for faster inference
+   - Support Apple Neural Engine on M1/M2/M3
+   - WebGPU-based browser transcription (experimental)
+
+---
+
+### 🎯 ACCURACY OPTIMIZATIONS
+
+#### Phase 1: Enhanced Correction Engine
+
+10. **Phonetic Matching Layer**
+    - Add Soundex/Metaphone for sound-alike corrections
+    - "Burnie Green" → "Bernie Greene" via phonetic similarity
+    - Handles ASR homophones: "there/their/they're"
+    ```python
+    from metaphone import doublemetaphone
+    # "Greene" and "Green" both → ('KRN', 'KRN')
+    ```
+
+11. **N-gram Context Window**
+    - Look at surrounding words for disambiguation
+    - "Brooklyn" after "Massachusetts" → likely "Brookline"
+    - "Brooklyn" after "New York" → keep as "Brooklyn"
+    - Window size: 5 words before, 3 words after
+
+12. **Confidence-Weighted Voting**
+    - Multiple correction methods vote on final output
+    - Weight by historical accuracy per method
+    - Track which methods work best for different term types
+
+#### Phase 2: Learning Improvements
+
+13. **Real-Time Feedback Loop**
+    - Operator corrections train model instantly
+    - "John → John VanScoyoc" teaches pattern "John [at meeting start] = John VanScoyoc"
+    - Session-specific learning decays after 24 hours
+
+14. **Cross-Session Term Promotion**
+    - Terms corrected 3+ times across sessions → permanent
+    - Auto-generate aliases from observed ASR errors
+    - Weekly digest: "Add these 12 terms to engine?"
+
+15. **Speaker Diarization Integration**
+    - Identify individual speakers
+    - Apply speaker-specific correction profiles
+    - "Bernard Greene speaks differently than typical ASR expects"
+
+#### Phase 3: AI-Powered Accuracy
+
+16. **LLM Post-Processing Pipeline**
+    - Use local LLM (Llama 3, Mistral) for grammar/context fixes
+    - Run async, display uncorrected first, update when ready
+    - Configurable: off / light / aggressive
+
+17. **Named Entity Recognition Pre-Pass**
+    - spaCy NER identifies proper nouns before correction
+    - Focus correction engine on flagged terms
+    - Reduces false positives on common words
+
+18. **Meeting Agenda Integration**
+    - Upload meeting agenda PDF before session
+    - Extract all names, topics, motions
+    - Pre-populate session-specific terms
+    - "Item 7: 123 Main Street" → load that address
+
+---
+
+### 🛡️ RELIABILITY OPTIMIZATIONS
+
+#### Phase 1: Fault Tolerance
+
+19. **Multi-Engine Hot Standby** ✅ (Partially implemented)
+    - Three engines always ready: Browser → Whisper → Speechmatics
+    - Automatic failover in <500ms
+    - Health monitoring with proactive switching
+    - Current: Manual switching. Target: Fully automatic
+
+20. **Audio Buffer Persistence**
+    - Write audio to disk in 30-second rolling buffer
+    - On crash recovery, reprocess buffered audio
+    - Never lose more than 30 seconds of captions
+
+21. **Heartbeat Monitoring**
+    - Server pings browser every 5 seconds
+    - Browser pings server every 5 seconds
+    - Auto-reconnect with exponential backoff
+    - Dashboard shows connection quality indicator
+
+#### Phase 2: Broadcast Integration
+
+22. **Hardware Encoder Support**
+    - CEA-608/708 closed caption output via serial
+    - SRT (Secure Reliable Transport) caption embedding
+    - NDI caption metadata channel
+    - Blackmagic DeckLink integration
+
+23. **Redundant Server Architecture**
+    ```
+    Primary Server ←──sync──→ Backup Server
+          ↓                         ↓
+    Audio Source              Audio Source
+    (same input)              (same input)
+          ↓                         ↓
+       Overlay ←───failover───→ Overlay
+    ```
+
+24. **Session State Sync**
+    - WebSocket replication to backup server
+    - Automatic failover if primary stops responding
+    - Caption continuity guaranteed
+
+#### Phase 3: Monitoring & Alerting
+
+25. **Real-Time Dashboard Metrics**
+    - Latency histogram (p50, p95, p99)
+    - Accuracy score (based on corrections applied)
+    - System health: CPU, memory, GPU utilization
+    - Alert thresholds: latency > 1s, accuracy < 90%
+
+26. **Session Quality Report**
+    - Auto-generated PDF after each session
+    - Graphs: latency over time, corrections heatmap
+    - Recommendations: "Consider adding these 5 terms"
+
+---
+
+### 🌟 WILD & BRILLIANT IDEAS
+
+#### Moonshot 1: Voice Cloning for Accuracy
+- Clone speakers' voices using 3-second sample
+- Train tiny personal ASR model per speaker
+- "Bernard Greene ASR" recognizes his speech perfectly
+- Privacy-preserving: models stored locally only
+
+#### Moonshot 2: Lip Reading Augmentation
+- Use webcam to read speaker's lips
+- Combine audio + visual for 99%+ accuracy
+- Especially useful in noisy environments
+- OpenCV + MediaPipe face mesh integration
+
+#### Moonshot 3: Predictive Caption Pre-Generation
+- For recurring meetings with similar structure
+- AI predicts likely phrases before they're spoken
+- "Motion to approve minutes" → pre-rendered, instant display
+- User confirms or corrects in real-time
+
+#### Moonshot 4: Crowd-Sourced Accuracy Network
+- Anonymous, privacy-preserving correction sharing
+- Community media orgs share learned corrections
+- "Brookline" learned by one org → helps all Massachusetts orgs
+- Federated learning without sharing raw audio
+
+#### Moonshot 5: Real-Time Translation Overlay
+- Whisper supports 99 languages
+- Detect non-English speech → translate → caption
+- Multilingual town meetings with single system
+- Speaker says Spanish → English captions appear
+
+#### Moonshot 6: Emotion-Aware Captioning
+- Detect speaker emotion from audio
+- Add subtle indicators: [applause], [laughter], [heated discussion]
+- Helps deaf/HoH viewers understand room dynamics
+- Non-intrusive: small icons, not text
+
+#### Moonshot 7: AR Caption Glasses Integration
+- Send captions to Xreal/Viture AR glasses
+- Personal captioning for in-person attendees
+- No screen needed, captions float in vision
+- Bluetooth Low Energy for low latency
+
+#### Moonshot 8: Retroactive Perfect Transcripts
+- After session: re-run audio through large model (Whisper large-v3)
+- Compare to live captions, generate "corrections made" report
+- Perfect archival transcript for official records
+- Run overnight, ready by morning
+
+---
+
+### Implementation Priority Matrix
+
+| Priority | Effort | Impact | Item |
+|----------|--------|--------|------|
+| 🔴 HIGH | Low | High | WebSocket delivery (#5) |
+| 🔴 HIGH | Low | High | Parallel correction pipeline (#4) |
+| 🔴 HIGH | Medium | High | Multi-engine hot standby (#19) |
+| 🟡 MED | Medium | Medium | Whisper streaming mode (#1) |
+| 🟡 MED | Medium | Medium | Phonetic matching (#10) |
+| 🟡 MED | Medium | High | Meeting agenda integration (#18) |
+| 🟢 LOW | High | High | LLM post-processing (#16) |
+| 🟢 LOW | High | Medium | Speaker diarization (#15) |
+| 🌟 MOON | Very High | Very High | Voice cloning (#M1) |
+| 🌟 MOON | Very High | High | Lip reading (#M2) |
+
+---
+
+### Success Metrics
+
+**Speed**
+- [ ] 95% of captions appear within 500ms of speech
+- [ ] Zero captions delayed more than 2 seconds
+- [ ] Catch-up from 5s delay in under 3 seconds
+
+**Accuracy**
+- [ ] 98%+ proper noun accuracy (measured against human transcript)
+- [ ] <1% false positive corrections (changing correct text to wrong)
+- [ ] 99.5%+ general transcription accuracy
+
+**Reliability**
+- [ ] 99.9% uptime during broadcast hours
+- [ ] <1 dropout per 100 hours of operation
+- [ ] Automatic recovery from any single failure in <30 seconds
+
+---
+
 ## Contact
 
 - **Organization:** Brookline Interactive Group
