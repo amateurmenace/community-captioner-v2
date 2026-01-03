@@ -357,6 +357,9 @@ class EmbeddingsManager:
         self.embeddings_cache = {}  # term -> embedding vector
         self.model = None
         self.model_type = None  # 'local' or 'openai'
+        self._cache_lock = threading.Lock()  # Thread safety for cache
+        self._cache_dirty = False  # Track if cache needs saving
+        self._last_save_time = 0  # Debounce saves
         self._load_cache()
 
     def _load_cache(self):
@@ -369,12 +372,24 @@ class EmbeddingsManager:
             except Exception as e:
                 print(f"Warning: Could not load embeddings cache: {e}")
 
-    def _save_cache(self):
-        """Save embeddings cache to disk"""
+    def _save_cache(self, force=False):
+        """Save embeddings cache to disk (debounced, thread-safe)"""
+        # Only save every 5 seconds max, unless forced
+        now = time.time()
+        if not force and (now - self._last_save_time) < 5:
+            self._cache_dirty = True
+            return
+
         try:
+            with self._cache_lock:
+                # Copy cache to avoid iteration issues
+                cache_copy = dict(self.embeddings_cache)
+
             cache_file = self.embeddings_dir / "embeddings_cache.json"
             with open(cache_file, "w") as f:
-                json.dump(self.embeddings_cache, f)
+                json.dump(cache_copy, f)
+            self._cache_dirty = False
+            self._last_save_time = now
         except Exception as e:
             print(f"Warning: Could not save embeddings cache: {e}")
 
@@ -407,10 +422,11 @@ class EmbeddingsManager:
         if not text:
             return None
 
-        # Check cache first
+        # Check cache first (thread-safe read)
         cache_key = text.lower().strip()
-        if cache_key in self.embeddings_cache:
-            return self.embeddings_cache[cache_key]
+        with self._cache_lock:
+            if cache_key in self.embeddings_cache:
+                return self.embeddings_cache[cache_key]
 
         embedding = None
 
@@ -431,8 +447,9 @@ class EmbeddingsManager:
                 print(f"OpenAI embedding error: {e}")
 
         if embedding:
-            self.embeddings_cache[cache_key] = embedding
-            self._save_cache()
+            with self._cache_lock:
+                self.embeddings_cache[cache_key] = embedding
+            self._save_cache()  # Debounced save
 
         return embedding
 
@@ -6298,10 +6315,12 @@ def print_banner():
 print_banner()
 webbrowser.open(f'http://localhost:{PORT}')
 
-class ReusableTCPServer(socketserver.TCPServer):
+class ThreadedTCPServer(socketserver.ThreadingMixIn, socketserver.TCPServer):
+    """Multi-threaded server to handle concurrent requests without blocking"""
     allow_reuse_address = True
+    daemon_threads = True  # Threads die when main thread exits
 
-with ReusableTCPServer(("", PORT), Handler) as httpd:
+with ThreadedTCPServer(("", PORT), Handler) as httpd:
     try:
         httpd.serve_forever()
     except KeyboardInterrupt:
