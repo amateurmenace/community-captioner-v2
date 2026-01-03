@@ -4849,7 +4849,6 @@ class Handler(http.server.SimpleHTTPRequestHandler):
                         })
                         self.wfile.write(f"data: {data}\n\n".encode())
                         self.wfile.flush()
-                    import time
                     time.sleep(0.1)  # 100ms polling
             except (BrokenPipeError, ConnectionResetError):
                 pass  # Client disconnected
