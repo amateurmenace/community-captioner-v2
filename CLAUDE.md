@@ -362,6 +362,395 @@ python3 start-server.py
 | Local Whisper API | **0.8-1.0s** | **Consistent** | Model always warm |
 | Browser Speech | 0.2s | Lowest | Requires Chrome/Edge |
 
+---
+
+## 🚀 ULTRA-FAST CAPTION OPTIMIZATION PLAN (v4.3)
+
+### Executive Summary
+This plan targets **sub-500ms end-to-end latency** while maintaining high accuracy. The key insight: **latency comes from 4 sources** - audio capture, transcription, correction engine, and display. We must optimize ALL of them.
+
+### Current Bottleneck Analysis
+
+| Stage | Current Latency | Target | Optimization Strategy |
+|-------|-----------------|--------|----------------------|
+| Audio Capture | 20-100ms | 10ms | Smaller buffers, priority threading |
+| Transcription (Whisper) | 150-400ms | 100-200ms | Speculative decoding, streaming output |
+| Transcription (Browser) | 200-500ms | 100-200ms | Web Worker, partial result handling |
+| Correction Engine | 10-50ms | <5ms | Pre-compiled patterns, caching |
+| Display Update | 16-50ms | <10ms | Direct DOM, no React re-render |
+| **TOTAL** | **400-1100ms** | **<500ms** | |
+
+---
+
+### PHASE 1: Whisper Transcription Speedup (High Impact)
+
+#### 1.1 Streaming/Speculative Transcription
+**Problem**: Current approach waits for complete audio chunk before transcribing.
+**Solution**: Implement speculative streaming transcription.
+
+```python
+# NEW: Speculative transcription pipeline
+class StreamingWhisperEngine:
+    def __init__(self):
+        self.speculation_buffer = []
+        self.confirmed_text = ""
+
+    def process_audio_stream(self, audio_chunk):
+        # Run fast speculative decode on partial audio
+        speculative = self.model.transcribe(
+            audio_chunk,
+            beam_size=1,
+            prefix=self.confirmed_text[-50:],  # Use context
+            suppress_blank=True
+        )
+
+        # Emit speculative text immediately (marked as provisional)
+        yield {"text": speculative, "is_final": False}
+
+        # When silence detected, confirm and emit final
+        if self.detect_silence(audio_chunk):
+            final = self.model.transcribe(full_audio, beam_size=3)
+            self.confirmed_text += final
+            yield {"text": final, "is_final": True}
+```
+
+**Expected Gain**: 100-200ms reduction (output starts before speech ends)
+
+#### 1.2 Batched Inference with ONNX Runtime
+**Problem**: PyTorch/CTranslate2 has overhead per inference call.
+**Solution**: Export to ONNX for faster inference, especially on CPU.
+
+```bash
+# Convert faster-whisper to ONNX
+pip3 install optimum[onnxruntime]
+optimum-cli export onnx --model openai/whisper-tiny.en whisper-tiny-onnx/
+```
+
+**Expected Gain**: 30-50% faster inference on CPU (50-100ms)
+
+#### 1.3 Whisper.cpp Integration Option
+**Problem**: Python overhead, especially on Apple Silicon.
+**Solution**: Optional whisper.cpp backend for native speed.
+
+```bash
+# Install whisper.cpp server
+brew install whisper-cpp
+whisper-server -m models/ggml-tiny.en.bin -p 8001
+```
+
+**Expected Gain**: 2-3x faster on Apple Silicon M-series chips
+
+---
+
+### PHASE 2: Correction Engine Optimization (Medium Impact)
+
+#### 2.1 Pre-compiled Pattern Cache
+**Problem**: Regex patterns compiled on every correction call.
+**Solution**: Pre-compile all patterns at engine load time.
+
+```python
+class OptimizedCaptionEngine:
+    def __init__(self):
+        self._compiled_patterns = {}
+
+    def _compile_patterns(self):
+        """Pre-compile all regex patterns once"""
+        for rule in self.correction_rules:
+            pattern = rule["pattern"]
+            if pattern not in self._compiled_patterns:
+                self._compiled_patterns[pattern] = re.compile(pattern, re.IGNORECASE)
+
+    def correct(self, text):
+        # Use pre-compiled patterns - no compilation overhead
+        for pattern, compiled in self._compiled_patterns.items():
+            # ... apply correction
+```
+
+**Expected Gain**: 5-15ms per correction call
+
+#### 2.2 Tiered Correction Strategy
+**Problem**: All 4 correction phases run on every caption (regex → learned → fuzzy → semantic).
+**Solution**: Fast path for common cases, defer expensive operations.
+
+```python
+def correct_fast(self, text):
+    """Ultra-fast correction for live captions"""
+    # TIER 1: Exact match lookup (O(1) hash lookup)
+    corrections = self._exact_match_cache.get(text.lower())
+    if corrections:
+        return self._apply_cached_corrections(text, corrections)
+
+    # TIER 2: Regex patterns only (skip fuzzy/semantic)
+    result = self._apply_regex_only(text)
+
+    # TIER 3: Queue for async semantic analysis (non-blocking)
+    self._async_semantic_queue.put(text)
+
+    return result
+
+def correct_full(self, text):
+    """Full correction for session recording/export"""
+    # Run all 4 phases for maximum accuracy
+    return self.correct(text, use_rag=True)
+```
+
+**Expected Gain**: 10-30ms for live captions (semantic deferred)
+
+#### 2.3 LRU Correction Cache
+**Problem**: Same phrases get re-corrected repeatedly.
+**Solution**: Cache recent corrections with LRU eviction.
+
+```python
+from functools import lru_cache
+
+@lru_cache(maxsize=1000)
+def cached_correct(self, text_hash):
+    return self.correct(text)
+
+# In practice:
+def correct_with_cache(self, text):
+    cache_key = hash(text.lower())
+    cached = self._correction_cache.get(cache_key)
+    if cached:
+        return cached
+    result = self.correct(text)
+    self._correction_cache[cache_key] = result
+    return result
+```
+
+**Expected Gain**: Near-instant for repeated phrases
+
+---
+
+### PHASE 3: Browser Speech API Optimization (High Impact)
+
+#### 3.1 Web Worker for Speech Processing
+**Problem**: Speech recognition callbacks block main thread.
+**Solution**: Offload processing to Web Worker.
+
+```javascript
+// caption-worker.js
+self.onmessage = async (e) => {
+    const { text, isFinal } = e.data;
+
+    // Send to correction API
+    const response = await fetch('/api/caption', {
+        method: 'POST',
+        body: JSON.stringify({ text, is_final: isFinal })
+    });
+
+    const result = await response.json();
+    self.postMessage(result);
+};
+
+// main.js
+const worker = new Worker('caption-worker.js');
+recognition.onresult = (event) => {
+    worker.postMessage({
+        text: event.results[0][0].transcript,
+        isFinal: event.results[0].isFinal
+    });
+};
+```
+
+**Expected Gain**: Eliminates UI jank, faster processing
+
+#### 3.2 Optimistic Partial Display
+**Problem**: Waiting for final results adds perceived latency.
+**Solution**: Display partial results immediately with visual indicator.
+
+```javascript
+recognition.onresult = (event) => {
+    const result = event.results[event.results.length - 1];
+    const text = result[0].transcript;
+
+    if (result.isFinal) {
+        // Final: send for correction
+        displayCaption(text, 'final');
+        sendForCorrection(text);
+    } else {
+        // Partial: display immediately (no correction yet)
+        displayCaption(text, 'partial');
+    }
+};
+
+function displayCaption(text, type) {
+    const el = document.getElementById('caption');
+    el.textContent = text;
+    el.className = type === 'partial' ? 'caption-partial' : 'caption-final';
+}
+```
+
+**Expected Gain**: Perceived latency drops to near-zero for partials
+
+#### 3.3 WebSocket for Bidirectional Streaming
+**Problem**: HTTP POST/response has round-trip overhead.
+**Solution**: Persistent WebSocket connection for caption updates.
+
+```python
+# Server: Add WebSocket endpoint
+@app.websocket("/ws/caption")
+async def caption_websocket(websocket):
+    await websocket.accept()
+    while True:
+        data = await websocket.receive_json()
+        result = process_caption(data["text"])
+        await websocket.send_json(result)
+```
+
+```javascript
+// Client: Persistent connection
+const ws = new WebSocket('ws://localhost:8080/ws/caption');
+
+ws.onmessage = (event) => {
+    const result = JSON.parse(event.data);
+    updateCaptionDisplay(result);
+};
+
+function sendCaption(text, isFinal) {
+    ws.send(JSON.stringify({ text, is_final: isFinal }));
+}
+```
+
+**Expected Gain**: 20-50ms reduction (no HTTP overhead)
+
+---
+
+### PHASE 4: Display Pipeline Optimization (Medium Impact)
+
+#### 4.1 Direct DOM Updates (Bypass React)
+**Problem**: React's reconciliation adds latency for simple text updates.
+**Solution**: Direct DOM manipulation for caption display.
+
+```javascript
+// Instead of React state updates:
+const captionEl = document.getElementById('caption-display');
+const rawEl = document.getElementById('raw-display');
+
+function updateCaption(result) {
+    // Direct DOM - no React overhead
+    captionEl.textContent = result.corrected;
+    rawEl.textContent = result.raw;
+
+    // Highlight corrections with CSS
+    if (result.corrections.length > 0) {
+        captionEl.classList.add('has-corrections');
+    }
+}
+```
+
+**Expected Gain**: 10-30ms reduction
+
+#### 4.2 RequestAnimationFrame Batching
+**Problem**: Multiple rapid updates cause layout thrashing.
+**Solution**: Batch updates to next animation frame.
+
+```javascript
+let pendingUpdate = null;
+
+function scheduleUpdate(result) {
+    pendingUpdate = result;
+    if (!updateScheduled) {
+        updateScheduled = true;
+        requestAnimationFrame(() => {
+            if (pendingUpdate) {
+                updateCaption(pendingUpdate);
+            }
+            updateScheduled = false;
+        });
+    }
+}
+```
+
+**Expected Gain**: Smoother display, prevents dropped frames
+
+---
+
+### PHASE 5: Audio Pipeline Optimization (Low-Medium Impact)
+
+#### 5.1 Priority Audio Thread
+**Problem**: Audio callback competes with other Python threads.
+**Solution**: Set thread priority for audio processing.
+
+```python
+import threading
+
+def start_audio_thread(self):
+    self.audio_thread = threading.Thread(
+        target=self._audio_loop,
+        daemon=True
+    )
+    # Set higher priority on supported platforms
+    try:
+        import os
+        os.nice(-10)  # Higher priority (requires sudo)
+    except:
+        pass
+    self.audio_thread.start()
+```
+
+#### 5.2 Ring Buffer for Audio
+**Problem**: List append/copy has overhead.
+**Solution**: Use pre-allocated ring buffer.
+
+```python
+import numpy as np
+
+class RingBuffer:
+    def __init__(self, capacity):
+        self.buffer = np.zeros(capacity, dtype=np.float32)
+        self.write_pos = 0
+        self.read_pos = 0
+
+    def write(self, data):
+        # Zero-copy write to pre-allocated buffer
+        n = len(data)
+        end = self.write_pos + n
+        if end <= len(self.buffer):
+            self.buffer[self.write_pos:end] = data
+        else:
+            # Wrap around
+            first = len(self.buffer) - self.write_pos
+            self.buffer[self.write_pos:] = data[:first]
+            self.buffer[:n-first] = data[first:]
+        self.write_pos = end % len(self.buffer)
+```
+
+**Expected Gain**: 5-10ms reduction, more consistent timing
+
+---
+
+### Implementation Priority
+
+| Phase | Priority | Effort | Impact | Dependencies |
+|-------|----------|--------|--------|--------------|
+| 1.1 Streaming Whisper | HIGH | Medium | 100-200ms | None |
+| 2.2 Tiered Correction | HIGH | Low | 20-30ms | None |
+| 3.2 Optimistic Partial | HIGH | Low | Perceived 200ms+ | None |
+| 3.3 WebSocket | MEDIUM | Medium | 20-50ms | websockets lib |
+| 2.1 Pre-compiled Patterns | MEDIUM | Low | 5-15ms | None |
+| 1.2 ONNX Runtime | MEDIUM | Medium | 50-100ms | onnxruntime |
+| 4.1 Direct DOM | LOW | Low | 10-30ms | None |
+| 1.3 Whisper.cpp | LOW | High | 100-200ms | Native build |
+
+### Target Performance After Optimization
+
+| Mode | Current | Target | Improvement |
+|------|---------|--------|-------------|
+| Browser Speech (partial) | 200ms | **50ms** | 4x faster |
+| Browser Speech (final) | 400ms | **200ms** | 2x faster |
+| Whisper (first word) | 400ms | **200ms** | 2x faster |
+| Whisper (complete) | 800ms | **400ms** | 2x faster |
+| Local Whisper API | 800ms | **300ms** | 2.6x faster |
+
+### Quick Wins (Implement First)
+1. **Pre-compiled regex patterns** - 30 min, 5-15ms gain
+2. **LRU correction cache** - 1 hour, variable gain
+3. **Optimistic partial display** - 1 hour, huge perceived improvement
+4. **Tiered correction (fast path)** - 2 hours, 20-30ms gain
+
+---
+
 #### Ultra-Low Latency Whisper Engine (v4.2.4 - January 2, 2026)
 **MAJOR REWRITE** - Complete overhaul of Whisper engine for near-instant captions:
 
