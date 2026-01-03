@@ -4512,6 +4512,16 @@ speechmatics_buffer = ""  # Rolling buffer for Speechmatics
 local_whisper_api_buffer = ""
 browser_caption_buffer = ""  # Rolling buffer for Browser Speech API
 
+# Browser Speech API latency tracking
+browser_caption_stats = {
+    "last_caption_time": 0,           # When last caption was received
+    "caption_count": 0,               # Total captions received
+    "avg_interval_ms": 0,             # Average time between captions
+    "current_silence_ms": 0,          # Time since last caption
+    "is_stale": False,                # True if no caption for > 3 seconds
+    "session_start_time": 0,          # When captioning started
+}
+
 # =============================================================================
 # ROLLING CAPTION BUFFER - Keeps text visible longer (up to 2 lines)
 # =============================================================================
@@ -4736,8 +4746,13 @@ class Handler(http.server.SimpleHTTPRequestHandler):
 
         # Caption endpoints
         if path == '/api/caption':
-            # Debug: log every caption request (uncomment to debug)
-            # print(f"   [API] Caption requested. Current: '{caption_state.get('caption', '')[:40]}...'")
+            # Update browser stats - calculate silence duration
+            if browser_caption_stats["last_caption_time"] > 0:
+                silence_ms = (time.time() - browser_caption_stats["last_caption_time"]) * 1000
+                browser_caption_stats["current_silence_ms"] = silence_ms
+                browser_caption_stats["is_stale"] = silence_ms > 3000  # Stale if > 3 seconds
+                caption_state["browser_stats"] = browser_caption_stats.copy()
+
             self.send_json({**caption_state, "session": session_manager.get_status()})
         
         elif path == '/api/info':
@@ -4969,7 +4984,7 @@ class Handler(http.server.SimpleHTTPRequestHandler):
                 pass
 
     def _handle_post(self):
-        global whisper_buffer, speechmatics_buffer, local_whisper_api_buffer, browser_caption_buffer, caption_state
+        global whisper_buffer, speechmatics_buffer, local_whisper_api_buffer, browser_caption_buffer, caption_state, browser_caption_stats
         path = urlparse(self.path).path
         data = self.read_json()
 
@@ -4978,6 +4993,30 @@ class Handler(http.server.SimpleHTTPRequestHandler):
             if 'caption' in data:
                 new_text = data['caption'].strip()
                 is_final = data.get('is_final', True)
+
+                # Track browser caption timing for latency monitoring
+                now = time.time()
+                if browser_caption_stats["session_start_time"] == 0:
+                    browser_caption_stats["session_start_time"] = now
+
+                if browser_caption_stats["last_caption_time"] > 0:
+                    interval_ms = (now - browser_caption_stats["last_caption_time"]) * 1000
+                    # Update rolling average
+                    count = browser_caption_stats["caption_count"]
+                    if count > 0:
+                        browser_caption_stats["avg_interval_ms"] = (
+                            (browser_caption_stats["avg_interval_ms"] * count + interval_ms) / (count + 1)
+                        )
+                    else:
+                        browser_caption_stats["avg_interval_ms"] = interval_ms
+
+                browser_caption_stats["last_caption_time"] = now
+                browser_caption_stats["caption_count"] += 1
+                browser_caption_stats["current_silence_ms"] = 0
+                browser_caption_stats["is_stale"] = False
+
+                # Include stats in caption_state for frontend
+                caption_state["browser_stats"] = browser_caption_stats.copy()
 
                 if is_final and new_text:
                     # Save to session FIRST (just this segment)
