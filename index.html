@@ -6173,9 +6173,12 @@
             // Whisper state
             const [whisperDevices, setWhisperDevices] = useState([]);
             const [selectedDevice, setSelectedDevice] = useState('');
-            const [selectedModel, setSelectedModel] = useState('base');
+            const [selectedModel, setSelectedModel] = useState('tiny.en');
             const [modelLoading, setModelLoading] = useState(false);
             const [modelLoaded, setModelLoaded] = useState(false);
+            const [whisperGpuAvailable, setWhisperGpuAvailable] = useState(false);
+            const [whisperVadAvailable, setWhisperVadAvailable] = useState(false);
+            const [whisperAvgLatency, setWhisperAvgLatency] = useState(0);
 
             // Speechmatics state
             const [speechmaticsRunning, setSpeechmaticsRunning] = useState(false);
@@ -6431,7 +6434,7 @@
                         .catch(err => console.error('Error fetching suggestions:', err));
                 }, 500);
 
-                // Fetch Whisper devices on mount
+                // Fetch Whisper devices and status on mount
                 fetch('/api/whisper/devices')
                     .then(r => r.json())
                     .then(data => {
@@ -6443,6 +6446,18 @@
                         }
                     })
                     .catch(err => console.error('Error fetching devices:', err));
+
+                // Check Whisper GPU and VAD availability
+                fetch('/api/whisper/status')
+                    .then(r => r.json())
+                    .then(data => {
+                        setWhisperGpuAvailable(data.gpu_available || false);
+                        setWhisperVadAvailable(data.silero_vad_available || false);
+                        if (data.avg_latency_ms) {
+                            setWhisperAvgLatency(data.avg_latency_ms);
+                        }
+                    })
+                    .catch(err => console.error('Error checking Whisper status:', err));
 
                 // Check Speechmatics status on mount
                 fetch('/api/speechmatics/status')
@@ -6845,6 +6860,13 @@
                     setModelLoading(false);
                     if (data.status === 'ok') {
                         setModelLoaded(true);
+                        // Update GPU and VAD status from response
+                        if (data.gpu_accelerated !== undefined) {
+                            setWhisperGpuAvailable(data.gpu_accelerated);
+                        }
+                        if (data.vad_available !== undefined) {
+                            setWhisperVadAvailable(data.vad_available);
+                        }
                         // Auto-start whisper after model loads if requested
                         if (autoStart) {
                             setTimeout(() => {
@@ -6856,7 +6878,7 @@
                             }, 100);
                         }
                     } else if (data.error) {
-                        alert(`Whisper Error: ${data.error}\n\nMake sure you have installed:\npip3 install faster-whisper sounddevice numpy`);
+                        alert(`Whisper Error: ${data.error}\n\nMake sure you have installed:\npip3 install faster-whisper sounddevice numpy\n\nFor GPU acceleration: pip3 install torch`);
                     }
                 })
                 .catch(err => {
@@ -8500,9 +8522,14 @@
                                                     onChange={(e) => { setSelectedModel(e.target.value); setModelLoaded(false); }}
                                                     style={{width: 'auto', padding: '10px 12px'}}>
                                                     <option value="tiny">Tiny (fastest)</option>
+                                                    <option value="tiny.en">Tiny.en (fast, English)</option>
                                                     <option value="base">Base (balanced)</option>
+                                                    <option value="base.en">Base.en (balanced, English)</option>
                                                     <option value="small">Small (accurate)</option>
+                                                    <option value="small.en">Small.en (accurate, English)</option>
                                                     <option value="medium">Medium (best)</option>
+                                                    <option value="medium.en">Medium.en (best, English)</option>
+                                                    <option value="large-v3">Large-v3 (highest quality)</option>
                                                 </select>
                                                 {/* Step 1: Load Model button (shown when model not loaded) */}
                                                 {!modelLoaded && !whisperRunning && (
@@ -8526,6 +8553,31 @@
                                                     }}>
                                                         ✓ Ready
                                                     </span>
+                                                )}
+                                                {/* GPU and VAD status badges */}
+                                                {modelLoaded && (
+                                                    <div style={{display: 'flex', gap: '4px', marginLeft: '4px'}}>
+                                                        <span style={{
+                                                            fontSize: '10px',
+                                                            color: whisperGpuAvailable ? '#4CAF50' : '#888',
+                                                            background: whisperGpuAvailable ? 'rgba(76, 175, 80, 0.15)' : 'rgba(136, 136, 136, 0.15)',
+                                                            padding: '3px 6px',
+                                                            borderRadius: '3px',
+                                                            fontWeight: '600'
+                                                        }}>
+                                                            {whisperGpuAvailable ? '🚀 GPU' : '💻 CPU'}
+                                                        </span>
+                                                        <span style={{
+                                                            fontSize: '10px',
+                                                            color: whisperVadAvailable ? '#4CAF50' : '#888',
+                                                            background: whisperVadAvailable ? 'rgba(76, 175, 80, 0.15)' : 'rgba(136, 136, 136, 0.15)',
+                                                            padding: '3px 6px',
+                                                            borderRadius: '3px',
+                                                            fontWeight: '600'
+                                                        }}>
+                                                            {whisperVadAvailable ? '✓ VAD' : '○ VAD'}
+                                                        </span>
+                                                    </div>
                                                 )}
                                             </div>
                                         )}

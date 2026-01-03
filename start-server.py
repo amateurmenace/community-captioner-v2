@@ -275,6 +275,52 @@ try:
 except ImportError:
     pass
 
+# Silero VAD for Voice Activity Detection (optional but recommended)
+SILERO_VAD_AVAILABLE = False
+silero_vad_model = None
+silero_get_speech_timestamps = None
+TORCH_AVAILABLE = False
+try:
+    import torch
+    TORCH_AVAILABLE = True
+except ImportError:
+    pass
+
+def load_silero_vad():
+    """Load Silero VAD model for voice activity detection"""
+    global silero_vad_model, silero_get_speech_timestamps, SILERO_VAD_AVAILABLE
+    if not TORCH_AVAILABLE:
+        print("⚠️ Silero VAD requires torch. Install with: pip3 install torch")
+        return False
+    try:
+        import torch
+        # Load model and utility functions
+        model, utils = torch.hub.load(
+            repo_or_dir='snakers4/silero-vad',
+            model='silero_vad',
+            force_reload=False,
+            onnx=True  # Use ONNX for faster inference without torchaudio dependency
+        )
+        silero_vad_model = model
+        (silero_get_speech_timestamps, _, _, _, _) = utils
+        SILERO_VAD_AVAILABLE = True
+        print("✅ Silero VAD loaded (ONNX mode)")
+        return True
+    except Exception as e:
+        # Try alternative loading method
+        try:
+            import torch
+            silero_vad_model = torch.jit.load(torch.hub.load_state_dict_from_url(
+                'https://models.silero.ai/vad_models/silero_vad.jit',
+                map_location='cpu'
+            ))
+            SILERO_VAD_AVAILABLE = True
+            print("✅ Silero VAD loaded (JIT fallback)")
+            return True
+        except Exception as e2:
+            print(f"⚠️ Silero VAD not available: {e}. Using energy-based VAD.")
+            return False
+
 # =============================================================================
 # ADVANCED RAG CAPTION ENGINE v4.0 - Semantic matching with learning
 # =============================================================================
@@ -2207,59 +2253,153 @@ class SessionManager:
 
 
 # =============================================================================
-# WHISPER ENGINE
+# WHISPER ENGINE - Ultra-Low Latency Real-Time Captioning
 # =============================================================================
 
 class WhisperEngine:
-    """Local speech-to-text using faster-whisper"""
-    
+    """
+    Ultra-optimized local speech-to-text using faster-whisper.
+
+    Key optimizations for INSTANT captions:
+    1. Continuous streaming with overlapping windows
+    2. Energy-based VAD that's fast and reliable
+    3. Immediate transcription on speech detection (no waiting)
+    4. Rolling buffer with incremental output
+    5. Aggressive settings for minimum latency
+    """
+
     MODEL_INFO = {
-        "tiny": {"size": "75 MB", "speed": "Fastest", "quality": "Basic"},
-        "base": {"size": "150 MB", "speed": "Fast", "quality": "Good"},
-        "small": {"size": "500 MB", "speed": "Medium", "quality": "Better"},
-        "medium": {"size": "1.5 GB", "speed": "Slow", "quality": "Great"},
+        "tiny": {"size": "75 MB", "speed": "Instant", "quality": "Basic", "latency": "~0.3s"},
+        "tiny.en": {"size": "75 MB", "speed": "Instant", "quality": "Good (English)", "latency": "~0.3s"},
+        "base": {"size": "150 MB", "speed": "Very Fast", "quality": "Good", "latency": "~0.5s"},
+        "base.en": {"size": "150 MB", "speed": "Very Fast", "quality": "Better (English)", "latency": "~0.5s"},
+        "small": {"size": "500 MB", "speed": "Fast", "quality": "Better", "latency": "~0.8s"},
+        "small.en": {"size": "500 MB", "speed": "Fast", "quality": "Great (English)", "latency": "~0.8s"},
+        "medium": {"size": "1.5 GB", "speed": "Medium", "quality": "Great", "latency": "~1.5s"},
+        "medium.en": {"size": "1.5 GB", "speed": "Medium", "quality": "Excellent (English)", "latency": "~1.5s"},
+        "large-v3": {"size": "3 GB", "speed": "Slow", "quality": "Best", "latency": "~2.5s"},
     }
-    
+
     def __init__(self):
         self.model = None
         self.model_name = None
         self.is_running = False
         self.text_callback = None
         self.sample_rate = 16000
-        self.chunk_duration = 3.0
         self.stream = None
         self.thread = None
         self.audio_buffer = []
         self.buffer_lock = threading.Lock()
-        
+
+        # AGGRESSIVE settings for ultra-low latency
+        self.min_chunk_duration = 0.4   # 400ms minimum - very fast!
+        self.max_chunk_duration = 1.5   # Force output after 1.5s max
+        self.silence_threshold = 0.008  # Lower threshold = more sensitive
+        self.speech_pad_ms = 100        # Less padding = faster
+
+        # GPU acceleration settings
+        self.device = "cpu"
+        self.compute_type = "int8"
+        self.gpu_available = False
+
+        # Performance tracking
+        self.avg_latency_ms = 0
+        self.transcription_count = 0
+        self.last_output_time = 0
+
+        # Streaming state
+        self.previous_text = ""
+        self.speech_energy_history = deque(maxlen=10)  # Track energy levels
+
+        self._detect_gpu()
+
+    def _detect_gpu(self):
+        """Detect if GPU acceleration is available (CUDA or Apple MPS)"""
+        try:
+            import torch
+            if torch.cuda.is_available():
+                self.gpu_available = True
+                self.device = "cuda"
+                self.compute_type = "float16"
+                gpu_name = torch.cuda.get_device_name(0)
+                print(f"🚀 NVIDIA GPU detected: {gpu_name}")
+            elif hasattr(torch.backends, 'mps') and torch.backends.mps.is_available():
+                # Apple Silicon (M1/M2/M3) - faster-whisper doesn't support MPS directly
+                # but we can still use optimized CPU with more threads
+                self.gpu_available = False  # MPS not supported by faster-whisper
+                self.device = "cpu"
+                self.compute_type = "int8"  # int8 is fastest on Apple Silicon
+                print("🍎 Apple Silicon detected - using optimized CPU (int8)")
+                print("   Note: faster-whisper doesn't support MPS, but int8 is fast on M-series")
+            else:
+                print("💻 No GPU detected - using CPU (int8 quantized)")
+        except ImportError:
+            print("💻 PyTorch not available - using CPU (int8)")
+        except Exception as e:
+            print(f"💻 GPU detection failed: {e}")
+
     def get_status(self):
         missing = []
         if not WHISPER_AVAILABLE: missing.append("faster-whisper")
         if not AUDIO_AVAILABLE: missing.append("sounddevice")
         if not NUMPY_AVAILABLE: missing.append("numpy")
-        
+
         return {
             "available": WHISPER_AVAILABLE and AUDIO_AVAILABLE and NUMPY_AVAILABLE,
             "model_loaded": self.model is not None,
             "model_name": self.model_name,
             "is_running": self.is_running,
             "missing_packages": missing,
-            "models": self.MODEL_INFO
+            "models": self.MODEL_INFO,
+            "gpu_available": self.gpu_available,
+            "device": self.device,
+            "compute_type": self.compute_type,
+            "avg_latency_ms": round(self.avg_latency_ms, 1),
+            "min_chunk_ms": int(self.min_chunk_duration * 1000),
+            "max_chunk_ms": int(self.max_chunk_duration * 1000)
         }
-    
-    def load_model(self, model_name="base"):
+
+    def load_model(self, model_name="tiny.en"):
+        """Load Whisper model - defaults to tiny.en for fastest response"""
         if not WHISPER_AVAILABLE:
-            return {"error": "faster-whisper not installed"}
-        
+            return {"error": "faster-whisper not installed. Run: pip3 install faster-whisper"}
+
         try:
-            print(f"🔄 Loading Whisper model '{model_name}'...")
-            self.model = WhisperModel(model_name, device="cpu", compute_type="int8")
+            # Detect CPU cores for optimal threading
+            import os
+            cpu_count = os.cpu_count() or 4
+            # Use more threads on Apple Silicon (it's efficient with many threads)
+            cpu_threads = min(cpu_count, 8)  # Cap at 8 for stability
+
+            print(f"🔄 Loading Whisper model '{model_name}' on {self.device} ({cpu_threads} threads)...")
+
+            self.model = WhisperModel(
+                model_name,
+                device=self.device,
+                compute_type=self.compute_type,
+                cpu_threads=cpu_threads,
+                num_workers=1  # Single worker for lowest latency
+            )
             self.model_name = model_name
-            print(f"✅ Model '{model_name}' ready!")
-            return {"status": "ok", "model": model_name}
+
+            device_info = "GPU" if self.gpu_available else f"CPU ({cpu_threads} threads)"
+            print(f"✅ Model '{model_name}' ready on {device_info}!")
+
+            return {
+                "status": "ok",
+                "model": model_name,
+                "device": self.device,
+                "gpu_accelerated": self.gpu_available,
+                "cpu_threads": cpu_threads
+            }
         except Exception as e:
+            if self.device == "cuda":
+                print(f"⚠️ GPU failed, trying CPU: {e}")
+                self.device = "cpu"
+                self.compute_type = "int8"
+                return self.load_model(model_name)
             return {"error": str(e)}
-    
+
     def get_audio_devices(self):
         if not AUDIO_AVAILABLE:
             return []
@@ -2275,50 +2415,165 @@ class WhisperEngine:
         except:
             pass
         return devices
-    
+
     def _audio_callback(self, indata, frames, time_info, status):
+        """Callback for audio input"""
         with self.buffer_lock:
             self.audio_buffer.append(indata.copy())
-    
+
+    def _get_audio_energy(self, audio: np.ndarray) -> float:
+        """Fast energy calculation for VAD"""
+        return np.sqrt(np.mean(audio ** 2))
+
+    def _has_speech(self, audio: np.ndarray) -> bool:
+        """Fast energy-based speech detection with adaptive threshold"""
+        energy = self._get_audio_energy(audio)
+        self.speech_energy_history.append(energy)
+
+        # Adaptive threshold based on recent history
+        if len(self.speech_energy_history) >= 5:
+            avg_energy = sum(self.speech_energy_history) / len(self.speech_energy_history)
+            threshold = max(self.silence_threshold, avg_energy * 0.3)
+        else:
+            threshold = self.silence_threshold
+
+        return energy > threshold
+
     def _transcription_loop(self):
-        samples_needed = int(self.sample_rate * self.chunk_duration)
+        """
+        Ultra-fast transcription loop optimized for minimum latency.
+
+        Strategy:
+        - Transcribe immediately when we have enough audio with speech
+        - Don't wait for silence - output as soon as possible
+        - Use fastest possible Whisper settings
+        """
+        min_samples = int(self.sample_rate * self.min_chunk_duration)
+        max_samples = int(self.sample_rate * self.max_chunk_duration)
+
+        # Use a numpy array for accumulated audio (more efficient)
+        audio_accumulator = np.array([], dtype=np.float32)
+        has_active_speech = False
+        speech_start_time = 0
+        last_speech_time = 0
 
         while self.is_running:
             try:
-                time.sleep(0.1)
+                time.sleep(0.02)  # 20ms polling for responsiveness
+
+                # Get buffered audio
                 with self.buffer_lock:
                     if not self.audio_buffer:
                         continue
-                    total = sum(len(c) for c in self.audio_buffer)
-                    if total < samples_needed:
-                        continue
-                    audio = np.concatenate(self.audio_buffer).flatten().astype(np.float32)
+                    chunks = self.audio_buffer.copy()
                     self.audio_buffer = []
 
-                print(f"🎧 Processing {len(audio)} audio samples...")
-                if self.model and len(audio) > 0:
-                    segments, _ = self.model.transcribe(audio, beam_size=5, language="en", vad_filter=True)
+                # Flatten and accumulate audio chunks
+                for chunk in chunks:
+                    flat_chunk = chunk.flatten().astype(np.float32)
+                    audio_accumulator = np.concatenate([audio_accumulator, flat_chunk])
+
+                total_samples = len(audio_accumulator)
+                if total_samples == 0:
+                    continue
+
+                # Check for speech in recent 200ms
+                check_samples = min(int(self.sample_rate * 0.2), total_samples)
+                recent_audio = audio_accumulator[-check_samples:]
+                is_speaking = self._has_speech(recent_audio)
+
+                now = time.time()
+
+                if is_speaking:
+                    if not has_active_speech:
+                        has_active_speech = True
+                        speech_start_time = now
+                    last_speech_time = now
+
+                # Decide when to transcribe
+                should_transcribe = False
+                reason = ""
+
+                if has_active_speech:
+                    speech_duration = now - speech_start_time
+                    silence_duration = now - last_speech_time
+
+                    # Transcribe if:
+                    # 1. We have minimum audio AND silence detected (speech ended)
+                    if total_samples >= min_samples and silence_duration > 0.25:
+                        should_transcribe = True
+                        reason = "speech_ended"
+                    # 2. Max duration reached (force output for long speech)
+                    elif total_samples >= max_samples:
+                        should_transcribe = True
+                        reason = "max_duration"
+                    # 3. Been speaking for a while, output partial
+                    elif total_samples >= min_samples and speech_duration > 0.8:
+                        should_transcribe = True
+                        reason = "partial_output"
+
+                if should_transcribe and self.model:
+                    transcription_start = time.time()
+
+                    # FASTEST possible settings
+                    segments, _ = self.model.transcribe(
+                        audio_accumulator,
+                        beam_size=1,              # Fastest - greedy decoding
+                        best_of=1,
+                        language="en",
+                        vad_filter=False,         # We already did VAD
+                        condition_on_previous_text=False,
+                        compression_ratio_threshold=2.4,
+                        log_prob_threshold=-1.0,
+                        no_speech_threshold=0.5,
+                        without_timestamps=True,
+                        temperature=0.0,          # Deterministic = faster
+                    )
+
                     text = " ".join(seg.text for seg in segments).strip()
-                    print(f"🔤 Transcribed: '{text}'")
+
+                    # Track performance
+                    transcription_time = (time.time() - transcription_start) * 1000
+                    self.transcription_count += 1
+                    self.avg_latency_ms = (
+                        (self.avg_latency_ms * (self.transcription_count - 1) + transcription_time)
+                        / self.transcription_count
+                    )
+
+                    # Output text
                     if text and self.text_callback:
-                        print(f"📞 Calling callback with text...")
                         self.text_callback(text)
-                    elif not text:
-                        print(f"⚠️ Empty transcription result")
+                        self.last_output_time = now
+
+                    # Reset state
+                    if reason == "speech_ended":
+                        audio_accumulator = np.array([], dtype=np.float32)
+                        has_active_speech = False
+                    elif reason == "max_duration" or reason == "partial_output":
+                        # Keep some audio for context continuity
+                        keep_samples = int(self.sample_rate * 0.3)
+                        if total_samples > keep_samples:
+                            audio_accumulator = audio_accumulator[-keep_samples:].copy()
+                        # Stay in speech mode
+
             except Exception as e:
                 if self.is_running:
                     print(f"⚠️ Transcription error: {e}")
-                    time.sleep(1)
-    
+                    import traceback
+                    traceback.print_exc()
+                    time.sleep(0.3)
+                    audio_accumulator = np.array([], dtype=np.float32)
+                    has_active_speech = False
+
     def start(self, device_id=None, callback=None):
         if not AUDIO_AVAILABLE or not NUMPY_AVAILABLE:
-            return {"error": "Missing packages"}
+            return {"error": "Missing packages: sounddevice and numpy required"}
         if not self.model:
-            return {"error": "No model loaded"}
+            return {"error": "No model loaded. Load a model first."}
         if self.is_running:
             return {"error": "Already running"}
 
-        # Clean up any existing stream first to prevent bus error
+        # Clean up existing stream
         if self.stream is not None:
             try:
                 self.stream.stop()
@@ -2330,23 +2585,37 @@ class WhisperEngine:
         self.text_callback = callback
         self.is_running = True
         self.audio_buffer = []
+        self.avg_latency_ms = 0
+        self.transcription_count = 0
+        self.speech_energy_history.clear()
 
         try:
+            # Small blocksize for responsiveness
             self.stream = sd.InputStream(
-                device=device_id, channels=1, samplerate=self.sample_rate,
-                callback=self._audio_callback, blocksize=int(self.sample_rate * 0.1)
+                device=device_id,
+                channels=1,
+                samplerate=self.sample_rate,
+                callback=self._audio_callback,
+                blocksize=int(self.sample_rate * 0.02)  # 20ms blocks!
             )
             self.stream.start()
             self.thread = threading.Thread(target=self._transcription_loop, daemon=True)
             self.thread.start()
-            print(f"🎤 Whisper listening...")
-            return {"status": "started"}
+
+            print(f"🎤 Whisper listening (ultra-low latency mode)...")
+            print(f"   Min chunk: {int(self.min_chunk_duration*1000)}ms, Max: {int(self.max_chunk_duration*1000)}ms")
+
+            return {
+                "status": "started",
+                "device": self.device,
+                "gpu_accelerated": self.gpu_available,
+                "min_latency_ms": int(self.min_chunk_duration * 1000)
+            }
         except Exception as e:
             self.is_running = False
-            if self.stream:
-                self.stream = None
+            self.stream = None
             return {"error": str(e)}
-    
+
     def stop(self):
         self.is_running = False
         if self.stream:
@@ -2356,31 +2625,51 @@ class WhisperEngine:
             except:
                 pass
             self.stream = None
-        return {"status": "stopped"}
-    
-    def transcribe_audio(self, audio_data, high_accuracy=False):
-        """Transcribe audio data for accuracy pass
 
-        Args:
-            audio_data: Audio data as numpy array
-            high_accuracy: If True, use higher beam_size for better accuracy
-        """
+        return {
+            "status": "stopped",
+            "avg_latency_ms": round(self.avg_latency_ms, 1),
+            "transcription_count": self.transcription_count
+        }
+
+    def transcribe_audio(self, audio_data, high_accuracy=False):
+        """Transcribe audio data for post-processing"""
         if not self.model:
             return {"error": "No model loaded"}
 
         try:
-            # Use higher beam_size for post-processing and video transcription
             beam_size = 10 if high_accuracy else 5
             segments, _ = self.model.transcribe(
                 audio_data,
                 beam_size=beam_size,
+                best_of=5 if high_accuracy else 2,
                 language="en",
                 vad_filter=True,
-                word_timestamps=high_accuracy  # More detailed for post-processing
+                word_timestamps=high_accuracy,
+                condition_on_previous_text=True
             )
             return {"text": " ".join(seg.text for seg in segments).strip()}
         except Exception as e:
             return {"error": str(e)}
+
+    def set_realtime_mode(self, enabled: bool = True):
+        """Configure for real-time vs accuracy"""
+        if enabled:
+            self.min_chunk_duration = 0.4
+            self.max_chunk_duration = 1.5
+        else:
+            self.min_chunk_duration = 1.5
+            self.max_chunk_duration = 4.0
+        return {"mode": "realtime" if enabled else "accuracy"}
+
+    def set_latency(self, min_ms: int = 400, max_ms: int = 1500):
+        """Adjust latency settings"""
+        self.min_chunk_duration = min_ms / 1000.0
+        self.max_chunk_duration = max_ms / 1000.0
+        return {
+            "min_chunk_ms": min_ms,
+            "max_chunk_ms": max_ms
+        }
 
 
 # =============================================================================
@@ -2835,8 +3124,8 @@ class LocalWhisperAPIEngine:
         self.process_thread = None
         self.audio_buffer = []
         self.buffer_lock = threading.Lock()
-        self.latency_manager = AdaptiveLatencyManager(max_latency_ms=2000)
-        self.chunk_duration = 2.0  # seconds of audio per API call
+        self.latency_manager = AdaptiveLatencyManager(max_latency_ms=1500)
+        self.chunk_duration = 0.8  # seconds of audio per API call (reduced from 2.0 for ultra-fast response)
 
     def get_status(self) -> Dict:
         """Get Local Whisper API engine status"""
@@ -2973,13 +3262,13 @@ class LocalWhisperAPIEngine:
         self.latency_manager.clear()
 
         try:
-            # Start audio input
+            # Start audio input with small blocksize for low latency
             self.stream = sd.InputStream(
                 device=device_id,
                 channels=1,
                 samplerate=self.sample_rate,
                 callback=self._audio_callback,
-                blocksize=int(self.sample_rate * 0.1)
+                blocksize=int(self.sample_rate * 0.02)  # 20ms blocks for ultra-low latency
             )
             self.stream.start()
 
@@ -4422,11 +4711,16 @@ class Handler(http.server.SimpleHTTPRequestHandler):
         elif path == '/api/speechmatics/status':
             self.send_json(speechmatics_engine.get_status())
 
+        # Local Whisper API status endpoint
+        elif path == '/api/localwhisper/status':
+            self.send_json(local_whisper_api_engine.get_status())
+
         # Latency stats endpoint
         elif path == '/api/latency/stats':
             self.send_json({
                 "global": latency_manager.get_stats(),
-                "speechmatics": speechmatics_engine.latency_manager.get_stats()
+                "speechmatics": speechmatics_engine.latency_manager.get_stats(),
+                "localwhisper": local_whisper_api_engine.latency_manager.get_stats()
             })
 
         # Server-Sent Events for real-time caption streaming (hardware encoder integration)
@@ -4927,6 +5221,34 @@ class Handler(http.server.SimpleHTTPRequestHandler):
             caption_state["whisper_running"] = False
             self.send_json(result)
 
+        elif path == '/api/whisper/mode':
+            # Set real-time vs accuracy mode
+            realtime = data.get('realtime', True)
+            result = whisper_engine.set_realtime_mode(realtime)
+            self.send_json(result)
+
+        elif path == '/api/whisper/settings':
+            # Update Whisper settings
+            if 'min_chunk_duration' in data:
+                whisper_engine.min_chunk_duration = float(data['min_chunk_duration'])
+            if 'max_chunk_duration' in data:
+                whisper_engine.max_chunk_duration = float(data['max_chunk_duration'])
+            if 'silence_threshold' in data:
+                whisper_engine.silence_threshold = float(data['silence_threshold'])
+            self.send_json({
+                "status": "ok",
+                "min_chunk_duration": whisper_engine.min_chunk_duration,
+                "max_chunk_duration": whisper_engine.max_chunk_duration,
+                "silence_threshold": whisper_engine.silence_threshold
+            })
+
+        elif path == '/api/whisper/latency':
+            # Quick latency adjustment
+            min_ms = data.get('min_ms', 400)
+            max_ms = data.get('max_ms', 1500)
+            result = whisper_engine.set_latency(min_ms, max_ms)
+            self.send_json(result)
+
         # Speechmatics controls
         elif path == '/api/speechmatics/status':
             self.send_json(speechmatics_engine.get_status())
@@ -4964,9 +5286,6 @@ class Handler(http.server.SimpleHTTPRequestHandler):
             self.send_json(result)
 
         # Local Whisper API controls
-        elif path == '/api/localwhisper/status':
-            self.send_json(local_whisper_api_engine.get_status())
-
         elif path == '/api/localwhisper/config':
             api_url = data.get('api_url')
             api_key = data.get('api_key', '')
@@ -5809,31 +6128,43 @@ def print_banner():
     embeddings_ok = EMBEDDINGS_AVAILABLE
     ffmpeg_ok = FFMPEG_AVAILABLE
     rag_status = "✅ Active" if caption_engine.rag_enabled else "⚪ Disabled"
+
+    # Detect platform for display
+    import platform
+    is_apple_silicon = platform.machine() == 'arm64' and platform.system() == 'Darwin'
+    if whisper_engine.gpu_available:
+        gpu_status = "🚀 GPU"
+    elif is_apple_silicon:
+        gpu_status = "🍎 M-chip"
+    else:
+        gpu_status = "💻 CPU"
+
+    latency_info = f"{int(whisper_engine.min_chunk_duration*1000)}-{int(whisper_engine.max_chunk_duration*1000)}ms"
     print(f"""
 ╔══════════════════════════════════════════════════════════════════════════════╗
-║              🎤 COMMUNITY CAPTIONER v4.0 - Advanced RAG Engine 🎤            ║
+║          🎤 COMMUNITY CAPTIONER v4.2.4 - Ultra-Low Latency Edition 🎤        ║
 ╠══════════════════════════════════════════════════════════════════════════════╣
 ║                                                                              ║
-║  CORE FEATURES:                                                              ║
-║    ⚡ Web Speech Mode     - Real-time browser captions (~200ms)              ║
-║    🎯 Whisper Mode        - Accurate local AI ({"✅ Ready" if whisper_ok else "❌ pip3 install faster-whisper":<24})  ║
-║    🧠 RAG Caption Engine  - Semantic matching ({rag_status:<24})   ║
-║    📚 Vector Embeddings   - Context-aware ({"✅ Ready" if embeddings_ok else "⚪ Optional":<24})  ║
+║  CAPTIONING MODES:                                                           ║
+║    ⚡ Browser Speech      - Instant (~200ms), requires Chrome/Edge           ║
+║    🎯 Whisper AI          - Local transcription ({"✅ Ready" if whisper_ok else "❌ pip3 install faster-whisper":<24})  ║
+║       └── {gpu_status} mode, {latency_info} chunks, tiny.en default                     ║
+║    ☁️  Speechmatics       - Cloud ASR (~300ms), requires API key             ║
 ║                                                                              ║
-║  AI FEATURES (v4.0):                                                         ║
+║  AI CAPTION ENGINE:                                                          ║
+║    🧠 RAG Corrections     - Semantic matching ({rag_status:<24})   ║
+║    📚 Vector Embeddings   - Context-aware ({"✅ Ready" if embeddings_ok else "⚪ Optional":<24})  ║
 ║    🔄 Real-time Learning  - Improves from corrections                        ║
+║                                                                              ║
+║  FEATURES:                                                                   ║
 ║    📝 Session Recording   - Audio + captions, SRT/VTT/TXT export             ║
 ║    📊 Analytics Dashboard - Word cloud, sentiment, topic analysis            ║
-║    📁 Knowledge Base      - PDF/DOCX ingestion, entity extraction            ║
 ║    🎬 Video Intelligence  - Highlight detection ({"✅ Ready" if ffmpeg_ok else "❌ Install ffmpeg":<24})  ║
-║    💾 Portable Engines    - Download/upload with learned patterns            ║
 ║                                                                              ║
 ╠══════════════════════════════════════════════════════════════════════════════╣
-║                                                                              ║
 ║  Control Panel:  http://localhost:{PORT}                                      ║
 ║  OBS Overlay:    http://localhost:{PORT}?overlay=true                         ║
 ║  Network:        http://{LOCAL_IP}:{PORT:<38}  ║
-║                                                                              ║
 ║  Press Ctrl+C to stop                                                        ║
 ╚══════════════════════════════════════════════════════════════════════════════╝
 """)
