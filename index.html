@@ -6414,6 +6414,18 @@
                             setCorrections(data.corrections || []);
                             setRecording(data.session?.recording || false);
                             setWhisperRunning(data.whisper_running || false);
+
+                            // Update latency from real data if available
+                            if (data.latency_stats) {
+                                setLatencyStats(data.latency_stats);
+                                // Update caption delay from real lag data (convert ms to seconds)
+                                const lagMs = data.latency_stats.current_lag_ms || 0;
+                                setCaptionDelay(lagMs / 1000);
+                            }
+                            // Also check is_behind flag
+                            if (data.is_behind) {
+                                console.warn('⚠️ Captions falling behind:', data.latency_stats);
+                            }
                         })
                         .catch(err => console.error('Error fetching caption:', err));
 
@@ -6662,12 +6674,11 @@
                     const variance = Math.random() * 15 - 7.5; // ±7.5%
                     setCaptionConfidence(Math.round(Math.max(75, Math.min(95, baseConfidence + variance))));
 
-                    // Simulate delay (browser: 0.1-0.5s, whisper: 2-4s)
-                    if (browserListening) {
+                    // Only simulate delay for Browser mode - Whisper provides real latency data
+                    if (browserListening && !whisperRunning) {
                         setCaptionDelay(0.1 + Math.random() * 0.4);
-                    } else {
-                        setCaptionDelay(2.0 + Math.random() * 2.0);
                     }
+                    // For Whisper mode, captionDelay is set from real latency_stats in the polling callback
                 }, 2000); // Update every 2 seconds
 
                 return () => clearInterval(interval);
@@ -9476,7 +9487,13 @@
                                 </div>
 
                                 {/* Caption Delay Indicator */}
-                                <div style={{background: 'rgba(255,255,255,0.1)', padding: '12px', borderRadius: '8px', marginTop: '12px'}}>
+                                <div style={{
+                                    background: captionDelay > 2 ? 'rgba(231, 110, 80, 0.3)' : 'rgba(255,255,255,0.1)',
+                                    padding: '12px',
+                                    borderRadius: '8px',
+                                    marginTop: '12px',
+                                    border: captionDelay > 2 ? '1px solid rgba(231, 110, 80, 0.5)' : 'none'
+                                }}>
                                     <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center'}}>
                                         <div>
                                             <div style={{fontSize: '12px', opacity: 0.8}}>LATENCY</div>
@@ -9485,12 +9502,20 @@
                                             </div>
                                         </div>
                                         <div style={{fontSize: '24px'}}>
-                                            {captionDelay < 1 ? '⚡' : captionDelay < 3 ? '⏱️' : '🐌'}
+                                            {captionDelay < 1 ? '⚡' : captionDelay < 2 ? '⏱️' : '🐌'}
                                         </div>
                                     </div>
                                     <div style={{fontSize: '10px', opacity: 0.6, marginTop: '4px'}}>
-                                        {captionDelay < 1 ? 'Real-time' : captionDelay < 3 ? 'Near real-time' : 'Significant delay'}
+                                        {captionDelay < 0.5 ? 'Real-time' :
+                                         captionDelay < 1 ? 'Near real-time' :
+                                         captionDelay < 2 ? 'Slight delay' :
+                                         '⚠️ Falling behind - auto catch-up active'}
                                     </div>
+                                    {latencyStats && latencyStats.catch_up_events > 0 && (
+                                        <div style={{fontSize: '10px', opacity: 0.7, marginTop: '6px', color: '#F0B429'}}>
+                                            Catch-up events: {latencyStats.catch_up_events} ({(latencyStats.dropped_audio_ms / 1000).toFixed(1)}s audio dropped)
+                                        </div>
+                                    )}
                                 </div>
 
                                 {/* Session Learning Stats */}

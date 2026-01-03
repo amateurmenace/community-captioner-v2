@@ -2311,6 +2311,15 @@ class WhisperEngine:
         self.previous_text = ""
         self.speech_energy_history = deque(maxlen=10)  # Track energy levels
 
+        # LATENCY TRACKING - detect when we're falling behind
+        self.audio_start_time = 0           # When audio capture started
+        self.total_audio_received_ms = 0    # Total audio duration received
+        self.total_audio_processed_ms = 0   # Total audio duration processed
+        self.current_lag_ms = 0             # How far behind we are
+        self.dropped_audio_ms = 0           # Total audio dropped to catch up
+        self.max_allowed_lag_ms = 2000      # Max lag before aggressive catch-up
+        self.catch_up_events = 0            # Number of times we had to catch up
+
         self._detect_gpu()
 
     def _detect_gpu(self):
@@ -2356,7 +2365,18 @@ class WhisperEngine:
             "compute_type": self.compute_type,
             "avg_latency_ms": round(self.avg_latency_ms, 1),
             "min_chunk_ms": int(self.min_chunk_duration * 1000),
-            "max_chunk_ms": int(self.max_chunk_duration * 1000)
+            "max_chunk_ms": int(self.max_chunk_duration * 1000),
+            # Latency tracking
+            "current_lag_ms": round(self.current_lag_ms, 0),
+            "dropped_audio_ms": round(self.dropped_audio_ms, 0),
+            "catch_up_events": self.catch_up_events,
+            "is_behind": self.current_lag_ms > 1000,  # True if > 1 second behind
+            "latency_stats": {
+                "current_lag_ms": round(self.current_lag_ms, 0),
+                "dropped_audio_ms": round(self.dropped_audio_ms, 0),
+                "catch_up_events": self.catch_up_events,
+                "max_allowed_lag_ms": self.max_allowed_lag_ms
+            }
         }
 
     def load_model(self, model_name="tiny.en"):
@@ -2417,9 +2437,17 @@ class WhisperEngine:
         return devices
 
     def _audio_callback(self, indata, frames, time_info, status):
-        """Callback for audio input"""
+        """Callback for audio input with latency tracking"""
+        # Track how much audio we've received
+        audio_duration_ms = (frames / self.sample_rate) * 1000
+        self.total_audio_received_ms += audio_duration_ms
+
         with self.buffer_lock:
-            self.audio_buffer.append(indata.copy())
+            self.audio_buffer.append({
+                "audio": indata.copy(),
+                "timestamp": time.time(),
+                "duration_ms": audio_duration_ms
+            })
 
     def _get_audio_energy(self, audio: np.ndarray) -> float:
         """Fast energy calculation for VAD"""
@@ -2447,12 +2475,14 @@ class WhisperEngine:
         - Transcribe immediately when we have enough audio with speech
         - Don't wait for silence - output as soon as possible
         - Use fastest possible Whisper settings
+        - CATCH UP: Drop old audio if falling behind real-time
         """
         min_samples = int(self.sample_rate * self.min_chunk_duration)
         max_samples = int(self.sample_rate * self.max_chunk_duration)
 
         # Use a numpy array for accumulated audio (more efficient)
         audio_accumulator = np.array([], dtype=np.float32)
+        oldest_audio_timestamp = None  # Track age of oldest audio in accumulator
         has_active_speech = False
         speech_start_time = 0
         last_speech_time = 0
@@ -2468,21 +2498,61 @@ class WhisperEngine:
                     chunks = self.audio_buffer.copy()
                     self.audio_buffer = []
 
+                now = time.time()
+
+                # === LATENCY CHECK: Are we falling behind? ===
+                if chunks:
+                    oldest_chunk_time = chunks[0]["timestamp"]
+                    buffer_lag_ms = (now - oldest_chunk_time) * 1000
+
+                    # If buffer is too old, we're behind - need to catch up
+                    if buffer_lag_ms > self.max_allowed_lag_ms:
+                        # Calculate how much to drop
+                        dropped_ms = 0
+                        chunks_to_keep = []
+
+                        for chunk in reversed(chunks):
+                            chunk_age_ms = (now - chunk["timestamp"]) * 1000
+                            if chunk_age_ms <= self.max_allowed_lag_ms / 2:
+                                chunks_to_keep.insert(0, chunk)
+                            else:
+                                dropped_ms += chunk["duration_ms"]
+
+                        if dropped_ms > 0:
+                            self.dropped_audio_ms += dropped_ms
+                            self.catch_up_events += 1
+                            print(f"⚡ CATCH-UP: Dropped {dropped_ms:.0f}ms of old audio (was {buffer_lag_ms:.0f}ms behind)")
+
+                            # Also clear the accumulator - it has old audio too
+                            audio_accumulator = np.array([], dtype=np.float32)
+                            oldest_audio_timestamp = None
+                            has_active_speech = False
+
+                            chunks = chunks_to_keep
+
+                # Track oldest audio timestamp
+                if chunks and oldest_audio_timestamp is None:
+                    oldest_audio_timestamp = chunks[0]["timestamp"]
+
                 # Flatten and accumulate audio chunks
                 for chunk in chunks:
-                    flat_chunk = chunk.flatten().astype(np.float32)
+                    audio_data = chunk["audio"]
+                    flat_chunk = audio_data.flatten().astype(np.float32)
                     audio_accumulator = np.concatenate([audio_accumulator, flat_chunk])
+                    self.total_audio_processed_ms += chunk["duration_ms"]
 
                 total_samples = len(audio_accumulator)
                 if total_samples == 0:
                     continue
 
+                # Update current lag estimate
+                if oldest_audio_timestamp:
+                    self.current_lag_ms = (now - oldest_audio_timestamp) * 1000
+
                 # Check for speech in recent 200ms
                 check_samples = min(int(self.sample_rate * 0.2), total_samples)
                 recent_audio = audio_accumulator[-check_samples:]
                 is_speaking = self._has_speech(recent_audio)
-
-                now = time.time()
 
                 if is_speaking:
                     if not has_active_speech:
@@ -2548,12 +2618,16 @@ class WhisperEngine:
                     # Reset state
                     if reason == "speech_ended":
                         audio_accumulator = np.array([], dtype=np.float32)
+                        oldest_audio_timestamp = None
                         has_active_speech = False
+                        self.current_lag_ms = 0  # We're caught up
                     elif reason == "max_duration" or reason == "partial_output":
                         # Keep some audio for context continuity
                         keep_samples = int(self.sample_rate * 0.3)
                         if total_samples > keep_samples:
                             audio_accumulator = audio_accumulator[-keep_samples:].copy()
+                            # Update timestamp estimate for kept audio
+                            oldest_audio_timestamp = now - (keep_samples / self.sample_rate)
                         # Stay in speech mode
 
             except Exception as e:
@@ -2588,6 +2662,14 @@ class WhisperEngine:
         self.avg_latency_ms = 0
         self.transcription_count = 0
         self.speech_energy_history.clear()
+
+        # Reset latency tracking
+        self.audio_start_time = time.time()
+        self.total_audio_received_ms = 0
+        self.total_audio_processed_ms = 0
+        self.current_lag_ms = 0
+        self.dropped_audio_ms = 0
+        self.catch_up_events = 0
 
         try:
             # Small blocksize for responsiveness
@@ -4483,11 +4565,17 @@ def on_whisper_text(text):
     caption_state["caption"] = result["corrected"]
     caption_state["corrections"] = result["corrections"]
 
+    # Include latency stats for frontend display
+    caption_state["latency_stats"] = whisper_engine.get_status().get("latency_stats", {})
+    caption_state["is_behind"] = whisper_engine.current_lag_ms > 1000
+
     # Save to session
     if session_manager.is_recording:
         session_manager.add_caption(result["raw"], result["corrected"], result["corrections"])
 
-    print(f"   📝 Whisper: {text}")
+    # Log with latency info
+    lag_info = f" [lag: {whisper_engine.current_lag_ms:.0f}ms]" if whisper_engine.current_lag_ms > 500 else ""
+    print(f"   📝 Whisper: {text}{lag_info}")
 
 def on_speechmatics_text(text, is_final=False):
     """
